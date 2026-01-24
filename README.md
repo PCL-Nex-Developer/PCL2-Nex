@@ -9,7 +9,7 @@
 专注于丰富的联机功能与启动器插件扩展
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Plugin](https://img.shields.io/badge/Framework-Nex--Plugin-yellow.svg)](https://github.com/Nex-Devloper/nex-plugin-framework)
+[![Plugin](https://img.shields.io/badge/Plugin-Nex--Plugin--Framework-yellow.svg)](https://github.com/Nex-Devloper/nex-plugin-framework)
 <br>
 [![Base](https://img.shields.io/badge/Base-PCL2-green.svg)](https://github.com/Meloong-Git/PCL)
 [![Base](https://img.shields.io/badge/Base-PCL2--CE-green.svg)](https://github.com/PCL-Community/PCL2-CE)
