@@ -54,5 +54,5 @@ PCL2-Nex 的诞生离不开以下优秀项目的开源贡献：
 ---
 
 <div align="center">
-    <strong>Nex Devloper</strong>
+    <strong>PCL-Nex-Developer</strong>
 </div>
