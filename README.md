@@ -4,7 +4,7 @@
 
 # PCL2-Nex
 
-**基于 PCL2 与 PCL2-CE 的 Minecraft 启动器**  
+**基于 PCL2 的 Minecraft 启动器**  
 专注于丰富的联机功能与插件扩展
 
 [![Plugin](https://img.shields.io/badge/Plugin_API-pcl2--nex--api-yellow.svg)](https://github.com/PCL-Nex-Developer/pcl2-nex-api)
