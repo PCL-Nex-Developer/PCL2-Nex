@@ -8,7 +8,7 @@
 专注于丰富的联机功能与插件扩展
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![API](https://img.shields.io/badge/API-pcl2--nex--api-yellow.svg)](https://github.com/Nex-Devloper/pcl2-nex-api)
+[![API](https://img.shields.io/badge/API-pcl2--nex--api-yellow.svg)](https://github.com/PCL-Nex-Developer/pcl2-nex-api)
 [![Base](https://img.shields.io/badge/Base-PCL2-green.svg)](https://github.com/Meloong-Git/PCL)
 [![Base](https://img.shields.io/badge/Base-PCL2--CE-green.svg)](https://github.com/PCL-Community/PCL2-CE)
 
@@ -20,7 +20,7 @@
 
 **PCL2-Nex** 是一款基于 [Plain Craft Launcher 2 (PCL2)](https://github.com/Meloong-Git/PCL) 及其社区版 [PCL2-CE](https://github.com/PCL-Community/PCL2-CE) 的 Minecraft 启动器项目。  
 
-在保留原版简洁流畅体验的基础上，引入了 **插件扩展接口规范**（**[pcl2-nex-api](https://github.com/Nex-Devloper/pcl2-nex-api)**），并重点增强了联机功能与扩展性。
+在保留原版简洁流畅体验的基础上，引入了 **插件扩展接口规范**（**[pcl2-nex-api](https://github.com/PCL-Nex-Developer/pcl2-nex-api)**），并重点增强了联机功能与扩展性。
 
 ---
 
