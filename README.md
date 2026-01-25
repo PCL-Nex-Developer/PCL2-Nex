@@ -7,10 +7,10 @@
 **基于 PCL2 与 PCL2-CE 的 Minecraft 启动器**  
 专注于丰富的联机功能与插件扩展
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![API](https://img.shields.io/badge/API-pcl2--nex--api-yellow.svg)](https://github.com/PCL-Nex-Developer/pcl2-nex-api)
-[![Base](https://img.shields.io/badge/Base-PCL2-green.svg)](https://github.com/Meloong-Git/PCL)
-[![Base](https://img.shields.io/badge/Base-PCL2--CE-green.svg)](https://github.com/PCL-Community/PCL2-CE)
+[![Plugin](https://img.shields.io/badge/Plugin_API-pcl2--nex--api-yellow.svg)](https://github.com/PCL-Nex-Developer/pcl2-nex-api)
+[![GitHub stars](https://img.shields.io/github/stars/PCL-Nex-Developer/pcl2-nex?style=social)](https://github.com/PCL-Nex-Developer/pcl2-nex/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/PCL-Nex-Developer/pcl2-nex?style=social)](https://github.com/PCL-Nex-Developer/pcl2-nex/network/members)
+[![Release](https://img.shields.io/github/v/release/PCL-Nex-Developer/pcl2-nex)](https://github.com/PCL-Nex-Developer/pcl2-nex/releases)
 
 </div>
 
@@ -20,7 +20,7 @@
 
 **PCL2-Nex** 是一款基于 [Plain Craft Launcher 2 (PCL2)](https://github.com/Meloong-Git/PCL) 及其社区版 [PCL2-CE](https://github.com/PCL-Community/PCL2-CE) 的 Minecraft 启动器项目。  
 
-在保留原版简洁流畅体验的基础上，引入了 **插件扩展接口规范**（**[pcl2-nex-api](https://github.com/PCL-Nex-Developer/pcl2-nex-api)**），并重点增强了联机功能与扩展性。
+在保留原版简洁流畅体验的基础上，引入了 **Nex插件扩展接口规范**（**[pcl2-nex-api](https://github.com/PCL-Nex-Developer/pcl2-nex-api)**），并重点增强了联机功能与扩展性。
 
 ---
 
@@ -34,10 +34,10 @@
 
 ## 🔗 致谢与上游
 
-本项目基于并扩展了以下开源项目：
-
-* **[PCL2-CE (Community Edition)](https://github.com/PCL-Community/PCL2-CE)** – 提供核心源码
-* **[PCL2 (Meloong-Git)](https://github.com/Meloong-Git/PCL)** – 参考部分上游源码
+本项目基于以下开源项目开发：
+* **[PCL2 (Meloong-Git)](https://github.com/Meloong-Git/PCL)** – 基于该库修改
+* **[PCL.Core（PCL-Community）](https://github.com/PCL-Community/PCL.Core)** – 提供部分核心库源码
+* **[PCL2-Nex-API](https://github.com/PCL-Nex-Developer/pcl2-nex-api)** – 提供Plugin API映射支持
 
 ---
 
@@ -51,10 +51,11 @@
 
 ## ⚖️ 许可证
 
-* **PCL2-Nex** 采用 **Apache License 2.0**。  
-  您可以免费使用、修改和分发本软件，但需遵守协议条款。详情请参阅根目录 `LICENSE` 文件。
+* **PCL2-Nex** 采用 **与PCL2上游一致的协议**。  
+  您需遵守pcl2协议条款。详情请参阅根目录 `LICENSE` 文件。
 
-* **pcl2-nex-api** 是独立的插件扩展接口规范项目，仅包含 **接口定义**，不包含插件实现或核心代码
+* **PCL-Nex-Core** 采用 **与PCL.Core一致的协议**。  
+  您需遵守Apache-2.0 License。详情请参阅根目录 `LICENSE.Core` 文件。
 
 ---
 
