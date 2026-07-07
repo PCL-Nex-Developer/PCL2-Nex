@@ -48,5 +48,5 @@ jobs:
       - name: Upload the Build Artifact
         uses: actions/upload-artifact@v7
         with:
-          name: PCL2_CE_${{ inputs.configuration }}_${{ inputs.architecture }}
+          name: PCL2_Nex_${{ inputs.configuration }}_${{ inputs.architecture }}
           path: artifact/**

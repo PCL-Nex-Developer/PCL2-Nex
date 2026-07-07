@@ -139,7 +139,7 @@ public static class PluginRepositoryService
     public static string GetOfficialIndexUrl()
     {
         // 默认官方市场索引地址，由 PCL Nex 开发组审核维护。
-        return "https://github.com/PCL-Nex-Developer/PCL2-Nex/raw/refs/heads/dev/plugins.json";
+        return "https://raw.githubusercontent.com/PCL-Nex-Developer/PCL2-Nex/refs/heads/dev/plugins.json";
     }
 
 }

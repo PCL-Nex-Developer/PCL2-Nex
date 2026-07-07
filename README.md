@@ -19,7 +19,7 @@
 [上游仓库](https://github.com/Meloong-Git/PCL)
 
 [提交问题](https://github.com/PCL-Nex-Developer/PCL2-Nex/issues/new/choose) |
-[插件开发指南](https://github.com/PCL-Nex-Developer/PCL2-Nex/wiki/插件开发指南)
+[插件开发指南](https://github.com/PCL-Nex-Developer/PCL2-Nex/wiki/Home)
 
 </div>
 

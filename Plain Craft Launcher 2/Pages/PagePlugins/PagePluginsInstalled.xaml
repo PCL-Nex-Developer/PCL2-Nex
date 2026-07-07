@@ -24,6 +24,11 @@
                     </Grid>
                 </StackPanel>
             </local:MyCard>
+            <local:MyCard Title="插件工具面板" Margin="0,0,0,15">
+                <StackPanel Margin="25,40,25,15">
+                    <local:PluginTabHost x:Name="TabHostPlugins" />
+                </StackPanel>
+            </local:MyCard>
         </StackPanel>
     </local:MyScrollViewer>
 </local:MyPageRight>

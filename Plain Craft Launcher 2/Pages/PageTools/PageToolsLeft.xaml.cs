@@ -43,11 +43,7 @@ public partial class PageToolsLeft
         // 选择第一个未被禁用的子页面
         if (isPageSwitched) 
             return;
-        var hideCfg = Config.Preference.Hide;
-        if (!hideCfg.ToolsTest)
-            ItemTest.SetChecked(true, false, false);
-        else
-            ItemPlugins.SetChecked(true, false, false);
+        ItemTest.SetChecked(true, false, false);
     }
 
     private void RebuildPluginEntries()
@@ -136,7 +132,7 @@ public partial class PageToolsLeft
     ///     当前页面的编号。
     /// </summary>
     public FormMain.PageSubType pageID = Config.Preference.Hide.ToolsTest
-        ? FormMain.PageSubType.ToolsPlugins
+        ? FormMain.PageSubType.ToolsTest
         : FormMain.PageSubType.ToolsTest;
 
     /// <summary>
@@ -161,13 +157,6 @@ public partial class PageToolsLeft
                 if (ModMain.frmToolsTest is null)
                     ModMain.frmToolsTest = new PageToolsTest();
                 return ModMain.frmToolsTest;
-            }
-            case FormMain.PageSubType.ToolsPlugins:
-            {
-                if (ModMain.frmToolsPlugins is null)
-                    ModMain.frmToolsPlugins = new PageToolsPlugins();
-                ModMain.frmToolsPlugins.Build();
-                return ModMain.frmToolsPlugins;
             }
             default:
             {

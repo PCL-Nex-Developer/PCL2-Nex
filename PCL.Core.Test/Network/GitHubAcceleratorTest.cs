@@ -8,6 +8,7 @@ public class GitHubAcceleratorTest
 {
     [TestMethod]
     [DataRow("https://github.com/PCL-Nex-Developer/PCL2-Nex/releases")]
+    [DataRow("https://api.github.com/repos/PCL-Nex-Developer/PCL2-Nex")]
     [DataRow("https://raw.githubusercontent.com/PCL-Nex-Developer/PCL2-Nex/main/README.md")]
     [DataRow("https://gist.githubusercontent.com")]
     [DataRow("https://gist.githubusercontent.com/user/hash/raw/file.txt")]
@@ -20,7 +21,6 @@ public class GitHubAcceleratorTest
     }
 
     [TestMethod]
-    [DataRow("https://api.github.com/repos/PCL-Nex-Developer/PCL2-Nex")]
     [DataRow("http://github.com/PCL-Nex-Developer/PCL2-Nex")]
     [DataRow("https://example.com/github.com/PCL-Nex-Developer/PCL2-Nex")]
     public void Rewrite_ShouldIgnoreUnsupportedUrls(string url)

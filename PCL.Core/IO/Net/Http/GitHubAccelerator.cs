@@ -47,6 +47,7 @@ public static class GitHubAccelerator
         if (!string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)) return false;
 
         return uri.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase) ||
+             uri.Host.Equals("api.github.com", StringComparison.OrdinalIgnoreCase) ||
                uri.Host.Equals("raw.githubusercontent.com", StringComparison.OrdinalIgnoreCase) ||
                uri.Host.Equals("gist.githubusercontent.com", StringComparison.OrdinalIgnoreCase) ||
                uri.Host.Equals("avatars.githubusercontent.com", StringComparison.OrdinalIgnoreCase);

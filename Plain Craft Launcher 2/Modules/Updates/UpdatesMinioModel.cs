@@ -158,9 +158,10 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
 
     private JsonNode GetRemoteInfoByName(string name, string path = "")
     {
-        var localInfoFile = Path.Combine(ModBase.pathTemp, "Cache", "Update", $"{name}.json");
+        var fileName = $"{name}.json";
+        var localInfoFile = Path.Combine(ModBase.pathTemp, "Cache", "Update", fileName);
         JsonNode jsonData;
-        if (IsCacheValid($"{name}.json", _remoteCache[name]))
+        if (TryGetRemoteCacheHash(name, fileName, out var hash) && IsCacheValid(fileName, hash))
         {
             jsonData = ModBase.GetJson(ModBase.ReadFile(localInfoFile));
         }
@@ -171,12 +172,18 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
                 .GetAwaiter()
                 .GetResult();
 
+            response.EnsureSuccessStatusCode();
             var content = response.AsString();
             jsonData = ModBase.GetJson(content);
             ModBase.WriteFile(localInfoFile, content);
         }
 
         return jsonData;
+    }
+
+    private bool TryGetRemoteCacheHash(string name, string fileName, out string hash)
+    {
+        return _remoteCache.TryGetValue(fileName, out hash) || _remoteCache.TryGetValue(name, out hash);
     }
 
     /// <summary>

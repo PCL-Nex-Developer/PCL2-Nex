@@ -5,27 +5,25 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
 using PCL.Core.App.Plugins;
-using PCL.Plugins;
 
 namespace PCL;
 
-public partial class PageToolsPlugins
+public partial class PageDownloadPluginStore
 {
     private CancellationTokenSource? _cts;
     private IReadOnlyList<PluginRepositoryEntry>? _allEntries;
 
-    public PageToolsPlugins()
+    public PageDownloadPluginStore()
     {
         InitializeComponent();
-        Loaded += (_, _) => Build();
+        Loaded += (_, _) => LoadStore();
+        PanSearchBox.Search += (_, _) => Search();
+        PanSearchBox.KeyDown += (_, e) => { if (e.Key == Key.Enter) Search(); };
     }
 
-    public void Build()
+    public void LoadStore()
     {
-        var entries = PluginHostBootstrap.UiExtensions.GetTools();
-        TabHostPlugins.BuildTabs(entries, "当前没有工具类插件");
         _ = LoadStoreAsync();
     }
 
@@ -96,41 +94,52 @@ public partial class PageToolsPlugins
         catch { installed = new Dictionary<string, PluginInstallRecord>(); }
 
         for (var i = 0; i < entries.Count; i++)
-            PanPlugins.Children.Add(_CreatePluginRow(entries[i], installed, i == entries.Count - 1));
+            PanPlugins.Children.Add(CreatePluginRow(entries[i], installed, i == entries.Count - 1));
     }
 
-    private Border _CreatePluginRow(PluginRepositoryEntry entry, Dictionary<string, PluginInstallRecord> installed, bool isLast)
+    private Border CreatePluginRow(PluginRepositoryEntry entry, Dictionary<string, PluginInstallRecord> installed, bool isLast)
     {
         var row = new Border
         {
-            Padding = new Thickness(0, 12, 0, 12),
+            MinHeight = 64,
+            Padding = new Thickness(0, 7, 0, 7),
             BorderThickness = new Thickness(0, 0, 0, isLast ? 0 : 1)
         };
         row.SetResourceReference(Border.BorderBrushProperty, "ColorBrushGray6");
 
         var layout = new Grid();
         layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(136) });
         layout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        var main = new StackPanel { Margin = new Thickness(0, 0, 18, 0) };
-        var titleRow = new StackPanel { Orientation = Orientation.Horizontal };
-        var title = new TextBlock { Text = entry.Name, FontSize = 15, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+        var main = new StackPanel { Margin = new Thickness(0, 0, 14, 0), VerticalAlignment = VerticalAlignment.Center };
+        var titleRow = new DockPanel { LastChildFill = true };
+        var title = new TextBlock { Text = entry.Name, FontSize = 14, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
         title.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrush1");
+        var badgeRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(8, 0, 0, 0) };
+        badgeRow.SetValue(DockPanel.DockProperty, Dock.Right);
+        badgeRow.Children.Add(CreateBadge("v" + (entry.Version ?? "?"), "ColorBrush8", "ColorBrush2"));
+        if (installed.ContainsKey(entry.Id)) badgeRow.Children.Add(CreateBadge("已安装", "ColorBrushGray7", "ColorBrushGray2"));
+        titleRow.Children.Add(badgeRow);
         titleRow.Children.Add(title);
-        titleRow.Children.Add(CreateBadge("v" + (entry.Version ?? "?"), "ColorBrush8", "ColorBrush2"));
-        if (installed.ContainsKey(entry.Id)) titleRow.Children.Add(CreateBadge("已安装", "ColorBrushGray7", "ColorBrushGray2"));
         main.Children.Add(titleRow);
 
-        var byline = new TextBlock
+        var infoParts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(entry.Author)) infoParts.Add(entry.Author!);
+        infoParts.Add(entry.Id);
+        if (!string.IsNullOrWhiteSpace(entry.License)) infoParts.Add(entry.License!);
+        var apiRange = FormatVersionRange(entry.MinApiVersion?.ToString(), entry.MaxApiVersion?.ToString());
+        if (apiRange != "任意") infoParts.Add("API " + apiRange);
+        if (!string.IsNullOrWhiteSpace(entry.TrustLevel)) infoParts.Add(entry.TrustLevel!);
+
+        var info = new TextBlock
         {
-            Text = string.IsNullOrWhiteSpace(entry.Author) ? entry.Id : entry.Author + "  ·  " + entry.Id,
+            Text = string.Join("  |  ", infoParts),
             FontSize = 11,
-            Margin = new Thickness(0, 3, 0, 0),
+            Margin = new Thickness(0, 2, 0, 0),
             TextTrimming = TextTrimming.CharacterEllipsis
         };
-        byline.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
-        main.Children.Add(byline);
+        info.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
+        main.Children.Add(info);
 
         if (!string.IsNullOrWhiteSpace(entry.Description))
         {
@@ -138,24 +147,16 @@ public partial class PageToolsPlugins
             {
                 Text = entry.Description,
                 FontSize = 12,
-                Margin = new Thickness(0, 6, 0, 0),
-                TextWrapping = TextWrapping.Wrap,
-                MaxHeight = 38
+                Margin = new Thickness(0, 2, 0, 0),
+                TextTrimming = TextTrimming.CharacterEllipsis
             };
-            description.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrush1");
+            description.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray3");
             main.Children.Add(description);
         }
 
         var tags = CreateTagRow(entry);
         if (tags.Children.Count > 0) main.Children.Add(tags);
         layout.Children.Add(main);
-
-        var metaPanel = new StackPanel { Margin = new Thickness(0, 2, 18, 0), VerticalAlignment = VerticalAlignment.Top };
-        AddMetaLine(metaPanel, "许可", string.IsNullOrWhiteSpace(entry.License) ? "未知" : entry.License);
-        AddMetaLine(metaPanel, "API", FormatVersionRange(entry.MinApiVersion?.ToString(), entry.MaxApiVersion?.ToString()));
-        if (!string.IsNullOrWhiteSpace(entry.TrustLevel)) AddMetaLine(metaPanel, "信任", entry.TrustLevel);
-        metaPanel.SetValue(Grid.ColumnProperty, 1);
-        layout.Children.Add(metaPanel);
 
         var actionRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
         var installSources = PluginRepositoryService.GetInstallSources(entry).ToList();
@@ -166,13 +167,13 @@ public partial class PageToolsPlugins
             status.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrush2");
             actionRow.Children.Add(status);
 
-            if (!string.IsNullOrWhiteSpace(entry.Version) && Version.TryParse(entry.Version, out var rv) && rv > record.InstalledVersion)
+            if (!string.IsNullOrWhiteSpace(entry.Version) && Version.TryParse(entry.Version, out var remoteVersion) && remoteVersion > record.InstalledVersion)
             {
                 foreach (var source in installSources)
                 {
-                    var btn = new MyButton { Text = "更新 " + GetSourceLabel(source), Height = 28, MinWidth = 72, Margin = new Thickness(actionRow.Children.Count > 1 ? 8 : 0, 0, 0, 0), ColorType = MyButton.ColorState.Highlight };
-                    btn.Click += (_, _) => InstallPlugin(entry, source);
-                    actionRow.Children.Add(btn);
+                    var button = new MyButton { Text = GetActionLabel("更新", source), Height = 28, MinWidth = 72, Margin = new Thickness(actionRow.Children.Count > 1 ? 8 : 0, 0, 0, 0), ColorType = MyButton.ColorState.Highlight };
+                    button.Click += (_, _) => InstallPlugin(entry, source);
+                    actionRow.Children.Add(button);
                 }
             }
         }
@@ -180,9 +181,9 @@ public partial class PageToolsPlugins
         {
             foreach (var source in installSources)
             {
-                var btn = new MyButton { Text = "安装 " + GetSourceLabel(source), Height = 28, MinWidth = 72, Margin = new Thickness(actionRow.Children.Count > 0 ? 8 : 0, 0, 0, 0), ColorType = MyButton.ColorState.Highlight };
-                btn.Click += (_, _) => InstallPlugin(entry, source);
-                actionRow.Children.Add(btn);
+                var button = new MyButton { Text = GetActionLabel("安装", source), Height = 28, MinWidth = 72, Margin = new Thickness(actionRow.Children.Count > 0 ? 8 : 0, 0, 0, 0), ColorType = MyButton.ColorState.Highlight };
+                button.Click += (_, _) => InstallPlugin(entry, source);
+                actionRow.Children.Add(button);
             }
             if (installSources.Count == 0)
             {
@@ -194,13 +195,14 @@ public partial class PageToolsPlugins
 
         if (!string.IsNullOrWhiteSpace(entry.HomepageUrl))
         {
-            var linkBtn = new MyButton { Text = "主页", Height = 28, MinWidth = 50, Margin = new Thickness(8, 0, 0, 0) };
-            var url = entry.HomepageUrl; linkBtn.Click += (_, _) => ModBase.OpenWebsite(url);
-            actionRow.Children.Add(linkBtn);
+            var linkButton = new MyButton { Text = "主页", Height = 28, MinWidth = 50, Margin = new Thickness(8, 0, 0, 0) };
+            var url = entry.HomepageUrl;
+            linkButton.Click += (_, _) => ModBase.OpenWebsite(url);
+            actionRow.Children.Add(linkButton);
         }
 
         actionRow.VerticalAlignment = VerticalAlignment.Top;
-        actionRow.SetValue(Grid.ColumnProperty, 2);
+    actionRow.SetValue(Grid.ColumnProperty, 1);
         layout.Children.Add(actionRow);
         row.Child = layout;
         return row;
@@ -223,30 +225,18 @@ public partial class PageToolsPlugins
 
     private static WrapPanel CreateTagRow(PluginRepositoryEntry entry)
     {
-        var row = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
+        var row = new WrapPanel { Margin = new Thickness(0, 3, 0, 0) };
         if (!string.IsNullOrWhiteSpace(entry.ReviewedBy)) row.Children.Add(CreateBadge("已审核", "ColorBrushGray7", "ColorBrushGray2"));
-        foreach (var cap in entry.Capabilities.Take(4)) row.Children.Add(CreateBadge(cap.ToString(), "ColorBrush8", "ColorBrush3"));
-        if (entry.Capabilities.Length > 4) row.Children.Add(CreateBadge("+" + (entry.Capabilities.Length - 4), "ColorBrushGray7", "ColorBrushGray2"));
+        foreach (var cap in entry.Capabilities.Take(3)) row.Children.Add(CreateBadge(cap.ToString(), "ColorBrush8", "ColorBrush3"));
+        if (entry.Capabilities.Length > 3) row.Children.Add(CreateBadge("+" + (entry.Capabilities.Length - 3), "ColorBrushGray7", "ColorBrushGray2"));
         return row;
     }
 
-    private static void AddMetaLine(Panel panel, string label, string value)
+    private static string GetActionLabel(string action, PluginInstallSourceEntry source)
     {
-        var text = new TextBlock
-        {
-            Text = label + ": " + value,
-            FontSize = 11,
-            Margin = new Thickness(0, panel.Children.Count == 0 ? 0 : 5, 0, 0),
-            TextTrimming = TextTrimming.CharacterEllipsis
-        };
-        text.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
-        panel.Children.Add(text);
-    }
-
-    private static string GetSourceLabel(PluginInstallSourceEntry source)
-    {
-        if (!string.IsNullOrWhiteSpace(source.Name)) return source.Name;
-        return "Manifest";
+        if (string.Equals(source.Type, "manifest", StringComparison.OrdinalIgnoreCase)) return action;
+        if (!string.IsNullOrWhiteSpace(source.Name)) return action + " " + source.Name;
+        return action;
     }
 
     private static string FormatVersionRange(string? minVersion, string? maxVersion)
@@ -293,11 +283,15 @@ public partial class PageToolsPlugins
         }
     }
 
-    private void BtnSearch_Click(object sender, MouseButtonEventArgs e)
+    private void Search()
     {
         if (_allEntries is null) return;
-        var query = TxtSearch.Text?.Trim();
-        if (string.IsNullOrEmpty(query)) { RenderPluginList(_allEntries); return; }
+        var query = PanSearchBox.Text?.Trim();
+        if (string.IsNullOrEmpty(query))
+        {
+            RenderPluginList(_allEntries);
+            return;
+        }
 
         var filtered = _allEntries.Where(entry =>
             (entry.Name?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)

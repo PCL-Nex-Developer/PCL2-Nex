@@ -13,7 +13,7 @@ public class PluginRepositoryServiceTest
     public void GetOfficialIndexUrl_ShouldUseRegistryJsonDefault()
     {
         Assert.AreEqual(
-            "https://github.com/PCL-Nex-Developer/PCL2-Nex/raw/refs/heads/dev/plugins.json",
+            "https://raw.githubusercontent.com/PCL-Nex-Developer/PCL2-Nex/refs/heads/dev/plugins.json",
             PluginRepositoryService.GetOfficialIndexUrl());
     }
 

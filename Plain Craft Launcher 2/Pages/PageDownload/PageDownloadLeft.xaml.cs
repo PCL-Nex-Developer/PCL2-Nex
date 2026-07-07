@@ -191,6 +191,12 @@ public partial class PageDownloadLeft : IRefreshable
                 ItemFavorites.Checked = true;
                 break;
             }
+            case FormMain.PageSubType.DownloadPluginStore:
+            {
+                ModMain.frmDownloadPluginStore?.LoadStore();
+                ItemPluginStore.Checked = true;
+                break;
+            }
         }
 
         HintService.Hint(Lang.Text("Download.Left.Hint.Refreshing"), log: false);
@@ -216,6 +222,7 @@ public partial class PageDownloadLeft : IRefreshable
         AnimatedControl = PanItem;
         InitializeComponent();
         ItemInstall.Check += PageCheck;
+        ItemPluginStore.Check += PageCheck;
         ItemMod.Check += PageCheck;
         ItemPack.Check += PageCheck;
         ItemDataPack.Check += PageCheck;
@@ -260,6 +267,12 @@ public partial class PageDownloadLeft : IRefreshable
                 if (ModMain.frmDownloadMod is null)
                     ModMain.frmDownloadMod = new PageDownloadMod();
                 return ModMain.frmDownloadMod;
+            }
+            case FormMain.PageSubType.DownloadPluginStore:
+            {
+                if (ModMain.frmDownloadPluginStore is null)
+                    ModMain.frmDownloadPluginStore = new PageDownloadPluginStore();
+                return ModMain.frmDownloadPluginStore;
             }
             case FormMain.PageSubType.DownloadPack:
             {
