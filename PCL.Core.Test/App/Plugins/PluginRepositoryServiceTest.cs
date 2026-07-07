@@ -220,4 +220,52 @@ public class PluginRepositoryServiceTest
 
         Assert.AreEqual(2, merged.Count);
     }
+
+    [TestMethod]
+    public void FindUpdates_ShouldReturnOnlyInstalledOlderPlugins()
+    {
+        var installed = new Dictionary<string, PluginInstallRecord>
+        {
+            ["com.example.hello"] = new()
+            {
+                PluginId = "com.example.hello",
+                InstalledVersion = new System.Version(1, 0, 0)
+            },
+            ["com.example.world"] = new()
+            {
+                PluginId = "com.example.world",
+                InstalledVersion = new System.Version(2, 0, 0)
+            }
+        };
+        var entries = new List<PluginRepositoryEntry>
+        {
+            new()
+            {
+                Id = "com.example.hello",
+                Name = "Hello",
+                Version = "1.1.0",
+                ManifestUrl = "https://example.test/hello/manifest.json"
+            },
+            new()
+            {
+                Id = "com.example.world",
+                Name = "World",
+                Version = "2.0.0",
+                ManifestUrl = "https://example.test/world/manifest.json"
+            },
+            new()
+            {
+                Id = "com.example.new",
+                Name = "New",
+                Version = "1.0.0",
+                ManifestUrl = "https://example.test/new/manifest.json"
+            }
+        };
+
+        var updates = PluginUpdateService.FindUpdates(entries, installed);
+
+        Assert.AreEqual(1, updates.Count);
+        Assert.AreEqual("com.example.hello", updates[0].Entry.Id);
+        Assert.AreEqual(new System.Version(1, 1, 0), updates[0].LatestVersion);
+    }
 }

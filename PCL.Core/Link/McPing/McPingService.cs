@@ -75,12 +75,12 @@ public class McPingService : IMcPingService
         }
         catch (OperationCanceledException)
         {
-            LogWrapper.Error(new TimeoutException(Lang.Text("Tools.ServerQuery.Error.Timeout.Connect")), ModuleName, $"Failed to connect to the {_endpoint}");
+            LogWrapper.Warn(new TimeoutException(Lang.Text("Tools.ServerQuery.Error.Timeout.Connect")), ModuleName, $"Failed to connect to the {_endpoint}");
             return null;
         }
         catch (Exception e)
         {
-            LogWrapper.Error(e, ModuleName, $"Failed to connect to the {_endpoint}");
+            LogWrapper.Warn(e, ModuleName, $"Failed to connect to the {_endpoint}");
             return null;
         }
 
@@ -100,22 +100,16 @@ public class McPingService : IMcPingService
             await stream.WriteAsync(statusPacket, linkedCts.Token);
             LogWrapper.Debug(ModuleName, $"Status sent, packet length: {statusPacket.Length}");
 
-            var pingTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            var pingPacket = _BuildPingRequestPacket(pingTimestamp);
-            
-            await stream.WriteAsync(pingPacket, linkedCts.Token);
-            LogWrapper.Debug(ModuleName, $"Ping sent, packet length: {pingPacket.Length}");
-
             (statusPayload, latency) = await _ReadStatusPayloadAsync(stream, linkedCts.Token);
         }
         catch (OperationCanceledException)
         {
-            LogWrapper.Error(new TimeoutException(Lang.Text("Tools.ServerQuery.Error.Timeout.ReadWrite")), "McPing", $"Operation timed out on {_endpoint}");
+            LogWrapper.Warn(new TimeoutException(Lang.Text("Tools.ServerQuery.Error.Timeout.ReadWrite")), "McPing", $"Operation timed out on {_endpoint}");
             return null;
         }
         catch (Exception e)
         {
-            LogWrapper.Error(e, ModuleName, $"Failed to communicate with {_endpoint}: {e.Message}");
+            LogWrapper.Warn(e, ModuleName, $"Failed to communicate with {_endpoint}: {e.Message}");
             return null;
         }
         finally
@@ -228,6 +222,13 @@ public class McPingService : IMcPingService
                         statusPayload = await _ReadExactAsync(packetStream, jsonLength, cancellationToken);
                         if (packetStream.Position != packetStream.Length)
                             LogWrapper.Warn(ModuleName, $"Status packet contains {packetStream.Length - packetStream.Position} trailing bytes.");
+                        if (latency is null)
+                        {
+                            var pingTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                            var pingPacket = _BuildPingRequestPacket(pingTimestamp);
+                            await stream.WriteAsync(pingPacket, cancellationToken);
+                            LogWrapper.Debug(ModuleName, $"Ping sent, packet length: {pingPacket.Length}");
+                        }
                         break;
 
                     case 1:

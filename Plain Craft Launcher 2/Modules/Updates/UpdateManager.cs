@@ -10,6 +10,8 @@ namespace PCL;
 
 public static class UpdateManager
 {
+    public const string UpdateLogFileName = "NexUpdateLog.md";
+
     public static bool isUpdateWaitingRestart;
 
     public static UpdatesWrapperModel remoteServer = new(new List<IUpdateSource>
@@ -72,7 +74,7 @@ public static class UpdateManager
                     SystemInfo.IsArm64System ? UpdateArch.arm64 : UpdateArch.x64
                 );
 
-                ModBase.WriteFile($"{ModBase.pathTemp}CEUpdateLog.md", version.Changelog);
+                ModBase.WriteFile(Path.Combine(ModBase.pathTemp, UpdateLogFileName), version.Changelog);
                 ModBase.Log($"[Update] 远程最新版本: {version.VersionName}, 当前版本: {ModBase.versionBaseName}");
                 if (!(SemVer.Parse(version.VersionName) > SemVer.Parse(ModBase.versionBaseName)))
                     return;

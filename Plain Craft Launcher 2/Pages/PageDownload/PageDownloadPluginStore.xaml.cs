@@ -11,70 +11,57 @@ namespace PCL;
 
 public partial class PageDownloadPluginStore
 {
-    private CancellationTokenSource? _cts;
     private IReadOnlyList<PluginRepositoryEntry>? _allEntries;
+    // 已安装插件的实时最新版本（从 manifestUrl fetch），用于显示更新按钮
+    private Dictionary<string, Version> _latestVersions = new(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly ModLoader.LoaderCombo<int> storeLoader = new("PluginStore", [
+        new ModLoader.LoaderTask<int, int>("获取插件列表", _ => LoadStoreData()) { ProgressWeight = 0.6d },
+        new ModLoader.LoaderTask<int, int>("检测插件更新", _ => FetchLatestVersionsData()) { ProgressWeight = 0.4d }
+    ]);
 
     public PageDownloadPluginStore()
     {
         InitializeComponent();
-        Loaded += (_, _) => LoadStore();
+        Loaded += (_, _) => PanBack.ScrollToHome();
+        PageLoaderInit(Load, PanLoad, CardPlugins, null, storeLoader, _ => Load_OnFinish());
         PanSearchBox.Search += (_, _) => Search();
         PanSearchBox.KeyDown += (_, e) => { if (e.Key == Key.Enter) Search(); };
     }
 
-    public void LoadStore()
+    private static IReadOnlyList<PluginRepositoryEntry>? _storeEntries;
+    private static Dictionary<string, Version> _storeLatestVersions = new(StringComparer.OrdinalIgnoreCase);
+
+    private static void LoadStoreData()
     {
-        _ = LoadStoreAsync();
+        var indexes = PluginUpdateService.FetchEnabledIndexesAsync().GetAwaiter().GetResult();
+        _storeEntries = PluginRepositoryService.MergeIndexes(indexes);
     }
 
-    private async System.Threading.Tasks.Task LoadStoreAsync()
+    private static void FetchLatestVersionsData()
     {
-        _cts?.Cancel();
-        _cts = new CancellationTokenSource();
-        var ct = _cts.Token;
+        var entries = _storeEntries ?? [];
+        Dictionary<string, PluginInstallRecord> installed;
+        try { installed = PluginInstallService.GetInstalledPlugins().ToDictionary(r => r.PluginId, r => r, StringComparer.OrdinalIgnoreCase); }
+        catch { return; }
 
-        TextLoading.Text = "正在从插件市场获取已审核插件列表...";
-        TextRepoInfo.Text = "正在加载...";
-
-        try
+        _storeLatestVersions.Clear();
+        var toCheck = entries.Where(e => installed.ContainsKey(e.Id)).ToList();
+        var tasks = toCheck.Select(async entry =>
         {
-            var indexes = new List<PluginRepositoryIndex>();
+            var version = await PluginUpdateService.FetchLatestVersionAsync(entry).ConfigureAwait(false);
+            if (version is not null)
+                lock (_storeLatestVersions)
+                    _storeLatestVersions[entry.Id] = version;
+        });
+        System.Threading.Tasks.Task.WhenAll(tasks).GetAwaiter().GetResult();
+    }
 
-            var officialUrl = PluginRepositoryService.GetOfficialIndexUrl();
-            var officialIndex = await PluginRepositoryService.FetchIndexAsync(officialUrl, ct);
-            if (officialIndex is not null)
-            {
-                indexes.Add(officialIndex);
-                TextRepoInfo.Text = "官方市场: " + officialIndex.Name + " (" + officialIndex.Plugins.Count + " 个插件)";
-            }
-            else
-            {
-                TextRepoInfo.Text = "官方市场: 加载失败（网络不可用或注册表未创建）";
-            }
-
-            var trustRecords = PluginTrustService.GetAllTrustRecords();
-            foreach (var repo in trustRecords.Where(r => r.Enabled))
-            {
-                try
-                {
-                    var index = await PluginRepositoryService.FetchIndexAsync(repo.RepoUrl, ct);
-                    if (index is not null) indexes.Add(index);
-                }
-                catch { }
-            }
-
-            _allEntries = PluginRepositoryService.MergeIndexes(indexes);
-            if (ct.IsCancellationRequested) return;
-
-            RenderPluginList(_allEntries);
-            TextRepoInfo.Text += "  |  合计 " + _allEntries.Count + " 个插件";
-        }
-        catch (OperationCanceledException) { }
-        catch (Exception ex)
-        {
-            TextLoading.Text = "加载失败: " + ex.Message;
-            TextRepoInfo.Text = "加载失败";
-        }
+    private void Load_OnFinish()
+    {
+        _allEntries = _storeEntries;
+        _latestVersions = new Dictionary<string, Version>(_storeLatestVersions, StringComparer.OrdinalIgnoreCase);
+        RenderPluginList(_allEntries ?? []);
     }
 
     private void RenderPluginList(IReadOnlyList<PluginRepositoryEntry> entries)
@@ -101,78 +88,120 @@ public partial class PageDownloadPluginStore
     {
         var row = new Border
         {
-            MinHeight = 64,
-            Padding = new Thickness(0, 7, 0, 7),
+            Padding = new Thickness(0, 6, 0, 6),
             BorderThickness = new Thickness(0, 0, 0, isLast ? 0 : 1)
         };
         row.SetResourceReference(Border.BorderBrushProperty, "ColorBrushGray6");
 
-        var layout = new Grid();
-        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        installed.TryGetValue(entry.Id, out var record);
 
-        var main = new StackPanel { Margin = new Thickness(0, 0, 14, 0), VerticalAlignment = VerticalAlignment.Center };
-        var titleRow = new DockPanel { LastChildFill = true };
-        var title = new TextBlock { Text = entry.Name, FontSize = 14, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
-        title.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrush1");
-        var badgeRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(8, 0, 0, 0) };
-        badgeRow.SetValue(DockPanel.DockProperty, Dock.Right);
-        badgeRow.Children.Add(CreateBadge("v" + (entry.Version ?? "?"), "ColorBrush8", "ColorBrush2"));
-        if (installed.ContainsKey(entry.Id)) badgeRow.Children.Add(CreateBadge("已安装", "ColorBrushGray7", "ColorBrushGray2"));
-        titleRow.Children.Add(badgeRow);
-        titleRow.Children.Add(title);
-        main.Children.Add(titleRow);
-
-        var infoParts = new List<string>();
-        if (!string.IsNullOrWhiteSpace(entry.Author)) infoParts.Add(entry.Author!);
-        infoParts.Add(entry.Id);
-        if (!string.IsNullOrWhiteSpace(entry.License)) infoParts.Add(entry.License!);
-        var apiRange = FormatVersionRange(entry.MinApiVersion?.ToString(), entry.MaxApiVersion?.ToString());
-        if (apiRange != "任意") infoParts.Add("API " + apiRange);
-        if (!string.IsNullOrWhiteSpace(entry.TrustLevel)) infoParts.Add(entry.TrustLevel!);
-
-        var info = new TextBlock
+        // 判断是否有可用更新：优先用实时版本，fallback 到静态 version
+        Version? remoteVersion = null;
+        var hasUpdate = false;
+        if (record is not null)
         {
-            Text = string.Join("  |  ", infoParts),
-            FontSize = 11,
-            Margin = new Thickness(0, 2, 0, 0),
+            if (_latestVersions.TryGetValue(entry.Id, out var live))
+            {
+                remoteVersion = live;
+                hasUpdate = live > record.InstalledVersion;
+            }
+            else if (PluginUpdateService.TryGetDisplayVersion(entry, out var staticVer))
+            {
+                remoteVersion = staticVer;
+                hasUpdate = staticVer > record.InstalledVersion;
+            }
+        }
+        else if (_latestVersions.TryGetValue(entry.Id, out var live))
+        {
+            remoteVersion = live;
+        }
+        else
+        {
+            PluginUpdateService.TryGetDisplayVersion(entry, out remoteVersion);
+        }
+
+        var displayVersion = remoteVersion ?? new Version(0, 0);
+
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        // ── 左侧：标题 + 描述 ──
+        var left = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+
+        var titleBar = new DockPanel { LastChildFill = true };
+        var title = new TextBlock
+        {
+            Text = entry.Name,
+            FontSize = 15,
+            FontWeight = FontWeights.Bold,
+            VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis
         };
-        info.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
-        main.Children.Add(info);
+        title.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrush1");
+        titleBar.Children.Add(title);
+        left.Children.Add(titleBar);
 
         if (!string.IsNullOrWhiteSpace(entry.Description))
         {
-            var description = new TextBlock
+            var desc = new TextBlock
             {
                 Text = entry.Description,
                 FontSize = 12,
-                Margin = new Thickness(0, 2, 0, 0),
+                Margin = new Thickness(0, 4, 0, 0),
                 TextTrimming = TextTrimming.CharacterEllipsis
             };
-            description.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray3");
-            main.Children.Add(description);
+            desc.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray3");
+            left.Children.Add(desc);
         }
 
         var tags = CreateTagRow(entry);
-        if (tags.Children.Count > 0) main.Children.Add(tags);
-        layout.Children.Add(main);
+        if (tags.Children.Count > 0)
+        {
+            tags.Margin = new Thickness(0, 5, 0, 0);
+            left.Children.Add(tags);
+        }
+        grid.Children.Add(left);
 
-        var actionRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
+        // ── 右侧：发布者/版本 Tag + 操作按钮（单行紧凑） ──
+        var right = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 0, 0) };
+        right.SetValue(Grid.ColumnProperty, 1);
+
+        // 发布者 Tag
+        if (!string.IsNullOrWhiteSpace(entry.Author))
+            right.Children.Add(CreateBadge(entry.Author!, "ColorBrushGray7", "ColorBrushGray2"));
+
+        // 版本 Tag：有更新显示 old -> new，否则直接版本
+        var versionText = record is not null && hasUpdate
+            ? record.InstalledVersion + " -> " + displayVersion
+            : (displayVersion != new Version(0, 0) ? "v" + displayVersion : "v?");
+        right.Children.Add(CreateBadge(versionText, hasUpdate ? "ColorBrush8" : "ColorBrushGray7", hasUpdate ? "ColorBrush2" : "ColorBrushGray2"));
+
+        // 操作按钮
+        var actionRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
         var installSources = PluginRepositoryService.GetInstallSources(entry).ToList();
 
-        if (installed.TryGetValue(entry.Id, out var record))
+        if (record is not null)
         {
-            var status = new TextBlock { Text = "已安装 v" + record.InstalledVersion, FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
-            status.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrush2");
-            actionRow.Children.Add(status);
-
-            if (!string.IsNullOrWhiteSpace(entry.Version) && Version.TryParse(entry.Version, out var remoteVersion) && remoteVersion > record.InstalledVersion)
+            if (hasUpdate)
             {
                 foreach (var source in installSources)
                 {
-                    var button = new MyButton { Text = GetActionLabel("更新", source), Height = 28, MinWidth = 72, Margin = new Thickness(actionRow.Children.Count > 1 ? 8 : 0, 0, 0, 0), ColorType = MyButton.ColorState.Highlight };
-                    button.Click += (_, _) => InstallPlugin(entry, source);
+                    var button = new MyButton
+                    {
+                        Text = GetActionLabel("更新", source),
+                        Height = 30,
+                        MinWidth = 72,
+                        Margin = new Thickness(actionRow.Children.Count > 0 ? 6 : 0, 0, 0, 0),
+                        ColorType = MyButton.ColorState.Highlight
+                    };
+                    button.Click += (_, _) => UpdatePlugin(new PluginUpdateCandidate
+                    {
+                        Installed = record,
+                        Entry = entry,
+                        Source = source,
+                        LatestVersion = remoteVersion!
+                    });
                     actionRow.Children.Add(button);
                 }
             }
@@ -181,7 +210,14 @@ public partial class PageDownloadPluginStore
         {
             foreach (var source in installSources)
             {
-                var button = new MyButton { Text = GetActionLabel("安装", source), Height = 28, MinWidth = 72, Margin = new Thickness(actionRow.Children.Count > 0 ? 8 : 0, 0, 0, 0), ColorType = MyButton.ColorState.Highlight };
+                var button = new MyButton
+                {
+                    Text = GetActionLabel("安装", source),
+                    Height = 30,
+                    MinWidth = 72,
+                    Margin = new Thickness(actionRow.Children.Count > 0 ? 6 : 0, 0, 0, 0),
+                    ColorType = MyButton.ColorState.Highlight
+                };
                 button.Click += (_, _) => InstallPlugin(entry, source);
                 actionRow.Children.Add(button);
             }
@@ -195,16 +231,16 @@ public partial class PageDownloadPluginStore
 
         if (!string.IsNullOrWhiteSpace(entry.HomepageUrl))
         {
-            var linkButton = new MyButton { Text = "主页", Height = 28, MinWidth = 50, Margin = new Thickness(8, 0, 0, 0) };
+            var linkButton = new MyButton { Text = "主页", Height = 30, MinWidth = 50, Margin = new Thickness(6, 0, 0, 0) };
             var url = entry.HomepageUrl;
             linkButton.Click += (_, _) => ModBase.OpenWebsite(url);
             actionRow.Children.Add(linkButton);
         }
 
-        actionRow.VerticalAlignment = VerticalAlignment.Top;
-    actionRow.SetValue(Grid.ColumnProperty, 1);
-        layout.Children.Add(actionRow);
-        row.Child = layout;
+        right.Children.Add(actionRow);
+        grid.Children.Add(right);
+
+        row.Child = grid;
         return row;
     }
 
@@ -274,12 +310,38 @@ public partial class PageDownloadPluginStore
             ModMain.frmMain?.RefreshRestartButton(true);
 
             ModMain.MyMsgBox("插件 " + prepared.Manifest.Name + " 安装成功！\n重启启动器后生效。", "安装完成");
-            _ = LoadStoreAsync();
+            PageLoaderRestart();
         }
         catch (Exception ex)
         {
             ModBase.Log(ex, "[Plugins] Store install failed: " + entry.Id, ModBase.LogLevel.Debug);
             ModMain.MyMsgBox("安装失败: " + ex.Message, "错误");
+        }
+    }
+
+    private async void UpdatePlugin(PluginUpdateCandidate candidate)
+    {
+        try
+        {
+            var trustDecision = PluginUpdateService.EvaluateUpdate(candidate);
+            var confirmMsg = "即将更新插件：\n\n名称: " + candidate.Entry.Name + "\n当前版本: v" + candidate.Installed.InstalledVersion + "\n最新版本: v" + candidate.LatestVersion + "\n下载源: " + candidate.Source.Url;
+            if (trustDecision == PluginTrustDecision.RequireReconfirm)
+                confirmMsg += "\n\n该更新涉及来源变化或能力变化，请确认你信任此版本。";
+
+            if (ModMain.MyMsgBox(confirmMsg, "确认更新", button2: "取消", isWarn: trustDecision != PluginTrustDecision.Allow) != 1) return;
+
+            ModMain.MyMsgBox("正在获取插件更新包，请稍候...", "更新中");
+            using var prepared = await PluginRemoteInstallService.PrepareAsync(candidate.Source);
+            await PluginInstallService.InstallFromDirectoryAsync(prepared.PluginRoot, prepared.Manifest, prepared.SourceType, prepared.SourceUrl);
+            ModMain.frmMain?.RefreshRestartButton(true);
+
+            ModMain.MyMsgBox("插件 " + prepared.Manifest.Name + " 已更新到 v" + prepared.Manifest.Version + "！\n重启启动器后生效。", "更新完成");
+            PageLoaderRestart();
+        }
+        catch (Exception ex)
+        {
+            ModBase.Log(ex, "[Plugins] Store update failed: " + candidate.Entry.Id, ModBase.LogLevel.Debug);
+            ModMain.MyMsgBox("更新失败: " + ex.Message, "错误");
         }
     }
 

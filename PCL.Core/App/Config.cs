@@ -111,6 +111,11 @@ public static partial class Config
         /// 已启用的插件 ID 列表。仅列表内插件会被加载。
         /// </summary>
         [AnyConfigItem<List<string>>("PluginEnabledStates")] public partial List<string> EnabledStates { get; set; }
+
+        /// <summary>
+        /// 启动后自动检查并安装插件更新。
+        /// </summary>
+        [ConfigItem<bool>("PluginAutoUpdate", false)] public partial bool AutoUpdate { get; set; }
     }
 
     /// <summary>

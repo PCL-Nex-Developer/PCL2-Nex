@@ -40,6 +40,7 @@ public class PluginTabHost : UserControl
                 var control = entry.CreateControl();
                 if (control is not null)
                 {
+                    DetachFromParent(control);
                     control.Margin = new Thickness(25, 40, 25, 15);
                     card.Children.Add(control);
                 }
@@ -59,6 +60,25 @@ public class PluginTabHost : UserControl
         }
 
         Content = panel;
+    }
+
+    private static void DetachFromParent(FrameworkElement control)
+    {
+        switch (control.Parent)
+        {
+            case Panel panel:
+                panel.Children.Remove(control);
+                break;
+            case Decorator decorator when ReferenceEquals(decorator.Child, control):
+                decorator.Child = null;
+                break;
+            case ContentControl contentControl when ReferenceEquals(contentControl.Content, control):
+                contentControl.Content = null;
+                break;
+            case ItemsControl itemsControl:
+                itemsControl.Items.Remove(control);
+                break;
+        }
     }
 
     private static MyCard _EmptyCard(string message)

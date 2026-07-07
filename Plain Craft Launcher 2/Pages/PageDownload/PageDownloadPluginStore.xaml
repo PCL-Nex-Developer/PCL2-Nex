@@ -5,19 +5,14 @@
                    PanScroll="{Binding ElementName=PanBack}">
     <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
         <StackPanel x:Name="PanMain" Margin="25">
-            <local:MySearchBox x:Name="PanSearchBox" Margin="0,0,0,15" SearchButtonVisibility="Visible" HintText="搜索插件名称、作者或 ID" />
-            <local:MyCard Margin="0,0,0,15">
-                <StackPanel Margin="19,17,19,14">
-                    <TextBlock x:Name="TextRepoInfo"
-                               Text="正在加载插件列表..."
-                               FontSize="13" TextWrapping="Wrap" />
-                </StackPanel>
+            <local:MyCard HorizontalAlignment="Center" SnapsToDevicePixels="True" x:Name="PanLoad" UseAnimation="False" Margin="0,0,0,15">
+                <local:MyLoading Text="正在从插件市场获取插件列表..." Margin="20" x:Name="Load"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center" />
             </local:MyCard>
             <local:MyCard x:Name="CardPlugins" UseAnimation="False">
-                <StackPanel x:Name="PanPlugins" Margin="12">
-                    <TextBlock x:Name="TextLoading"
-                               Text="正在从仓库获取插件列表..."
-                               FontSize="13" TextWrapping="Wrap" />
+                <StackPanel Margin="12">
+                    <local:MySearchBox x:Name="PanSearchBox" Margin="0,0,0,12" SearchButtonVisibility="Visible" HintText="搜索插件名称、作者或 ID" />
+                    <StackPanel x:Name="PanPlugins" />
                 </StackPanel>
             </local:MyCard>
         </StackPanel>

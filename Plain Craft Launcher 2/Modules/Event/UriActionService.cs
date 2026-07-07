@@ -56,6 +56,12 @@ public static class UriActionService
                 case "plugin-install":
                     InstallPlugin(request);
                     break;
+                case "add-plugin-source":
+                case "add-plugin-repo":
+                case "add-plugin-repository":
+                case "plugin-source":
+                    AddPluginSource(request);
+                    break;
                 case "plugin":
                 case "plugin-action":
                     DispatchPluginAction(request);
@@ -235,6 +241,39 @@ public static class UriActionService
             ModBase.Log(ex, "URI 安装插件失败", ModBase.LogLevel.Feedback);
             HintService.Hint("URI 安装插件失败：" + ex.Message, HintType.Error);
         }
+    }
+
+    private static void AddPluginSource(UriActionRequest request)
+    {
+        var url = GetFirstValue(request, "url", "source", "repo", "repository", "index", "registry") ?? request.PathArguments.FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            HintService.Hint("URI 添加插件源缺少 url 参数。", HintType.Error);
+            return;
+        }
+
+        url = url.Trim();
+        if (!IsAbsoluteHttpUri(url))
+        {
+            HintService.Hint("URI 插件源地址无效。仅支持 HTTP 或 HTTPS 地址。", HintType.Error);
+            return;
+        }
+
+        if (PluginTrustService.IsOfficialRepository(url))
+        {
+            HintService.Hint("官方插件源已内置，无需重复添加。", HintType.Success);
+            return;
+        }
+
+        var name = GetFirstValue(request, "name", "title", "repoName") ?? "自定义插件源";
+        name = string.IsNullOrWhiteSpace(name) ? "自定义插件源" : name.Trim();
+        var confirm = ModBase.RunInUiWait(() => ModMain.MyMsgBox(
+            "即将添加第三方插件源：\n\n名称: " + name + "\n地址: " + url + "\n\n插件源会影响商店中可展示和可更新的插件。请只添加你信任的来源。",
+            "确认添加插件源", button2: "取消", isWarn: true));
+        if (confirm != 1) return;
+
+        PluginTrustService.AddTrust(url, name, PluginRepositorySourceType.Custom);
+        HintService.Hint("插件源已添加：" + name, HintType.Success);
     }
 
     private static void DispatchPluginAction(UriActionRequest request)

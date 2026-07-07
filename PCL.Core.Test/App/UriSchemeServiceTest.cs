@@ -59,6 +59,25 @@ public sealed class UriSchemeServiceTest
     }
 
     [TestMethod]
+    public void DirectCommandUriKeepsActionWhenNameQueryExists()
+    {
+        Assert.IsTrue(UriSchemeService.TryParseUriAction("pcl://launch?name=My+Instance", out var request));
+        Assert.AreEqual("launch", request!.Command);
+        Assert.AreEqual("launch", request.ActionType);
+        Assert.AreEqual("My Instance", request.Query["name"]);
+    }
+
+    [TestMethod]
+    public void ParseAddPluginSourceUri()
+    {
+        Assert.IsTrue(UriSchemeService.TryParseUriAction("pcl://add-plugin-source?url=https%3A%2F%2Fexample.test%2Findex.json&name=Example+Source", out var request));
+        Assert.AreEqual("add-plugin-source", request!.Command);
+        Assert.AreEqual("add-plugin-source", request.ActionType);
+        Assert.AreEqual("https://example.test/index.json", request.Query["url"]);
+        Assert.AreEqual("Example Source", request.Query["name"]);
+    }
+
+    [TestMethod]
     public void NormalizeUriArgumentForCommandLine()
     {
         var uri = "pcl://actions?type=ShowHint&data=Hi";
