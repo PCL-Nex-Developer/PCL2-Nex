@@ -94,11 +94,11 @@ public sealed partial class UriSchemeService
         var actionSegments = commandSegmentIndex == 0 ? segments.Skip(1).ToArray() : segments;
         var query = ParseQuery(uri.Query);
 
-        var actionType = GetFirstValue(query, "type", "event", "action", "name");
-        if (string.IsNullOrWhiteSpace(actionType) && command.Equals("actions", StringComparison.OrdinalIgnoreCase) && actionSegments.Length > 0)
+        var actionType = command.Equals("actions", StringComparison.OrdinalIgnoreCase)
+            ? GetFirstValue(query, "type", "event", "action", "name")
+            : command;
+        if (string.IsNullOrWhiteSpace(actionType) && actionSegments.Length > 0)
             actionType = actionSegments[0];
-        if (string.IsNullOrWhiteSpace(actionType) && !command.Equals("actions", StringComparison.OrdinalIgnoreCase))
-            actionType = command;
 
         var data = GetFirstValue(query, "data", "arg", "args", "parameter", "value");
         if (data is null)

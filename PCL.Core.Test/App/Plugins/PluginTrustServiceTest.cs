@@ -50,6 +50,27 @@ public class PluginTrustServiceTest
     }
 
     [TestMethod]
+    public void EvaluateUpdate_ShouldAllow_WhenManifestSourceMatchesInstallRecord()
+    {
+        var installed = new PluginInstallRecord
+        {
+            PluginId = "com.example.hello",
+            InstalledFrom = "https://repo-a/hello/manifest.json",
+            CapabilitiesSnapshot = [PluginCapabilities.ContributeTools]
+        };
+        var incoming = new PluginRepositoryEntry
+        {
+            Id = "com.example.hello",
+            SourceRepoUrl = "https://repo-a/index.json",
+            Capabilities = [PluginCapabilities.ContributeTools]
+        };
+
+        var decision = PluginTrustService.EvaluateUpdate(installed, incoming, "https://repo-a/hello/manifest.json");
+
+        Assert.AreEqual(PluginTrustDecision.Allow, decision);
+    }
+
+    [TestMethod]
     public void EvaluateUpdate_ShouldRequireReconfirm_WhenSourceChanges()
     {
         var installed = new PluginInstallRecord

@@ -79,7 +79,7 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
             var deJsonData = GetRemoteInfoByName($"updates-{channelName}", "updates/")
                 ?.ToObject<MinioUpdateModel>()
                 ?.Assets
-                ?.FirstOrDefault();
+                ?.FirstOrDefault(IsPclNexAsset);
             if (deJsonData is null)
                 throw new Exception("No assets can download!");
             var selfSha256 = ModBase.GetFileSHA256(Basics.ExecutablePath);
@@ -143,7 +143,7 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
     {
         var channelName = GetChannelName(channel, arch);
         var deJsonData = GetRemoteInfoByName($"updates-{channelName}", "updates/")?.ToObject<MinioUpdateModel>().Assets
-            .FirstOrDefault();
+            .FirstOrDefault(IsPclNexAsset);
         if (deJsonData is null)
             throw new NullReferenceException("Can not get remote update info!");
         return new VersionDataModel
@@ -179,6 +179,18 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
         }
 
         return jsonData;
+    }
+
+    private static bool IsPclNexAsset(MinioUpdateAsset asset)
+    {
+        var fileName = asset.FileName ?? "";
+        if (fileName.Contains("PCL2_CE", StringComparison.OrdinalIgnoreCase) ||
+            fileName.Contains("PCL-CE", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return asset.Downloads is null || asset.Downloads.All(download =>
+            !download.Contains("pcl2-ce", StringComparison.OrdinalIgnoreCase) &&
+            !download.Contains("PCL-Community", StringComparison.OrdinalIgnoreCase));
     }
 
     private bool TryGetRemoteCacheHash(string name, string fileName, out string hash)

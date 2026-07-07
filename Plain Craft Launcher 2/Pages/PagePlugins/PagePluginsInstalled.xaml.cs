@@ -8,12 +8,13 @@ using System.Windows.Media;
 using PCL.Core.App;
 using PCL.Core.App.Plugins;
 using PCL.Core.UI;
-using PCL.Plugins;
 
 namespace PCL;
 
 public partial class PagePluginsInstalled
 {
+    private IReadOnlyList<PluginUpdateCandidate> _updates = [];
+
     public PagePluginsInstalled()
     {
         InitializeComponent();
@@ -22,14 +23,8 @@ public partial class PagePluginsInstalled
 
     public void Build()
     {
+        CheckPluginAutoUpdate.Checked = Config.Plugin.AutoUpdate;
         BuildInstalledList();
-        BuildToolsPanel();
-    }
-
-    private void BuildToolsPanel()
-    {
-        var entries = PluginHostBootstrap.UiExtensions.GetTools();
-        TabHostPlugins.BuildTabs(entries, "当前没有工具类插件");
     }
 
     private void BuildInstalledList()
@@ -247,5 +242,105 @@ public partial class PagePluginsInstalled
         ModMain.frmMain?.RefreshRestartButton(true);
         ModMain.MyMsgBox("插件 " + manifest.Name + " 导入成功！\n请重启启动器后生效。", "导入完成");
         BuildInstalledList();
+    }
+
+    private void CheckPluginAutoUpdate_Change(object senderRaw, bool user)
+    {
+        if (!user) return;
+        Config.Plugin.AutoUpdate = CheckPluginAutoUpdate.Checked == true;
+    }
+
+    private async void BtnCheckPluginUpdates_Click(object sender, MouseButtonEventArgs e)
+    {
+        await CheckPluginUpdatesAsync(showHint: true);
+    }
+
+    private async System.Threading.Tasks.Task CheckPluginUpdatesAsync(bool showHint)
+    {
+        BtnCheckPluginUpdates.IsEnabled = false;
+        PanPluginUpdates.Children.Clear();
+        var loading = new TextBlock { Text = "正在检查插件更新...", FontSize = 13, TextWrapping = TextWrapping.Wrap };
+        loading.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
+        PanPluginUpdates.Children.Add(loading);
+
+        try
+        {
+            _updates = await PluginUpdateService.CheckForUpdatesAsync();
+            RenderPluginUpdates();
+            if (showHint)
+                ModMain.MyMsgBox(_updates.Count == 0 ? "所有市场插件都是最新版本。" : "发现 " + _updates.Count + " 个可更新插件。", "插件更新");
+        }
+        catch (Exception ex)
+        {
+            PanPluginUpdates.Children.Clear();
+            var error = new TextBlock { Text = "检查失败: " + ex.Message, FontSize = 13, TextWrapping = TextWrapping.Wrap };
+            error.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
+            PanPluginUpdates.Children.Add(error);
+            if (showHint) ModMain.MyMsgBox("检查更新失败: " + ex.Message, "插件更新");
+        }
+        finally
+        {
+            BtnCheckPluginUpdates.IsEnabled = true;
+        }
+    }
+
+    private void RenderPluginUpdates()
+    {
+        PanPluginUpdates.Children.Clear();
+        if (_updates.Count == 0)
+        {
+            var empty = new TextBlock { Text = "暂无可用更新。", FontSize = 13, TextWrapping = TextWrapping.Wrap };
+            empty.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
+            PanPluginUpdates.Children.Add(empty);
+            return;
+        }
+
+        foreach (var candidate in _updates)
+        {
+            var row = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var info = new StackPanel();
+            var title = new TextBlock { Text = candidate.Entry.Name + "  v" + candidate.Installed.InstalledVersion + " -> v" + candidate.LatestVersion, FontSize = 13, FontWeight = FontWeights.SemiBold };
+            title.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrush2");
+            info.Children.Add(title);
+
+            var src = new TextBlock { Text = "来源: " + candidate.Source.Url, FontSize = 11, Margin = new Thickness(0, 2, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis };
+            src.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
+            info.Children.Add(src);
+            row.Children.Add(info);
+
+            var updateBtn = new MyButton { Text = "更新", Height = 28, MinWidth = 60, Margin = new Thickness(8, 0, 0, 0), ColorType = MyButton.ColorState.Highlight };
+            updateBtn.SetValue(Grid.ColumnProperty, 1);
+            updateBtn.Click += (_, _) => UpdatePlugin(candidate, refreshAfter: true);
+            row.Children.Add(updateBtn);
+
+            PanPluginUpdates.Children.Add(row);
+        }
+    }
+
+    private async void UpdatePlugin(PluginUpdateCandidate candidate, bool refreshAfter)
+    {
+        try
+        {
+            var trustDecision = PluginUpdateService.EvaluateUpdate(candidate);
+            var confirmMsg = "即将更新插件：\n\n名称: " + candidate.Entry.Name + "\n当前版本: v" + candidate.Installed.InstalledVersion + "\n最新版本: v" + candidate.LatestVersion + "\n下载源: " + candidate.Source.Url;
+            if (trustDecision == PluginTrustDecision.RequireReconfirm)
+                confirmMsg += "\n\n该更新涉及来源变化或能力变化，请确认你信任此版本。";
+
+            if (ModMain.MyMsgBox(confirmMsg, "确认更新", button2: "取消", isWarn: trustDecision != PluginTrustDecision.Allow) != 1) return;
+
+            using var prepared = await PluginRemoteInstallService.PrepareAsync(candidate.Source);
+            await PluginInstallService.InstallFromDirectoryAsync(prepared.PluginRoot, prepared.Manifest, prepared.SourceType, prepared.SourceUrl);
+            ModMain.frmMain?.RefreshRestartButton(true);
+            ModMain.MyMsgBox("插件 " + prepared.Manifest.Name + " 已更新到 v" + prepared.Manifest.Version + "！\n请重启启动器后生效。", "更新完成");
+            BuildInstalledList();
+            if (refreshAfter) await CheckPluginUpdatesAsync(showHint: false);
+        }
+        catch (Exception ex)
+        {
+            ModMain.MyMsgBox("更新失败: " + ex.Message, "错误");
+        }
     }
 }

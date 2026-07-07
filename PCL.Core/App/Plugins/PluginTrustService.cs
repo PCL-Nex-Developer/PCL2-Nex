@@ -66,9 +66,19 @@ public static class PluginTrustService
     /// <param name="incoming">市场注册表中的新版本条目。</param>
     /// <returns>信任决策。</returns>
     public static PluginTrustDecision EvaluateUpdate(PluginInstallRecord installed, PluginRepositoryEntry incoming)
+        => EvaluateUpdate(installed, incoming, incoming.SourceRepoUrl);
+
+    /// <summary>
+    /// 评估已安装插件的更新是否允许。
+    /// </summary>
+    /// <param name="installed">当前安装记录。</param>
+    /// <param name="incoming">市场注册表中的新版本条目。</param>
+    /// <param name="expectedSourceUrl">本次更新将写入安装记录的来源地址。</param>
+    /// <returns>信任决策。</returns>
+    public static PluginTrustDecision EvaluateUpdate(PluginInstallRecord installed, PluginRepositoryEntry incoming, string? expectedSourceUrl)
     {
         // 来源变更：需要二次确认
-        if (!string.Equals(installed.InstalledFrom, incoming.SourceRepoUrl, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(installed.InstalledFrom, expectedSourceUrl, StringComparison.OrdinalIgnoreCase))
             return PluginTrustDecision.RequireReconfirm;
 
         // 能力升级：新版本声明的能力比已安装版本更多

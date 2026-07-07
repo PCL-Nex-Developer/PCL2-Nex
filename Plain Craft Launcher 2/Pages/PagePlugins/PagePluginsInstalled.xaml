@@ -10,6 +10,24 @@
                     <TextBlock x:Name="TextEmptyInstalled" Text="暂无已安装插件" FontSize="13" TextWrapping="Wrap" Margin="0,0,0,5" />
                 </StackPanel>
             </local:MyCard>
+            <local:MyCard Title="插件更新" Margin="0,0,0,15">
+                <StackPanel Margin="25,40,25,15">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <local:MyCheckBox x:Name="CheckPluginAutoUpdate" Text="启动后自动检查插件更新" Height="22"
+                                          Change="CheckPluginAutoUpdate_Change"
+                                          ToolTip="启动后只检查并记录可用更新，插件文件需要在此页面手动更新。" />
+                        <local:MyButton Grid.Column="1" Text="检查更新" x:Name="BtnCheckPluginUpdates"
+                                        Click="BtnCheckPluginUpdates_Click" Margin="10,0,0,0" Height="30" MinWidth="90" />
+                    </Grid>
+                    <StackPanel x:Name="PanPluginUpdates" Margin="0,12,0,0">
+                        <TextBlock Text="尚未检查更新。" FontSize="13" TextWrapping="Wrap" />
+                    </StackPanel>
+                </StackPanel>
+            </local:MyCard>
             <local:MyCard Title="安装插件" Margin="0,0,0,15">
                 <StackPanel Margin="25,40,25,15">
                     <Grid>
@@ -22,11 +40,6 @@
                         <local:MyButton Grid.Column="1" Text="远程安装" x:Name="BtnInstallUrl" Click="BtnInstallUrl_Click" Margin="10,0,0,0" Height="30" MinWidth="80" />
                         <local:MyButton Grid.Column="2" Text="导入插件包" x:Name="BtnInstallZip" Click="BtnInstallZip_Click" Margin="8,0,0,0" Height="30" MinWidth="90" />
                     </Grid>
-                </StackPanel>
-            </local:MyCard>
-            <local:MyCard Title="插件工具面板" Margin="0,0,0,15">
-                <StackPanel Margin="25,40,25,15">
-                    <local:PluginTabHost x:Name="TabHostPlugins" />
                 </StackPanel>
             </local:MyCard>
         </StackPanel>

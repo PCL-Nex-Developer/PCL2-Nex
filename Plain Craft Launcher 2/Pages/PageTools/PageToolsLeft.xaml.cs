@@ -28,10 +28,11 @@ public partial class PageToolsLeft
     private void PageLinkLeft_Loaded(object sender, RoutedEventArgs e)
     {
         RebuildPluginEntries();
+        var hasPluginEntries = _pluginEntries.Count > 0;
         var isHiddenPage = false;
         var hide = Config.Preference.Hide;
 
-        if (ItemTest.Checked && hide.ToolsTest) isHiddenPage = true;
+        if (!hasPluginEntries && ItemTest.Checked && hide.ToolsTest) isHiddenPage = true;
         if (PageSetupUI.HiddenForceShow)
             isHiddenPage = false;
         // 若页面错误，或尚未加载，则继续
@@ -43,7 +44,8 @@ public partial class PageToolsLeft
         // 选择第一个未被禁用的子页面
         if (isPageSwitched) 
             return;
-        ItemTest.SetChecked(true, false, false);
+        if (!SelectFirstPluginEntry())
+            ItemTest.SetChecked(true, false, false);
     }
 
     private void RebuildPluginEntries()
@@ -109,16 +111,17 @@ public partial class PageToolsLeft
         else PanItem.Children.Insert(index, element);
     }
 
-    private void SelectFirstPluginEntry()
+    private bool SelectFirstPluginEntry()
     {
         foreach (UIElement child in PanItem.Children)
         {
             if (child is MyListItem { Tag: double tag } item && tag >= 1000)
             {
                 item.SetChecked(true, false, false);
-                return;
+                return true;
             }
         }
+        return false;
     }
 
     private void PageOtherLeft_Unloaded(object sender, RoutedEventArgs e)

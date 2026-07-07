@@ -51,13 +51,33 @@ public static class PluginRemoteInstallService
         if (string.IsNullOrWhiteSpace(manifestUrl))
             throw new ArgumentException("插件 manifest 地址不能为空。", nameof(manifestUrl));
 
-        var manifest = await HttpRequest.GetJsonAsync<PluginMarketManifest>(manifestUrl).ConfigureAwait(false)
+        var manifest = await FetchManifestAsync(manifestUrl, ct).ConfigureAwait(false)
             ?? throw new InvalidDataException("插件 manifest 解析失败。");
         var version = SelectCompatibleManifestVersion(manifest);
 
         var prepared = await PreparePackageAsync(version.PackageUrl, version.Sha256, ct).ConfigureAwait(false);
         var sourceLabel = string.IsNullOrWhiteSpace(version.Version) ? "市场 manifest" : "市场 manifest（v" + version.Version + "）";
         return new PluginPreparedInstall(prepared.PluginRoot, prepared.Manifest, PluginInstallSourceType.Repository, manifestUrl, sourceLabel, prepared.CleanupPath);
+    }
+
+    /// <summary>
+    /// 仅获取 manifest（不下载插件包），用于检查更新等轻量场景。
+    /// </summary>
+    public static async Task<PluginMarketManifest?> FetchManifestAsync(string manifestUrl, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(manifestUrl)) return null;
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromSeconds(15));
+            var manifest = await HttpRequest.GetJsonAsync<PluginMarketManifest>(manifestUrl).ConfigureAwait(false);
+            ct.ThrowIfCancellationRequested();
+            return manifest;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public static PluginMarketVersion SelectCompatibleManifestVersion(PluginMarketManifest manifest, string? currentHostVersion = null)
