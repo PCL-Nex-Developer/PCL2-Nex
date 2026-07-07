@@ -19,9 +19,6 @@ public partial class PageToolsGameLink
     private static ILobbyService? Lobby =>
         PluginHostBootstrap.Extensions.GetDefault<ILobbyService>(PluginExtensionPoints.LobbyService);
 
-    private static ILobbyNetworkTestService? NetworkTest =>
-        PluginHostBootstrap.Extensions.GetDefault<ILobbyNetworkTestService>(PluginExtensionPoints.LobbyNetworkTestService);
-
     static PageToolsGameLink()
     {
         initLoader = new ModLoader.LoaderCombo<int>(Lang.Text("Link.Mod.Task.InitLobby"),
@@ -622,27 +619,10 @@ public partial class PageToolsGameLink
     {
         try
         {
-            var networkTest = NetworkTest;
-            if (networkTest is null)
-            {
-                LabNatType.Text = Lang.Text("Tools.GameLink.Nat.Failed");
-                HintService.Hint(Lang.Text("Setup.GameLink.NetworkTest.Unavailable"), HintType.Info);
-                return;
-            }
-
             BtnNatTest.IsEnabled = false;
-            LabNatType.Text = Lang.Text("Tools.GameLink.Nat.Testing");
-            var result = await networkTest.TestAsync();
-            if (result is null)
-            {
-                LabNatType.Text = Lang.Text("Tools.GameLink.Nat.Failed");
-                HintService.Hint(Lang.Text("Setup.GameLink.NetworkTest.Failed"), HintType.Error);
-                return;
-            }
-
-            LabNatType.Text = Lang.Text("Tools.GameLink.Nat.Result",
-                LobbyNetworkTestUi.GetNatTypeString(result.UdpNatType),
-                LobbyNetworkTestUi.GetNatTypeString(result.TcpNatType));
+            LabNatType.Text = "网络测试由联机隧道插件提供";
+            HintService.Hint("网络测试由联机隧道插件提供，当前启动器不再内置网络测试。", HintType.Info);
+            await Task.CompletedTask;
         }
         catch (Exception ex)
         {
