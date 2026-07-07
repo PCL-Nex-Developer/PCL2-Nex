@@ -50,4 +50,7 @@ public static class PluginExtensionPoints
 
     /// <summary>联机功能服务扩展点，贡献对象类型为 <see cref="ILobbyService"/>。</summary>
     public const string LobbyService = "pcl:lobby:service";
+
+    /// <summary>联机网络测试服务扩展点，贡献对象类型为 <see cref="ILobbyNetworkTestService"/>。</summary>
+    public const string LobbyNetworkTestService = "pcl:lobby:network-test-service";
 }

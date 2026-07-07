@@ -18,7 +18,7 @@ public static class ApiVersions
     /// <summary>
     /// 次要版本号。向后兼容的新增能力时递增。
     /// </summary>
-    public const int Minor = 1;
+    public const int Minor = 2;
 
     /// <summary>
     /// 修订号。

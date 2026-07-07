@@ -1762,6 +1762,8 @@
     <sys:String x:Key="Setup.GameLink.NetworkTest.Title">Network test</sys:String>
     <sys:String x:Key="Setup.GameLink.NetworkTest.Start">Start test</sys:String>
     <sys:String x:Key="Setup.GameLink.NetworkTest.Testing">Testing...</sys:String>
+    <sys:String x:Key="Setup.GameLink.NetworkTest.Unavailable">The current lobby tunnel plugin does not provide network test.</sys:String>
+    <sys:String x:Key="Setup.GameLink.NetworkTest.Failed">Network test failed.</sys:String>
     <sys:String x:Key="Setup.GameLink.NetworkTest.NotTested">Not tested</sys:String>
     <sys:String x:Key="Setup.GameLink.NetworkTest.Supported">Supported</sys:String>
     <sys:String x:Key="Setup.GameLink.NetworkTest.Unsupported">Unsupported</sys:String>
