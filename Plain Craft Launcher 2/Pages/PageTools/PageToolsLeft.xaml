@@ -1,0 +1,31 @@
+<local:MyPageLeft x:Class="PCL.PageToolsLeft"
+                  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                  xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                  xmlns:local="clr-namespace:PCL"
+                  mc:Ignorable="d">
+    <StackPanel Orientation="Vertical" x:Name="PanItem" Margin="0,12,0,0">
+
+        <TextBlock Text="{DynamicResource Tools.Left.Utilities}" Margin="13,5,5,3" Opacity="0.6" FontSize="12"
+                   x:Name="TextToolsCategory" />
+        <local:MyListItem x:Name="ItemTest"
+                          IsScaleAnimationEnabled="False"
+                          Type="RadioBox" Tag="3"
+                          MinPaddingRight="35" Height="36"
+                          VerticalAlignment="Top"
+                          Title="{DynamicResource Tools.Left.Utilities.Title}" Check="PageCheck"
+                          LogoScale="0.9"
+                          SvgIcon="lucide/tool-case" />
+
+        <local:MyListItem x:Name="ItemPlugins"
+                          IsScaleAnimationEnabled="False"
+                          Type="RadioBox" Tag="100"
+                          MinPaddingRight="35" Height="36"
+                          VerticalAlignment="Top"
+                          Title="插件商店" Check="PageCheck"
+                          LogoScale="0.9"
+                          SvgIcon="lucide/package-plus" />
+
+    </StackPanel>
+</local:MyPageLeft>

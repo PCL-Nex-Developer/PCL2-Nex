@@ -1,64 +1,69 @@
+**简体中文** | [English](README-EN.md) | [繁體中文](README-ZH_TW.md)
+
 <div align="center">
 
-<img src="PCL2-Nex.png" alt="Logo" width="80" height="80">
+<img src="Plain Craft Launcher 2/Images/icon.ico" alt="Logo" width="80" height="80">
 
-# PCL2-Nex
+# PCL Nex
 
-**基于 PCL2 的 Minecraft 启动器**  
-专注于丰富的联机功能与插件扩展
+[![Stars](https://img.shields.io/github/stars/PCL-Nex-Developer/PCL2-Nex?style=for-the-badge&logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZlcnNpb249IjEiIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiI+PHBhdGggZD0iTTggLjI1YS43NS43NSAwIDAgMSAuNjczLjQxOGwxLjg4MiAzLjgxNSA0LjIxLjYxMmEuNzUuNzUgMCAwIDEgLjQxNiAxLjI3OWwtMy4wNDYgMi45Ny43MTkgNC4xOTJhLjc1MS43NTEgMCAwIDEtMS4wODguNzkxTDggMTIuMzQ3bC0zLjc2NiAxLjk4YS43NS43NSAwIDAgMS0xLjA4OC0uNzlsLjcyLTQuMTk0TC44MTggNi4zNzRhLjc1Ljc1IDAgMCAxIC40MTYtMS4yOGw0LjIxLS42MTFMNy4zMjcuNjY4QS43NS43NSAwIDAgMSA4IC4yNVoiIGZpbGw9IiNlYWM1NGYiLz48L3N2Zz4=&logoSize=auto&label=stars&labelColor=444444&color=eac54f)](https://github.com/PCL-Nex-Developer/PCL2-Nex/)
+![GitHub Release](https://img.shields.io/github/v/release/PCL-Nex-Developer/PCL2-Nex?label=release&logo=github&style=for-the-badge)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/PCL-Nex-Developer/PCL2-Nex/build-test.yml?style=for-the-badge)
 
-[![Plugin](https://img.shields.io/badge/Plugin_API-pcl2--nex--api-yellow.svg)](https://github.com/PCL-Nex-Developer/pcl2-nex-api)
-[![GitHub stars](https://img.shields.io/github/stars/PCL-Nex-Developer/pcl2-nex?style=social)](https://github.com/PCL-Nex-Developer/pcl2-nex/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/PCL-Nex-Developer/pcl2-nex?style=social)](https://github.com/PCL-Nex-Developer/pcl2-nex/network/members)
-[![Release](https://img.shields.io/github/v/release/PCL-Nex-Developer/pcl2-nex)](https://github.com/PCL-Nex-Developer/pcl2-nex/releases)
+[![Issues](https://img.shields.io/github/issues/PCL-Nex-Developer/PCL2-Nex?style=for-the-badge&label=issues&labelColor=444444&color=1F883D&logo=github)](https://github.com/PCL-Nex-Developer/PCL2-Nex/issues)
+[![Pull requests](https://img.shields.io/github/issues-pr/PCL-Nex-Developer/PCL2-Nex?style=for-the-badge&label=pull%20requests&labelColor=444444&color=1F883D&logo=github)](https://github.com/PCL-Nex-Developer/PCL2-Nex/pulls)
+![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/PCL-Nex-Developer/PCL2-Nex/total?style=for-the-badge) <br />
+
+
+[社区版下载](https://github.com/PCL-Nex-Developer/PCL2-Nex/releases/latest) |
+[上游仓库](https://github.com/Meloong-Git/PCL)
+
+[提交问题](https://github.com/PCL-Nex-Developer/PCL2-Nex/issues/new/choose) |
+[插件开发指南](https://github.com/PCL-Nex-Developer/PCL2-Nex/wiki/插件开发指南)
 
 </div>
 
----
+PCL Nex 是基于 PCL 开源代码二次开发的社区版本，包含主线暂未制作的功能和改进。
 
-## 📖 简介
+社区版版本号与主线并非严格对应关系，也请不要向官方仓库反馈社区版问题。
 
-**PCL2-Nex** 是一款基于 [Plain Craft Launcher 2 (PCL2)](https://github.com/Meloong-Git/PCL) 及其社区版 [PCL2-CE](https://github.com/PCL-Community/PCL2-CE) 的 Minecraft 启动器项目。  
+欢迎大家来用用看！
 
-在保留原版简洁流畅体验的基础上，引入了 **Nex插件扩展接口规范**（**[pcl2-nex-api](https://github.com/PCL-Nex-Developer/pcl2-nex-api)**），并重点增强了联机功能与扩展性。
 
----
+## 💻 支持平台
 
-## ✨ 核心特性
+| 操作系统 | 支持情况 | 环境要求 |
+|---|---|---|
+| Windows 10 1809 (17763) 或更高版本 | ✅ 完整支持 | [.NET 8 Desktop Runtime](https://get.dot.net/8) |
+| Windows 8 至 Windows 10 1809 (17763) 或更低版本 | ⚠️ 理论可运行，酌情提供社区支持 | [.NET 8 Desktop Runtime](https://get.dot.net/8) |
+| Windows 7 或更低版本 | ❌ 不支持 | / |
+| macOS / Linux / 其他操作系统 | ⚠️ 仅支持跨平台开发（交叉编译） | [.NET 10 SDK](https://get.dot.net/10) |
 
-* **API 扩展**：通过 **pcl2-nex-api** 接口规范实现插件化扩展，插件可与启动器核心交互。
-* **联机增强**：优化多人游戏连接体验，提高稳定性与互动性。
-* **自由定制**：支持基于接口的深度自定义，不修改核心即可扩展功能。
+**✅ 完整支持**：我们会尽可能提供相关支持，但你必须确保正在使用最新版本的启动器。
 
----
+**⚠️ 理论可运行，酌情提供社区支持**：PCL Nex 应该可以在这些平台上运行，但不保证功能完全可用。你可能需要升级到完整支持的系统版本，才能继续获得进一步的社区技术支持。
 
-## 🔗 致谢与上游
+**❌ 不支持**：PCL Nex 在这些平台上的可用性较低，甚至可能无法启动。请升级操作系统后再使用 PCL Nex。
 
-本项目基于以下开源项目开发：
-* **[PCL2 (Meloong-Git)](https://github.com/Meloong-Git/PCL)** – 基于该库修改
-* **[PCL.Core（PCL-Community）](https://github.com/PCL-Community/PCL.Core)** – 提供部分核心库源码
-* **[PCL2-Nex-API](https://github.com/PCL-Nex-Developer/pcl2-nex-api)** – 提供Plugin API映射支持
+**⚠️ 仅支持跨平台开发（交叉编译）**：PCL Nex 的源代码可以在 macOS 与 Linux 平台编译，但无法直接运行。作为开发者，你可以在这些平台上进行开发，然后将编译产物转移到 Windows 系统测试。
 
----
+**注：**
+社区仅对最新版本的启动器提供支持。
+根据部分问题的特殊性（例如系统环境不完整），你仍可能需要升级操作系统才能继续获得支持。
+PCL Nex 始终建议使用最新版本的操作系统以获得最佳体验。
+你仍然可以尝试在不受支持的系统上使用 PCL Nex，但可能会遇到更多额外问题。
 
-## 📦 安装与使用
+## 🔒 授权条款
 
-1. 前往 [Releases](#) 页面下载最新版本。  
-2. 解压并运行 `PCL2-Nex.exe`。  
-3. 根据提示完成 Minecraft 游戏环境配置。
+- `Plain Craft Launcher 2/` 使用 [自定义授权条款](https://github.com/PCL-Nex-Developer/PCL2-Nex/blob/dev/Plain%20Craft%20Launcher%202/LICENCE)
+- `其余所有目录` 使用 [Apache License 2.0](https://github.com/PCL-Nex-Developer/PCL2-Nex/blob/dev/LICENSE)
 
----
+## 🌟 统计数据
 
-## ⚖️ 许可证
+[![Star History Chart](https://api.star-history.com/svg?repos=PCL-Nex-Developer/PCL2-Nex&type=Date)](https://www.star-history.com/#PCL-Nex-Developer/PCL2-Nex&Date)
 
-* **PCL2-Nex** 采用 **与PCL2上游一致的协议**。  
-  您需遵守pcl2协议条款。详情请参阅根目录 `LICENSE` 文件。
+**本页浏览量**（总计 / 今日）：[![Hits](https://hits.zkitefly.eu.org/?tag=https://github.com/PCL-Nex-Developer/PCL2-Nex)](https://hits.zkitefly.eu.org/?tag=https://github.com/PCL-Nex-Developer/PCL2-Nex&web=true)
 
-* **PCL-Nex-Core** 采用 **与PCL.Core一致的协议**。  
-  您需遵守Apache-2.0 License。详情请参阅根目录 `LICENSE.Core` 文件。
+## ❤️ 贡献者
 
----
-
-<div align="center">
-<strong>PCL-Nex-Developer</strong>
-</div>
+[![](https://contrib.rocks/image?repo=PCL-Nex-Developer/PCL2-Nex)](https://github.com/PCL-Nex-Developer/PCL2-Nex/graphs/contributors)
