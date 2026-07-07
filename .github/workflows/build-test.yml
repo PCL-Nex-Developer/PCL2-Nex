@@ -1,0 +1,38 @@
+name: Build (CI)
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [dev]
+    paths-ignore: &ignored
+      - '**/.editorconfig'
+      - '**/.gitignore'
+      - '**/.gitattributes'
+      - '**/*.md'
+      - '**/LICENSE'
+      - '**/LICENCE'
+      - 'PCL.Core.Test/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/FUNDING.yml'
+  pull_request:
+    paths-ignore: *ignored
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - configuration: CI
+            architecture: x64
+          - configuration: CI
+            architecture: ARM64
+      fail-fast: false
+
+    uses: ./.github/workflows/reusable-build.yml
+    with:
+      configuration: ${{ matrix.configuration }}
+      architecture: ${{ matrix.architecture }}
+    secrets: inherit
