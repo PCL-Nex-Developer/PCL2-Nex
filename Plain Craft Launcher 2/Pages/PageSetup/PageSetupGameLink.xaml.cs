@@ -14,6 +14,9 @@ public partial class PageSetupGameLink
     private static ILobbyService? Lobby =>
         PluginHostBootstrap.Extensions.GetDefault<ILobbyService>(PluginExtensionPoints.LobbyService);
 
+    private static ILobbyNetworkTestService? NetworkTest =>
+        PluginHostBootstrap.Extensions.GetDefault<ILobbyNetworkTestService>(PluginExtensionPoints.LobbyNetworkTestService);
+
     public PageSetupGameLink()
     {
         InitializeComponent();
@@ -130,15 +133,37 @@ public partial class PageSetupGameLink
     }
 
     // 网络测试
-    private void BtnNetTest_Click(object sender, MouseButtonEventArgs e)
+    private async void BtnNetTest_Click(object sender, MouseButtonEventArgs e)
     {
         try
         {
-            HintService.Hint("网络测试由联机隧道插件提供，当前启动器不再内置网络测试。", HintType.Info);
+            var networkTest = NetworkTest;
+            if (networkTest is null)
+            {
+                HintService.Hint(Lang.Text("Setup.GameLink.NetworkTest.Unavailable"), HintType.Info);
+                return;
+            }
+
+            BtnNetTest.IsEnabled = false;
+            BtnNetTest.Text = Lang.Text("Setup.GameLink.NetworkTest.Testing");
+            var result = await networkTest.TestAsync();
+            if (result is null)
+            {
+                HintService.Hint(Lang.Text("Setup.GameLink.NetworkTest.Failed"), HintType.Error);
+                return;
+            }
+
+            TextUdpNatType.Text = Lang.Text("Setup.GameLink.NetworkTest.UdpNatType", LobbyNetworkTestUi.GetNatTypeString(result.UdpNatType));
+            TextTcpNatType.Text = Lang.Text("Setup.GameLink.NetworkTest.TcpNatType", LobbyNetworkTestUi.GetNatTypeString(result.TcpNatType));
+            TextIpv6Status.Text = Lang.Text("Setup.GameLink.NetworkTest.Ipv6Status", LobbyNetworkTestUi.GetIpv6StatusString(result.SupportIPv6));
         }
         catch (Exception ex)
         {
             ModBase.Log(ex, "[Link] 获取网络测试结果失败", ModBase.LogLevel.Hint);
+            HintService.Hint(Lang.Text("Setup.GameLink.NetworkTest.Failed"), HintType.Error);
+        }
+        finally
+        {
             BtnNetTest.IsEnabled = true;
             BtnNetTest.Text = Lang.Text("Setup.GameLink.NetworkTest.Start");
         }

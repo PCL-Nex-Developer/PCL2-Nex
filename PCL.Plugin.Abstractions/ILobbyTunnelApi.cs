@@ -57,6 +57,29 @@ public static class LobbyTunnelExtensions
             Contribution = service
         });
     }
+
+    /// <summary>
+    /// 注册一个联机网络测试服务。
+    /// </summary>
+    public static IDisposable RegisterLobbyNetworkTestService(
+        this IPluginExtensionApi extensions,
+        ILobbyNetworkTestService service,
+        string id = "default",
+        string displayName = "Lobby Network Test",
+        int order = 100)
+    {
+        ArgumentNullException.ThrowIfNull(extensions);
+        ArgumentNullException.ThrowIfNull(service);
+
+        return extensions.Register(new PluginExtensionDescriptor<ILobbyNetworkTestService>
+        {
+            ExtensionPoint = PluginExtensionPoints.LobbyNetworkTestService,
+            Id = string.IsNullOrWhiteSpace(id) ? "default" : id,
+            DisplayName = string.IsNullOrWhiteSpace(displayName) ? "Lobby Network Test" : displayName,
+            Order = order,
+            Contribution = service
+        });
+    }
 }
 
 /// <summary>
@@ -230,6 +253,35 @@ public interface ILobbyTunnelSession : IAsyncDisposable
 
     /// <summary>Adds a local port forward to a remote peer.</summary>
     Task<int> AddPortForwardAsync(string targetIp, int targetPort, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Provides the network test implementation for host-provided lobby pages.
+/// </summary>
+public interface ILobbyNetworkTestService
+{
+    Task<LobbyNetworkTestResult?> TestAsync(CancellationToken cancellationToken = default);
+}
+
+public sealed record LobbyNetworkTestResult
+{
+    public required LobbyNatType UdpNatType { get; init; }
+    public required LobbyNatType TcpNatType { get; init; }
+    public required bool SupportIPv6 { get; init; }
+}
+
+public enum LobbyNatType
+{
+    Unknown,
+    OpenInternet,
+    NoPat,
+    FullCone,
+    Restricted,
+    PortRestricted,
+    SymmetricEasy,
+    Symmetric,
+    SymmetricFirewall,
+    UdpBlocked
 }
 
 /// <summary>

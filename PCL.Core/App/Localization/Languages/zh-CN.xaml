@@ -1762,6 +1762,8 @@
     <sys:String x:Key="Setup.GameLink.NetworkTest.Title">网络测试</sys:String>
     <sys:String x:Key="Setup.GameLink.NetworkTest.Start">开始测试</sys:String>
     <sys:String x:Key="Setup.GameLink.NetworkTest.Testing">正在测试</sys:String>
+    <sys:String x:Key="Setup.GameLink.NetworkTest.Unavailable">当前联机隧道插件未提供网络测试。</sys:String>
+    <sys:String x:Key="Setup.GameLink.NetworkTest.Failed">网络测试失败。</sys:String>
     <sys:String x:Key="Setup.GameLink.NetworkTest.NotTested">尚未检测</sys:String>
     <sys:String x:Key="Setup.GameLink.NetworkTest.Supported">支持</sys:String>
     <sys:String x:Key="Setup.GameLink.NetworkTest.Unsupported">不支持</sys:String>
