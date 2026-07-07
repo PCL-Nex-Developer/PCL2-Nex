@@ -18,14 +18,5 @@
                           LogoScale="0.9"
                           SvgIcon="lucide/tool-case" />
 
-        <local:MyListItem x:Name="ItemPlugins"
-                          IsScaleAnimationEnabled="False"
-                          Type="RadioBox" Tag="100"
-                          MinPaddingRight="35" Height="36"
-                          VerticalAlignment="Top"
-                          Title="插件商店" Check="PageCheck"
-                          LogoScale="0.9"
-                          SvgIcon="lucide/package-plus" />
-
     </StackPanel>
 </local:MyPageLeft>

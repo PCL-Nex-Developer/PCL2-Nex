@@ -1388,6 +1388,7 @@ public partial class FormMain
         DownloadLiteLoader = 16,
         DownloadLabyMod = 17,
         DownloadLegacyFabric = 18,
+        DownloadPluginStore = 19,
 
         SetupLaunch = 0,
         SetupUI = 1,
@@ -1406,8 +1407,6 @@ public partial class FormMain
 
         ToolsGameLink = 1,
         ToolsTest = 3,
-        /// <summary>插件面板。</summary>
-        ToolsPlugins = 100,
         ToolsPluginInstalled = 101,
 
         VersionOverall = 0,

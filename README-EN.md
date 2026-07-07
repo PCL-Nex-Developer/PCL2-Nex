@@ -19,7 +19,7 @@
 [Upstream repo](https://github.com/Meloong-Git/PCL)
 
 [Submit issues](https://github.com/PCL-Nex-Developer/PCL2-Nex/issues/new/choose) |
-[Contribution Guidelines](https://github.com/PCL-Nex-Developer/PCL2-Nex/wiki/开发指南)
+[Contribution Guidelines](https://github.com/PCL-Nex-Developer/PCL2-Nex/wiki/Home)
 
 </div>
 

@@ -382,7 +382,7 @@ internal sealed class HostBridgeImpl(
         catch { return fallback ?? key; }
     }
 
-        public string HostVersion => ModBase.versionBaseName ?? "3.0.0";
+        public string HostVersion => ModBase.versionBaseName ?? "3.0.1";
 
     public object? GetOptionalService(string serviceId)
     {

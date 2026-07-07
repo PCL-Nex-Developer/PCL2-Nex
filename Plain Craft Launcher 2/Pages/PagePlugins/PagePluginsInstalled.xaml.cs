@@ -8,6 +8,7 @@ using System.Windows.Media;
 using PCL.Core.App;
 using PCL.Core.App.Plugins;
 using PCL.Core.UI;
+using PCL.Plugins;
 
 namespace PCL;
 
@@ -19,7 +20,17 @@ public partial class PagePluginsInstalled
         Loaded += (_, _) => Build();
     }
 
-    public void Build() { BuildInstalledList(); }
+    public void Build()
+    {
+        BuildInstalledList();
+        BuildToolsPanel();
+    }
+
+    private void BuildToolsPanel()
+    {
+        var entries = PluginHostBootstrap.UiExtensions.GetTools();
+        TabHostPlugins.BuildTabs(entries, "当前没有工具类插件");
+    }
 
     private void BuildInstalledList()
     {

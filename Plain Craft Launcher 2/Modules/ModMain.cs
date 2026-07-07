@@ -36,7 +36,6 @@ public static class ModMain
     public static PageToolsLeft? frmToolsLeft;
     public static PageToolsGameLink? frmToolsGameLink;
     public static PageToolsTest? frmToolsTest;
-    public static PageToolsPlugins? frmToolsPlugins;
     public static PageDownloadLeft? frmDownloadLeft;
     public static PageDownloadInstall? frmDownloadInstall;
     public static PageDownloadClient? frmDownloadClient;
@@ -56,6 +55,7 @@ public static class ModMain
     public static PageDownloadResourcePack? frmDownloadResourcePack;
     public static PageDownloadWorld? frmDownloadWorld;
     public static PageDownloadCompFavorites? frmDownloadCompFavorites;
+    public static PageDownloadPluginStore? frmDownloadPluginStore;
     public static PageSetupLeft? frmSetupLeft;
     public static PageSetupLaunch? frmSetupLaunch;
     public static PageSetupUI? frmSetupUI;

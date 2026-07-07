@@ -1,10 +1,10 @@
 {
   "name": "Plain Craft Launcher Nex",
   "version": {
-    "base": "3.0.0",
+    "base": "3.0.1",
     "upstream": "2.12.1",
     "suffix": "",
-    "code": 1000
+    "code": 1001
   },
   "licenses": [
     {

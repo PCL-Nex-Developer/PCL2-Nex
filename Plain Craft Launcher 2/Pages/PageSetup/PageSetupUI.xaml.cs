@@ -728,11 +728,13 @@ public partial class PageSetupUI
                     !HiddenForceShow && conf.SetupLog ? Visibility.Collapsed : Visibility.Visible;
 
                 var settingsPluginCount = PluginHostBootstrap.UiExtensions.GetSettings().Count;
+                var hasPluginSetupItems = true;
                 var categories = new[]
                 {
                     (ModMain.frmSetupLeft.TextGameCategory,
                         !(conf.SetupLaunch && conf.SetupJava && conf.SetupGameManage)),
                     (ModMain.frmSetupLeft.TextLauncherCategory, !(conf.SetupUi && conf.SetupLauncherLanguage && conf.SetupLauncherMisc)),
+                    (ModMain.frmSetupLeft.TextPluginsCategory, hasPluginSetupItems),
                     (ModMain.frmSetupLeft.TextAboutCategory,
                         !(conf.SetupAbout && conf.SetupUpdate && conf.SetupFeedback && conf.SetupLog))
                 };
@@ -761,6 +763,7 @@ public partial class PageSetupUI
                     setupCount += 1;
                 if (!conf.SetupUpdate)
                     setupCount += 1;
+                setupCount += 1;
                 setupCount += settingsPluginCount;
                 if (!conf.SetupAbout)
                     setupCount += 1;
@@ -777,15 +780,14 @@ public partial class PageSetupUI
             {
                 ModMain.frmToolsLeft.ItemTest.Visibility =
                     !HiddenForceShow && conf.ToolsTest ? Visibility.Collapsed : Visibility.Visible;
-                ModMain.frmToolsLeft.ItemPlugins.Visibility = Visibility.Visible;
                 
                 // 处理分类标题
-                var isToolsVisible = true;
+                var isToolsVisible = !conf.ToolsTest || HiddenForceShow || PluginHostBootstrap.UiExtensions.GetTools().Count > 0;
                 ModMain.frmToolsLeft.TextToolsCategory.Visibility = isToolsVisible ? Visibility.Visible : Visibility.Collapsed;
                 if (isToolsVisible) ModMain.frmToolsLeft.TextToolsCategory.Opacity = 0.6;
                 
                 // 统计工具页可用项数量
-                var toolsCount = 1;
+                var toolsCount = 0;
                 if (!conf.ToolsTest)
                     toolsCount += 1;
                 toolsCount += PluginHostBootstrap.UiExtensions.GetTools().Count;

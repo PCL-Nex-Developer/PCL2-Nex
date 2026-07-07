@@ -24,6 +24,22 @@
 
             <TextBlock Text="{DynamicResource Download.Left.CommunityResources}" Margin="13,10,5,4" Opacity="0.6"
                        FontSize="12" />
+            <local:MyListItem x:Name="ItemPluginStore" Type="RadioBox" IsScaleAnimationEnabled="False" Tag="19"
+                              Check="PageCheck"
+                              MinPaddingRight="35" Height="36" VerticalAlignment="Top"
+                              Title="插件商店"
+                              LogoScale="0.9"
+                              SvgIcon="lucide/package-plus">
+                <local:MyListItem.Buttons>
+                    <x:Array Type="{x:Type local:MyIconButton}">
+                        <local:MyIconButton Tag="19" ToolTip="{DynamicResource Common.Action.Refresh}"
+                                            ToolTipService.Placement="Right" Click="RefreshButton_Click"
+                                            ToolTipService.InitialShowDelay="200" ToolTipService.VerticalOffset="-1"
+                                            LogoScale="0.85"
+                                            SvgIcon="lucide/refresh-cw" />
+                    </x:Array>
+                </local:MyListItem.Buttons>
+            </local:MyListItem>
             <local:MyListItem x:Name="ItemMod" Type="RadioBox" IsScaleAnimationEnabled="False" Tag="2"
                               Check="PageCheck"
                               MinPaddingRight="35" Height="36" VerticalAlignment="Top"

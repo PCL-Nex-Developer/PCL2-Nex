@@ -68,12 +68,12 @@ jobs:
       - name: Download Build Artifact
         uses: actions/download-artifact@v4
         with:
-          name: PCL2_CE_${{ matrix.configuration }}_${{ matrix.architecture }}
+          name: PCL2_Nex_${{ matrix.configuration }}_${{ matrix.architecture }}
           path: ./artifact
 
       - name: Rename binaries
         run: |
-          mv "./artifact/Plain Craft Launcher 2.exe" "PCL2_CE_${{ matrix.configuration }}_${{ matrix.architecture }}.exe"
+          mv "./artifact/Plain Craft Launcher 2.exe" "PCL2_Nex_${{ matrix.configuration }}_${{ matrix.architecture }}.exe"
 
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@v6
@@ -83,14 +83,14 @@ jobs:
 
       - name: Sign the binary
         run: |
-          gpg --detach-sign --armor "PCL2_CE_${{ matrix.configuration }}_${{ matrix.architecture }}.exe"
+          gpg --detach-sign --armor "PCL2_Nex_${{ matrix.configuration }}_${{ matrix.architecture }}.exe"
 
       - name: Upload binary and signature to Release
         uses: softprops/action-gh-release@v2.2.2
         with:
           files: |
-            PCL2_CE_${{ matrix.configuration }}_${{ matrix.architecture }}.exe
-            PCL2_CE_${{ matrix.configuration }}_${{ matrix.architecture }}.exe.asc
+            PCL2_Nex_${{ matrix.configuration }}_${{ matrix.architecture }}.exe
+            PCL2_Nex_${{ matrix.configuration }}_${{ matrix.architecture }}.exe.asc
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
