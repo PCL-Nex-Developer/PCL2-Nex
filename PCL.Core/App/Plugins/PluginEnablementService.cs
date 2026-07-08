@@ -1,16 +1,20 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 
 namespace PCL.Core.App.Plugins;
 
 public static class PluginEnablementService
 {
+    private const string SelfProtectionDisabledDirectoryName = ".self-protection-disabled";
+
     private static readonly string[] SessionEnabledBaseline = NormalizeEnabledStates(ReadEnabledStates()).ToArray();
 
     public static bool IsEnabled(string pluginId)
     {
         if (string.IsNullOrWhiteSpace(pluginId)) return false;
+        if (IsDisabledBySelfProtection(pluginId)) return false;
 
         try
         {
@@ -26,12 +30,33 @@ public static class PluginEnablementService
     public static void SetEnabled(string pluginId, bool enabled)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(pluginId);
+        if (enabled) ClearSelfProtectionDisabled(pluginId);
 
         var states = NormalizeEnabledStates(ReadEnabledStates()).ToList();
         states.RemoveAll(id => string.Equals(id, pluginId, StringComparison.OrdinalIgnoreCase));
         if (enabled) states.Add(pluginId);
 
         Config.Plugin.EnabledStates = states;
+    }
+
+    public static bool IsDisabledBySelfProtection(string pluginId)
+    {
+        if (string.IsNullOrWhiteSpace(pluginId)) return false;
+        return File.Exists(_GetSelfProtectionMarkerPath(pluginId));
+    }
+
+    public static void MarkSelfProtectionDisabled(string pluginId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(pluginId);
+        Directory.CreateDirectory(_GetSelfProtectionDirectory());
+        File.WriteAllText(_GetSelfProtectionMarkerPath(pluginId), DateTimeOffset.UtcNow.ToString("O"));
+    }
+
+    public static void ClearSelfProtectionDisabled(string pluginId)
+    {
+        if (string.IsNullOrWhiteSpace(pluginId)) return;
+        var markerPath = _GetSelfProtectionMarkerPath(pluginId);
+        if (File.Exists(markerPath)) File.Delete(markerPath);
     }
 
     public static IReadOnlyList<string> GetEnabledPluginOrder()
@@ -111,5 +136,17 @@ public static class PluginEnablementService
             if (string.Equals(states[i], pluginId, StringComparison.OrdinalIgnoreCase)) return i;
         }
         return -1;
+    }
+
+    private static string _GetSelfProtectionDirectory()
+        => Path.Combine(Paths.Plugins, SelfProtectionDisabledDirectoryName);
+
+    private static string _GetSelfProtectionMarkerPath(string pluginId)
+        => Path.Combine(_GetSelfProtectionDirectory(), _SafeFileName(pluginId));
+
+    private static string _SafeFileName(string value)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        return new string(value.Select(c => invalid.Contains(c) ? '_' : c).ToArray());
     }
 }

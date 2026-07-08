@@ -125,23 +125,6 @@ public sealed class ToolsPanelDescriptor
 }
 
 /// <summary>
-/// 宿主页面工厂服务。插件可通过 <see cref="IPluginHost.GetOptionalService"/> 获取宿主预留页面，
-/// 再作为自己的 UI 入口贡献出来。
-/// </summary>
-public interface IPluginPageHostService
-{
-    /// <summary>
-    /// 创建宿主预留的联机大厅页面。
-    /// </summary>
-    FrameworkElement CreateLobbyToolsPage();
-
-    /// <summary>
-    /// 创建宿主预留的联机设置页面。
-    /// </summary>
-    FrameworkElement CreateLobbySettingsPage();
-}
-
-/// <summary>
 /// 插件页面工厂委托。返回需要挂载的根控件。
 /// </summary>
 /// <returns>WPF 根控件，由宿主负责布局。</returns>

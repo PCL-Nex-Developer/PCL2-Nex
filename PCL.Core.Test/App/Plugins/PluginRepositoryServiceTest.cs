@@ -268,4 +268,31 @@ public class PluginRepositoryServiceTest
         Assert.AreEqual("com.example.hello", updates[0].Entry.Id);
         Assert.AreEqual(new System.Version(1, 1, 0), updates[0].LatestVersion);
     }
+
+    [TestMethod]
+    public void FindUpdates_ShouldCompareVersionsWithMissingPartsAsZero()
+    {
+        var installed = new Dictionary<string, PluginInstallRecord>
+        {
+            ["com.example.hello"] = new()
+            {
+                PluginId = "com.example.hello",
+                InstalledVersion = new System.Version(1, 0, 0, 0)
+            }
+        };
+        var entries = new List<PluginRepositoryEntry>
+        {
+            new()
+            {
+                Id = "com.example.hello",
+                Name = "Hello",
+                Version = "v1.0.0",
+                ManifestUrl = "https://example.test/hello/manifest.json"
+            }
+        };
+
+        var updates = PluginUpdateService.FindUpdates(entries, installed);
+
+        Assert.AreEqual(0, updates.Count);
+    }
 }

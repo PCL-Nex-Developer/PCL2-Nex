@@ -193,7 +193,9 @@ public partial class PageDownloadLeft : IRefreshable
             }
             case FormMain.PageSubType.DownloadPluginStore:
             {
-                ModMain.frmDownloadPluginStore?.PageLoaderRestart();
+                if (ModMain.frmDownloadPluginStore is null)
+                    ModMain.frmDownloadPluginStore = new PageDownloadPluginStore();
+                ModMain.frmDownloadPluginStore.RefreshStore();
                 ItemPluginStore.Checked = true;
                 break;
             }

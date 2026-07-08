@@ -144,6 +144,24 @@ public class PluginPackageServiceTest
     }
 
     [TestMethod]
+    public void ValidatePackageManifest_ShouldAcceptNewerApiWhenNoMaximumDeclared()
+    {
+        var manifest = new PluginPackageManifest
+        {
+            Id = "com.example.hello",
+            Name = "Hello",
+            Version = new Version(1, 0, 0, 0),
+            EntryAssembly = "lib/test.dll",
+            MinApiVersion = new Version(1, 0, 0, 0)
+        };
+
+        var result = PluginPackageService.ValidatePackageManifest(manifest);
+
+        Assert.IsTrue(result.IsValid);
+        Assert.IsNull(result.ErrorMessage);
+    }
+
+    [TestMethod]
     public void ValidatePackageManifest_ShouldRejectApiVersionAbovePluginMaximum()
     {
         var manifest = new PluginPackageManifest

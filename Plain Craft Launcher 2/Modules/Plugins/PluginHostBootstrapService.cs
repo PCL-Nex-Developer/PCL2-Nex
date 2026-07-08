@@ -52,18 +52,6 @@ public static class PluginHostBootstrap
         _uiHost = new UiExtensionHostImpl(_uiRegistry);
         var bridge = new HostBridgeImpl(_uiHost, _instanceAdapter, _cliRegistry, _uriActionRegistry, _extensionRegistry);
         PluginHostBridge.Register(bridge);
-        _extensionRegistry.Changed += (_, _) =>
-        {
-            var app = Application.Current;
-            void RefreshLobbyUi()
-            {
-                PageSetupUI.HiddenRefresh();
-                ModMain.frmToolsGameLink?.RefreshProviderState();
-            }
-
-            if (app is null || app.Dispatcher.CheckAccess()) RefreshLobbyUi();
-            else app.Dispatcher.BeginInvoke(new Action(RefreshLobbyUi));
-        };
         // 退出时清理注册表
         Lifecycle.When(LifecycleState.Exiting, Cleanup);
         ModBase.Log("[Plugins] 插件宿主桥接已注册");
@@ -382,37 +370,7 @@ internal sealed class HostBridgeImpl(
         catch { return fallback ?? key; }
     }
 
-        public string HostVersion => ModBase.versionBaseName ?? "3.0.1";
-
-    public object? GetOptionalService(string serviceId)
-    {
-        if (serviceId == "pcl:host:ui-extension-registry") return PluginHostBootstrap.UiExtensions;
-        if (serviceId == "pcl:host:cli-registry") return PluginHostBootstrap.CliCommands;
-        if (serviceId == "pcl:host:uri-action-registry") return PluginHostBootstrap.UriActions;
-        if (serviceId == "pcl:host:extension-registry") return PluginHostBootstrap.Extensions;
-        if (serviceId == "pcl:host:lobby-tunnel-registry") return PluginHostBootstrap.Extensions;
-        if (serviceId == "pcl:host:tools-pages") return HostToolsPageService.Instance;
-        return null;
-    }
-}
-
-internal sealed class HostToolsPageService : IPluginPageHostService
-{
-    public static HostToolsPageService Instance { get; } = new();
-
-    private HostToolsPageService() { }
-
-    public FrameworkElement CreateLobbyToolsPage()
-    {
-        ModMain.frmToolsGameLink ??= new PageToolsGameLink();
-        return ModMain.frmToolsGameLink;
-    }
-
-    public FrameworkElement CreateLobbySettingsPage()
-    {
-        ModMain.frmSetupGameLink ??= new PageSetupGameLink();
-        return ModMain.frmSetupGameLink;
-    }
+        public string HostVersion => ModBase.versionBaseName ?? "3.0.2";
 }
 
 internal sealed class CliRegistrarImpl(PluginCliRegistry registry) : IHostCliRegistrar
@@ -470,9 +428,17 @@ internal sealed class InstanceInfoProviderAdapter : IHostInstanceInfoProvider
         catch { return null; }
     }
 
-    public event EventHandler? InstancesChanged;
-    public event EventHandler? SelectedChanged;
-    // 当前 PCL 实例列表没有统一的变化事件，这里暂不主动触发。
+    public event EventHandler? InstancesChanged
+    {
+        add { }
+        remove { }
+    }
+
+    public event EventHandler? SelectedChanged
+    {
+        add { }
+        remove { }
+    }
 
     private static HostInstanceSnapshot _ToSnapshot(McInstance inst)
     {

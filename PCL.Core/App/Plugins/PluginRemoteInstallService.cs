@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
@@ -9,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using PCL.Core.App;
 using PCL.Core.IO.Net.Http;
+using PCL.Core.Logging;
 
 namespace PCL.Core.App.Plugins;
 
@@ -55,29 +57,82 @@ public static class PluginRemoteInstallService
             ?? throw new InvalidDataException("插件 manifest 解析失败。");
         var version = SelectCompatibleManifestVersion(manifest);
 
+        return await PrepareManifestVersionAsync(manifestUrl, version, ct).ConfigureAwait(false);
+    }
+
+    public static async Task<PluginPreparedInstall> PrepareManifestVersionAsync(string manifestUrl, PluginMarketVersion version, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(manifestUrl))
+            throw new ArgumentException("插件 manifest 地址不能为空。", nameof(manifestUrl));
+        if (version is null)
+            throw new ArgumentNullException(nameof(version));
+        if (!LooksLikePackageUrl(version.PackageUrl))
+            throw new InvalidDataException("插件 manifest 版本缺少指向 .pclx 或 .zip 的 packageUrl。");
+
         var prepared = await PreparePackageAsync(version.PackageUrl, version.Sha256, ct).ConfigureAwait(false);
         var sourceLabel = string.IsNullOrWhiteSpace(version.Version) ? "市场 manifest" : "市场 manifest（v" + version.Version + "）";
         return new PluginPreparedInstall(prepared.PluginRoot, prepared.Manifest, PluginInstallSourceType.Repository, manifestUrl, sourceLabel, prepared.CleanupPath);
     }
 
     /// <summary>
-    /// 仅获取 manifest（不下载插件包），用于检查更新等轻量场景。
+    /// 仅获取 manifest（不下载插件包），用于检查更新等轻量场景。<br/>
+    /// 会依次尝试配置的镜像、所有 GitHub 加速镜像，确保在网络受限时仍能获取最新版本。
     /// </summary>
     public static async Task<PluginMarketManifest?> FetchManifestAsync(string manifestUrl, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(manifestUrl)) return null;
-        try
+
+        var candidates = GetManifestFetchCandidates(manifestUrl);
+
+        foreach (var (url, label) in candidates)
         {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            cts.CancelAfter(TimeSpan.FromSeconds(15));
-            var manifest = await HttpRequest.GetJsonAsync<PluginMarketManifest>(manifestUrl).ConfigureAwait(false);
             ct.ThrowIfCancellationRequested();
-            return manifest;
+            try
+            {
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeoutCts.CancelAfter(TimeSpan.FromSeconds(8));
+                using var resp = await HttpRequest.Create(url)
+                    .SendAsync(retryTimes: 1, cancellationToken: timeoutCts.Token)
+                    .ConfigureAwait(false);
+                if (!resp.IsSuccessStatusCode) continue;
+                var manifest = await resp.AsJsonAsync<PluginMarketManifest>(cancellationToken: timeoutCts.Token)
+                    .ConfigureAwait(false);
+                if (manifest is not null)
+                {
+                    if (!string.Equals(url, manifestUrl, StringComparison.OrdinalIgnoreCase))
+                        LogWrapper.Debug("Plugin", "Manifest fetched via " + label + ": " + manifestUrl);
+                    return manifest;
+                }
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+            catch { /* try next candidate */ }
         }
-        catch
+
+        LogWrapper.Debug("Plugin", "Manifest fetch exhausted all candidates: " + manifestUrl);
+        return null;
+    }
+
+    private static IReadOnlyList<(string Url, string Label)> GetManifestFetchCandidates(string manifestUrl)
+    {
+        var candidates = new List<(string Url, string Label)>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // 优先：通过 RewriteByConfig 应用用户配置的镜像
+        candidates.Add((manifestUrl, "configured"));
+        seen.Add(manifestUrl);
+
+        // 回退：所有 GitHub 加速镜像
+        if (GitHubAccelerator.ShouldRewrite(manifestUrl))
         {
-            return null;
+            foreach (var mirror in GitHubAccelerator.Mirrors)
+            {
+                var mirrored = mirror + manifestUrl;
+                if (seen.Add(mirrored))
+                    candidates.Add((mirrored, mirror.TrimEnd('/')));
+            }
         }
+
+        return candidates;
     }
 
     public static PluginMarketVersion SelectCompatibleManifestVersion(PluginMarketManifest manifest, string? currentHostVersion = null)

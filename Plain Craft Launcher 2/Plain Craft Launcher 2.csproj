@@ -28,10 +28,10 @@
         <Description>Minecraft 启动器 (作者: 龙腾猫跃; 经社区二次开发版本)</Description>
         <Product>Plain Craft Launcher Nex</Product>
         <Copyright>Copyright © 龙腾猫跃 2016. All Rights Reserved.</Copyright>
-        <Version>3.0.1-beta2</Version>
-        <AssemblyVersion>3.0.1.0</AssemblyVersion>
-        <FileVersion>3.0.1.0</FileVersion>
-        <InformationalVersion>3.0.1-beta2</InformationalVersion>
+        <Version>3.0.2</Version>
+        <AssemblyVersion>3.0.2.0</AssemblyVersion>
+        <FileVersion>3.0.2.0</FileVersion>
+        <InformationalVersion>3.0.2</InformationalVersion>
         <NoWarn>
             41999;42016;42017;42018;42019;42020;42021;42022;42032;42036;42314;
             VSTHRD002;VSTHRD003;VSTHRD110;VSTHRD200

@@ -18,12 +18,12 @@ public static class ApiVersions
     /// <summary>
     /// 次要版本号。向后兼容的新增能力时递增。
     /// </summary>
-    public const int Minor = 1;
+    public const int Minor = 2;
 
     /// <summary>
     /// 修订号。
     /// </summary>
-    public const int Patch = 0;
+    public const int Patch = 1;
 
     /// <summary>
     /// 当前 SDK 契约版本。
@@ -32,7 +32,7 @@ public static class ApiVersions
 
     /// <summary>
     /// 判断宿主提供的 API 版本是否满足插件要求的最低版本。<br/>
-    /// 规则：宿主主版本号必须与插件要求的主版本号一致，且宿主版本不低于插件要求的版本。
+    /// 未声明最高兼容版本时，宿主版本不低于插件要求即可。
     /// </summary>
     /// <param name="hostApiVersion">宿主实际提供的 API 版本</param>
     /// <param name="minRequired">插件声明的最低 API 版本</param>
@@ -42,7 +42,7 @@ public static class ApiVersions
 
     /// <summary>
     /// 判断宿主提供的 API 版本是否落在插件声明的兼容范围内。<br/>
-    /// 任一边界存在时，宿主主版本号必须与该边界主版本号一致。
+    /// 插件可通过最高兼容版本阻止在更新的宿主 API 中加载。
     /// </summary>
     /// <param name="hostApiVersion">宿主实际提供的 API 版本</param>
     /// <param name="minRequired">插件声明的最低 API 版本</param>
@@ -52,13 +52,11 @@ public static class ApiVersions
     {
         if (minRequired is not null)
         {
-            if (hostApiVersion.Major != minRequired.Major) return false;
             if (CompareNormalized(hostApiVersion, minRequired) < 0) return false;
         }
 
         if (maxSupported is not null)
         {
-            if (hostApiVersion.Major != maxSupported.Major) return false;
             if (CompareNormalized(hostApiVersion, maxSupported) > 0) return false;
         }
 

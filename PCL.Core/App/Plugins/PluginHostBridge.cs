@@ -57,11 +57,6 @@ public interface IPluginHostBridge
     /// 宿主版本名称。
     /// </summary>
     string HostVersion { get; }
-
-    /// <summary>
-    /// 获取宿主暴露的扩展服务（实验性）。未知标识符返回 <see langword="null"/>。
-    /// </summary>
-    object? GetOptionalService(string serviceId);
 }
 
 /// <summary>

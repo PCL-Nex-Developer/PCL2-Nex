@@ -40,14 +40,3 @@ public sealed class PluginExtensionDescriptor<TContribution> where TContribution
     public required TContribution Contribution { get; init; }
 }
 
-/// <summary>
-/// PCL 内置扩展点标识。
-/// </summary>
-public static class PluginExtensionPoints
-{
-    /// <summary>联机隧道提供者扩展点，贡献对象类型为 <see cref="ILobbyTunnelProvider"/>。</summary>
-    public const string LobbyTunnelProvider = "pcl:lobby:tunnel-provider";
-
-    /// <summary>联机功能服务扩展点，贡献对象类型为 <see cref="ILobbyService"/>。</summary>
-    public const string LobbyService = "pcl:lobby:service";
-}
