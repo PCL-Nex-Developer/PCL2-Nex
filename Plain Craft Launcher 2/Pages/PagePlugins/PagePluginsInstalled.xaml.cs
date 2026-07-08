@@ -56,9 +56,8 @@ public partial class PagePluginsInstalled
         }
         catch { }
 
-        // 合并所有插件 ID
-        var allIds = new HashSet<string>(records.Keys);
-        foreach (var id in manifests.Keys) allIds.Add(id);
+        // 列表只展示实际存在于本地插件目录或当前运行中的插件；安装记录仅作为显示元数据。
+        var allIds = new HashSet<string>(manifests.Keys);
         foreach (var id in loaded.Keys) allIds.Add(id);
 
         var enabledOrder = PluginEnablementService.GetEnabledPluginOrder();
@@ -302,11 +301,11 @@ public partial class PagePluginsInstalled
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             var info = new StackPanel();
-            var title = new TextBlock { Text = candidate.Entry.Name + "  v" + candidate.Installed.InstalledVersion + " -> v" + candidate.LatestVersion, FontSize = 13, FontWeight = FontWeights.SemiBold };
+            var title = new TextBlock { Text = candidate.Entry.Name, FontSize = 14, FontWeight = FontWeights.SemiBold };
             title.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrush2");
             info.Children.Add(title);
 
-            var src = new TextBlock { Text = "来源: " + candidate.Source.Url, FontSize = 11, Margin = new Thickness(0, 2, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis };
+            var src = new TextBlock { Text = "v" + PluginUpdateService.FormatVersion(candidate.Installed.InstalledVersion) + " -> v" + PluginUpdateService.FormatVersion(candidate.LatestVersion) + "  |  " + candidate.Source.Url, FontSize = 11, Margin = new Thickness(0, 2, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis };
             src.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
             info.Children.Add(src);
             row.Children.Add(info);
@@ -325,16 +324,16 @@ public partial class PagePluginsInstalled
         try
         {
             var trustDecision = PluginUpdateService.EvaluateUpdate(candidate);
-            var confirmMsg = "即将更新插件：\n\n名称: " + candidate.Entry.Name + "\n当前版本: v" + candidate.Installed.InstalledVersion + "\n最新版本: v" + candidate.LatestVersion + "\n下载源: " + candidate.Source.Url;
+            var confirmMsg = "即将更新插件：\n\n名称: " + candidate.Entry.Name + "\n当前版本: v" + PluginUpdateService.FormatVersion(candidate.Installed.InstalledVersion) + "\n最新版本: v" + PluginUpdateService.FormatVersion(candidate.LatestVersion) + "\n下载源: " + candidate.Source.Url;
             if (trustDecision == PluginTrustDecision.RequireReconfirm)
                 confirmMsg += "\n\n该更新涉及来源变化或能力变化，请确认你信任此版本。";
 
             if (ModMain.MyMsgBox(confirmMsg, "确认更新", button2: "取消", isWarn: trustDecision != PluginTrustDecision.Allow) != 1) return;
 
-            using var prepared = await PluginRemoteInstallService.PrepareAsync(candidate.Source);
+            using var prepared = await PluginRemoteInstallService.PrepareManifestVersionAsync(candidate.Source.Url, candidate.ManifestVersion);
             await PluginInstallService.InstallFromDirectoryAsync(prepared.PluginRoot, prepared.Manifest, prepared.SourceType, prepared.SourceUrl);
             ModMain.frmMain?.RefreshRestartButton(true);
-            ModMain.MyMsgBox("插件 " + prepared.Manifest.Name + " 已更新到 v" + prepared.Manifest.Version + "！\n请重启启动器后生效。", "更新完成");
+            ModMain.MyMsgBox("插件 " + prepared.Manifest.Name + " 已更新到 v" + PluginUpdateService.FormatVersion(prepared.Manifest.Version) + "！\n请重启启动器后生效。", "更新完成");
             BuildInstalledList();
             if (refreshAfter) await CheckPluginUpdatesAsync(showHint: false);
         }

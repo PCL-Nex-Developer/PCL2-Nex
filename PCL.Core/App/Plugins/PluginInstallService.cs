@@ -24,7 +24,7 @@ public static class PluginInstallService
     {
         lock (_lock)
         {
-            return _LoadAllRecords().AsReadOnly();
+            return _LoadInstalledRecords().AsReadOnly();
         }
     }
 
@@ -35,7 +35,7 @@ public static class PluginInstallService
     {
         lock (_lock)
         {
-            return _LoadAllRecords().FirstOrDefault(r => r.PluginId == pluginId);
+            return _LoadInstalledRecords().FirstOrDefault(r => r.PluginId == pluginId);
         }
     }
 
@@ -127,7 +127,7 @@ public static class PluginInstallService
     {
         lock (_lock)
         {
-            var record = _LoadAllRecords().FirstOrDefault(r => r.PluginId == pluginId);
+            var record = _LoadInstalledRecords().FirstOrDefault(r => r.PluginId == pluginId);
             if (record is not null)
             {
                 record.Enabled = enabled;
@@ -146,7 +146,7 @@ public static class PluginInstallService
     {
         lock (_lock)
         {
-            return _LoadAllRecords().Any(r => r.PluginId == pluginId);
+            return _LoadInstalledRecords().Any(r => r.PluginId == pluginId);
         }
     }
 
@@ -180,6 +180,56 @@ public static class PluginInstallService
             }
         }
         return records;
+    }
+
+    private static List<PluginInstallRecord> _LoadInstalledRecords()
+    {
+        var installedIds = _GetInstalledPluginIds();
+        if (installedIds.Count == 0)
+        {
+            foreach (var record in _LoadAllRecords())
+                _DeleteRecord(record.PluginId);
+            return [];
+        }
+
+        var records = new List<PluginInstallRecord>();
+        foreach (var record in _LoadAllRecords())
+        {
+            if (installedIds.Contains(record.PluginId))
+            {
+                records.Add(record);
+            }
+            else
+            {
+                _DeleteRecord(record.PluginId);
+            }
+        }
+        return records;
+    }
+
+    private static HashSet<string> _GetInstalledPluginIds()
+    {
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            foreach (var (manifest, _) in PluginLoaderService.EnumerateInstalledPluginPackages(PCL.Core.App.Paths.PluginInstalled))
+            {
+                if (!string.IsNullOrWhiteSpace(manifest.Id)) ids.Add(manifest.Id);
+            }
+        }
+        catch { }
+
+        try
+        {
+            foreach (var loaded in PluginLoaderService.LoadedPlugins)
+            {
+                if (!string.IsNullOrWhiteSpace(loaded.Id)) ids.Add(loaded.Id);
+            }
+        }
+        catch { }
+
+        return ids;
     }
 
     private static void _SaveRecord(PluginInstallRecord record)

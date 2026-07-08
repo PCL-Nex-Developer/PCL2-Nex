@@ -203,7 +203,6 @@ pcl.ui.registerToolsPanel('native-tools', 'Native Tools', 1, function () {
         public ICliCommandRegistrar? Commands => null;
         public IUriActionRegistrar? UriActions => null;
         public IPluginExtensionApi? Extensions => null;
-        public object? GetOptionalService(string serviceId) => null;
     }
 
     private sealed class FakeUiApi : IPluginUiApi

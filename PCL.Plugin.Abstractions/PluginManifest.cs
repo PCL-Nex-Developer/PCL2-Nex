@@ -117,11 +117,6 @@ public enum PluginCapabilities
     RegisterCliCommand = 1 << 4,
 
     /// <summary>
-    /// 允许注册自定义下载源适配器（实验性）。
-    /// </summary>
-    RegisterDownloadSource = 1 << 5,
-
-    /// <summary>
     /// 允许向插件页贡献自定义侧边栏入口及右侧面板。
     /// </summary>
     ContributePluginPage = 1 << 6,
@@ -135,12 +130,6 @@ public enum PluginCapabilities
     /// 允许向通用扩展点注册贡献项。
     /// </summary>
     RegisterExtension = 1 << 8,
-
-    /// <summary>
-    /// 旧名称：允许注册联机隧道提供者（实验性）。请改用 <see cref="RegisterExtension"/>。
-    /// </summary>
-    [Obsolete("Use RegisterExtension instead.")]
-    RegisterLobbyTunnelProvider = RegisterExtension,
 
     /// <summary>
     /// 允许注册可由 URI Scheme 触发的自定义动作。

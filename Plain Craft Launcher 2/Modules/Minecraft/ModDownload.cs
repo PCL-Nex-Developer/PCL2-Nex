@@ -328,8 +328,6 @@ public static class ModDownload
     public static ModLoader.LoaderTask<string, DlClientListResult> dlClientListMojangLoader =
         new("DlClientList Mojang", DlClientListMojangMain);
 
-    private static bool isNewClientVersionHinted = false;
-
     // MC 更新提示
     private static bool _DlClientListMojangMain_IsHinted;
 

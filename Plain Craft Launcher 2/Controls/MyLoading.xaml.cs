@@ -44,9 +44,6 @@ public partial class MyLoading
         Loaded += (_, _) => RefreshState();
         Unloaded += (_, _) => RefreshState();
         MouseLeftButtonUp += Button_MouseUp;
-        MouseLeftButtonDown += Button_MouseDown;
-        MouseLeave += Button_MouseLeave;
-        MouseLeftButtonUp += Button_MouseLeave;
     }
 
     #endregion
@@ -335,19 +332,6 @@ public partial class MyLoading
         Click?.Invoke(sender, e);
     }
 
-    private bool isMouseDown;
-
-    private void Button_MouseDown(object sender, MouseButtonEventArgs e)
-    {
-        // 鼠标点击判定（务必放在点击事件之后，以使得 Button_MouseUp 先于 Button_MouseLeave 执行）
-        isMouseDown = true;
-    }
-
-    private void Button_MouseLeave(object sender, object e)
-    {
-        isMouseDown = false;
-    }
-
     #endregion
 }
 
@@ -390,5 +374,9 @@ public class MyLoadingStateSimulator : ILoadingTrigger
     public Exception? Error => null;
 
     public event ILoadingTrigger.LoadingStateChangedEventHandler? LoadingStateChanged;
-    public event ILoadingTrigger.ProgressChangedEventHandler? ProgressChanged;
+    public event ILoadingTrigger.ProgressChangedEventHandler? ProgressChanged
+    {
+        add { }
+        remove { }
+    }
 }

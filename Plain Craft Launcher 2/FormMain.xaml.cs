@@ -1397,7 +1397,6 @@ public partial class FormMain
         SetupAbout = 4,
         SetupLog = 5,
         SetupFeedback = 6,
-        SetupGameLink = 7,
         SetupUpdate = 8,
         SetupJava = 9,
         SetupLauncherMisc = 10,
@@ -1405,7 +1404,6 @@ public partial class FormMain
         /// <summary>已安装插件。</summary>
         SetupPluginInstalled = 102,
 
-        ToolsGameLink = 1,
         ToolsTest = 3,
         ToolsPluginInstalled = 101,
 

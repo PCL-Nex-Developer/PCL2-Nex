@@ -10,10 +10,6 @@ namespace PCL;
 [ContentProperty("Inlines")]
 public partial class MyIconTextButton
 {
-    public delegate void ChangeEventHandler(object sender, bool raiseByMouse);
-
-    public delegate void CheckEventHandler(object sender, bool raiseByMouse);
-
     public delegate void ClickEventHandler(object sender, ModBase.RouteEventArgs e);
 
     public enum ColorState
@@ -158,9 +154,6 @@ public partial class MyIconTextButton
             RefreshColor();
         }
     } // 颜色类别
-
-    public event CheckEventHandler? Check;
-    public event ChangeEventHandler? Change;
 
     private string CheckedAnimationKey => "MyIconTextButton Checked " + Uuid;
     private string ColorAnimationKey => "MyIconTextButton Color " + Uuid;

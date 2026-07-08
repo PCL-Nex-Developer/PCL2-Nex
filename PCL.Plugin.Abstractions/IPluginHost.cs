@@ -55,11 +55,4 @@ public interface IPluginHost
     /// 通用扩展点注册。需要 <see cref="PluginCapabilities.RegisterExtension"/>。
     /// </summary>
     IPluginExtensionApi? Extensions { get; }
-
-    /// <summary>
-    /// 获取宿主暴露的扩展服务（实验性）。未知标识符返回 <see langword="null"/>。
-    /// </summary>
-    /// <param name="serviceId">服务标识符</param>
-    /// <returns>服务对象，或 <see langword="null"/></returns>
-    object? GetOptionalService(string serviceId);
 }

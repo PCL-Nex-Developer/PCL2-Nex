@@ -27,6 +27,9 @@ public sealed class PluginLoaderService : GeneralService
 {
     private static readonly List<PluginRecord> _Records = [];
     private static readonly object _Lock = new();
+    private static readonly object _SelfProtectionLock = new();
+    private static readonly HashSet<string> _SelfProtectionDisabledPluginIds = new(StringComparer.OrdinalIgnoreCase);
+    private static bool _selfProtectionRestartRequired;
     private static LifecycleContext? _context;
 
     public PluginLoaderService() : base("plugin-loader", "插件加载器", asyncStart: false)
@@ -60,75 +63,93 @@ public sealed class PluginLoaderService : GeneralService
     /// </summary>
     public static void LoadAll()
     {
-        var enabledOrder = PluginEnablementService.GetEnabledPluginOrder();
-        var enabledOrderComparer = Comparer<string>.Create((left, right) =>
-            PluginEnablementService.CompareByEnabledOrder(left, right, enabledOrder));
+        _BeginSelfProtectionPass();
 
-        // 从结构化安装目录加载
-        var installedDir = Paths.PluginInstalled;
-        if (!string.IsNullOrEmpty(installedDir) && Directory.Exists(installedDir))
-        {
-            foreach (var (manifest, pluginDir) in EnumerateInstalledPluginPackages(installedDir)
-                         .OrderBy(item => item.Manifest.Id, enabledOrderComparer))
-            {
-                if (!PluginEnablementService.IsEnabled(manifest.Id)) continue;
-                if (!_IsPackageCompatible(manifest)) continue;
-
-                if (manifest.IsJavaScriptPlugin())
-                {
-                    _LoadJavaScriptPlugin(manifest, pluginDir);
-                    continue;
-                }
-
-                if (!manifest.IsDotNetPlugin() || string.IsNullOrWhiteSpace(manifest.EntryAssembly)) continue;
-                var assemblyPath = Path.Combine(pluginDir, manifest.EntryAssembly.Replace('/', Path.DirectorySeparatorChar));
-                if (!File.Exists(assemblyPath))
-                {
-                    _context?.Warn($"插件入口程序集不存在: {assemblyPath}");
-                    continue;
-                }
-
-                var loaded = _TryLoadAssembly(assemblyPath);
-                if (loaded is null) continue;
-                foreach (var (loadedManifest, entryType) in loaded.Value.Entries
-                             .OrderBy(entry => entry.Manifest.Id, enabledOrderComparer))
-                {
-                    _LoadPlugin(assemblyPath, loaded.Value.Context, loadedManifest, entryType);
-                }
-            }
-        }
-
-        // 兼容旧布局：扫描根目录的平铺 DLL
-        var dir = Paths.Plugins;
-        if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return;
-
-        string[] assemblies;
         try
         {
-            assemblies = Directory.GetFiles(dir, "*.dll", SearchOption.TopDirectoryOnly);
-        }
-        catch (Exception ex)
-        {
-            _context?.Warn($"扫描插件目录失败: {dir}", ex);
-            return;
-        }
+            var enabledOrder = PluginEnablementService.GetEnabledPluginOrder();
+            var enabledOrderComparer = Comparer<string>.Create((left, right) =>
+                PluginEnablementService.CompareByEnabledOrder(left, right, enabledOrder));
 
-        var flatEntries = new List<(string AssemblyPath, CollectiblePluginLoadContext Context, PluginManifest Manifest, Type EntryType)>();
-        foreach (var path in assemblies)
-        {
-            var loaded = _TryLoadAssembly(path);
-            if (loaded is null) continue;
-            foreach (var (manifest, entryType) in loaded.Value.Entries)
+            // 从结构化安装目录加载
+            var installedDir = Paths.PluginInstalled;
+            if (!string.IsNullOrEmpty(installedDir) && Directory.Exists(installedDir))
             {
-                if (!PluginEnablementService.IsEnabled(manifest.Id)) continue;
-                flatEntries.Add((path, loaded.Value.Context, manifest, entryType));
-            }
-            if (!flatEntries.Any(entry => ReferenceEquals(entry.Context, loaded.Value.Context))) loaded.Value.Context.Unload();
-        }
+                foreach (var (manifest, pluginDir) in EnumerateInstalledPluginPackages(installedDir)
+                             .OrderBy(item => item.Manifest.Id, enabledOrderComparer))
+                {
+                    if (!PluginEnablementService.IsEnabled(manifest.Id)) continue;
+                    if (!_IsPackageCompatible(manifest))
+                    {
+                        _DisablePluginForSelfProtection(manifest.Id, "运行兼容性检查失败");
+                        continue;
+                    }
 
-        foreach (var entry in flatEntries.OrderBy(entry => entry.Manifest.Id, enabledOrderComparer))
+                    if (manifest.IsJavaScriptPlugin())
+                    {
+                        _LoadJavaScriptPlugin(manifest, pluginDir);
+                        continue;
+                    }
+
+                    if (!manifest.IsDotNetPlugin() || string.IsNullOrWhiteSpace(manifest.EntryAssembly)) continue;
+                    var assemblyPath = Path.Combine(pluginDir, manifest.EntryAssembly.Replace('/', Path.DirectorySeparatorChar));
+                    if (!File.Exists(assemblyPath))
+                    {
+                        _context?.Warn($"插件入口程序集不存在: {assemblyPath}");
+                        _DisablePluginForSelfProtection(manifest.Id, $"入口程序集不存在: {assemblyPath}");
+                        continue;
+                    }
+
+                    var loaded = _TryLoadAssembly(assemblyPath);
+                    if (loaded is null)
+                    {
+                        _DisablePluginForSelfProtection(manifest.Id, $"程序集无法加载或没有可用入口: {Path.GetFileName(assemblyPath)}");
+                        continue;
+                    }
+                    foreach (var (loadedManifest, entryType) in loaded.Value.Entries
+                                 .OrderBy(entry => entry.Manifest.Id, enabledOrderComparer))
+                    {
+                        _LoadPlugin(assemblyPath, loaded.Value.Context, loadedManifest, entryType);
+                    }
+                }
+            }
+
+            // 兼容旧布局：扫描根目录的平铺 DLL
+            var dir = Paths.Plugins;
+            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return;
+
+            string[] assemblies;
+            try
+            {
+                assemblies = Directory.GetFiles(dir, "*.dll", SearchOption.TopDirectoryOnly);
+            }
+            catch (Exception ex)
+            {
+                _context?.Warn($"扫描插件目录失败: {dir}", ex);
+                return;
+            }
+
+            var flatEntries = new List<(string AssemblyPath, CollectiblePluginLoadContext Context, PluginManifest Manifest, Type EntryType)>();
+            foreach (var path in assemblies)
+            {
+                var loaded = _TryLoadAssembly(path);
+                if (loaded is null) continue;
+                foreach (var (manifest, entryType) in loaded.Value.Entries)
+                {
+                    if (!PluginEnablementService.IsEnabled(manifest.Id)) continue;
+                    flatEntries.Add((path, loaded.Value.Context, manifest, entryType));
+                }
+                if (!flatEntries.Any(entry => ReferenceEquals(entry.Context, loaded.Value.Context))) loaded.Value.Context.Unload();
+            }
+
+            foreach (var entry in flatEntries.OrderBy(entry => entry.Manifest.Id, enabledOrderComparer))
+            {
+                _LoadPlugin(entry.AssemblyPath, entry.Context, entry.Manifest, entry.EntryType);
+            }
+        }
+        finally
         {
-            _LoadPlugin(entry.AssemblyPath, entry.Context, entry.Manifest, entry.EntryType);
+            _RestartIfSelfProtectionTriggered();
         }
     }
 
@@ -257,7 +278,7 @@ public sealed class PluginLoaderService : GeneralService
         return new LoadedAssembly(context, entries);
     }
 
-    private static void _LoadPlugin(string assemblyPath, CollectiblePluginLoadContext context, PluginManifest manifest, Type entryType)
+    private static bool _LoadPlugin(string assemblyPath, CollectiblePluginLoadContext context, PluginManifest manifest, Type entryType)
     {
         IPclPlugin instance;
         try
@@ -266,11 +287,12 @@ public sealed class PluginLoaderService : GeneralService
         }
         catch (Exception ex)
         {
-            _context?.Error($"实例化插件入口失败: {manifest.Id}", ex);
-            return;
+            _DisablePluginForSelfProtection(manifest.Id, "实例化插件入口失败", ex);
+            _context?.Error($"实例化插件入口失败: {manifest.Id}", ex, ActionLevel.NormalLog);
+            return false;
         }
 
-        _LoadPluginInstance(assemblyPath, entryType.Assembly, manifest, instance);
+        return _LoadPluginInstance(assemblyPath, entryType.Assembly, manifest, instance);
     }
 
     private static void _LoadJavaScriptPlugin(PluginPackageManifest packageManifest, string pluginDir)
@@ -282,6 +304,7 @@ public sealed class PluginLoaderService : GeneralService
         if (!File.Exists(entryPath))
         {
             _context?.Warn($"JavaScript 插件入口脚本不存在: {entryPath}");
+            _DisablePluginForSelfProtection(packageManifest.Id, $"入口脚本不存在: {entryPath}");
             return;
         }
 
@@ -289,14 +312,14 @@ public sealed class PluginLoaderService : GeneralService
         _LoadPluginInstance(entryPath, typeof(JavaScriptPlugin).Assembly, manifest, instance);
     }
 
-    private static void _LoadPluginInstance(string entryPath, Assembly assembly, PluginManifest manifest, IPclPlugin instance)
+    private static bool _LoadPluginInstance(string entryPath, Assembly assembly, PluginManifest manifest, IPclPlugin instance)
     {
         lock (_Lock)
         {
             if (_Records.Any(r => r.Id == manifest.Id))
             {
                 _context?.Warn($"插件 {manifest.Id} 已加载，跳过重复条目");
-                return;
+                return false;
             }
         }
 
@@ -330,10 +353,12 @@ public sealed class PluginLoaderService : GeneralService
         {
             record.LastException = ex;
             record.State = PluginState.Disabled;
-            _context?.Error($"插件加载失败: {manifest.Id}", ex);
+            _DisablePluginForSelfProtection(manifest.Id, "插件加载失败", ex);
+            _context?.Error($"插件加载失败: {manifest.Id}", ex, ActionLevel.NormalLog);
         }
 
         lock (_Lock) { _Records.Add(record); }
+        return record.State == PluginState.Running;
     }
 
     private static PluginManifest _ToRuntimeManifest(PluginPackageManifest packageManifest)
@@ -361,7 +386,7 @@ public sealed class PluginLoaderService : GeneralService
         var result = PluginPackageService.ValidateRuntimeCompatibility(manifest);
         if (result.IsValid) return true;
 
-        _context?.Warn($"插件 {manifest.Id} 运行兼容性检查失败：{result.ErrorMessage}，已跳过");
+        _context?.Warn($"插件 {manifest.Id} 运行兼容性检查失败：{result.ErrorMessage}，已跳过", actionLevel: ActionLevel.NormalLog);
         return false;
     }
 
@@ -369,17 +394,79 @@ public sealed class PluginLoaderService : GeneralService
     {
         if (PluginCompatibility.TryGetApiCompatibilityError(manifest.MinApiVersion, manifest.MaxApiVersion, out var apiError))
         {
-            _context?.Warn($"{label} {manifest.Id} {apiError} 已跳过");
+            _DisablePluginForSelfProtection(manifest.Id, apiError);
+            _context?.Warn($"{label} {manifest.Id} {apiError} 已跳过", actionLevel: ActionLevel.NormalLog);
             return false;
         }
 
         if (PluginCompatibility.TryGetHostCompatibilityError(manifest.MinHostVersion, manifest.MaxHostVersion, PluginCompatibility.CurrentHostVersion, out var hostError))
         {
-            _context?.Warn($"{label} {manifest.Id} {hostError} 已跳过");
+            _DisablePluginForSelfProtection(manifest.Id, hostError);
+            _context?.Warn($"{label} {manifest.Id} {hostError} 已跳过", actionLevel: ActionLevel.NormalLog);
             return false;
         }
 
         return true;
+    }
+
+    private static void _BeginSelfProtectionPass()
+    {
+        lock (_SelfProtectionLock)
+        {
+            _SelfProtectionDisabledPluginIds.Clear();
+            _selfProtectionRestartRequired = false;
+        }
+    }
+
+    private static void _DisablePluginForSelfProtection(string? pluginId, string reason, Exception? ex = null)
+    {
+        if (string.IsNullOrWhiteSpace(pluginId)) return;
+
+        lock (_SelfProtectionLock)
+        {
+            if (!_SelfProtectionDisabledPluginIds.Add(pluginId)) return;
+        }
+
+        try
+        {
+            PluginEnablementService.MarkSelfProtectionDisabled(pluginId);
+            PluginEnablementService.SetEnabled(pluginId, false);
+            lock (_SelfProtectionLock)
+            {
+                _selfProtectionRestartRequired = true;
+            }
+            _context?.Warn($"插件自保机制已禁用 {pluginId}：{reason}", ex, ActionLevel.NormalLog);
+        }
+        catch (Exception disableEx)
+        {
+            lock (_SelfProtectionLock)
+            {
+                _SelfProtectionDisabledPluginIds.Remove(pluginId);
+            }
+            _context?.Error($"插件自保机制禁用 {pluginId} 失败", disableEx, ActionLevel.NormalLog);
+        }
+    }
+
+    private static void _RestartIfSelfProtectionTriggered()
+    {
+        string[] disabledIds;
+        lock (_SelfProtectionLock)
+        {
+            if (!_selfProtectionRestartRequired || _SelfProtectionDisabledPluginIds.Count == 0) return;
+            disabledIds = _SelfProtectionDisabledPluginIds.OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToArray();
+            _selfProtectionRestartRequired = false;
+        }
+
+        _context?.Warn("插件自保机制已禁用异常插件，将自动重启启动器以恢复正常运行：" + string.Join(", ", disabledIds), actionLevel: ActionLevel.NormalLog);
+        try
+        {
+            _context?.RequestRestartOnExit();
+            Lifecycle.ForceShutdown();
+        }
+        catch (Exception ex)
+        {
+            _context?.Error("插件自保机制请求重启失败", ex);
+        }
     }
 
     private static PluginCapabilities _CombineCapabilities(IEnumerable<PluginCapabilities>? capabilities)

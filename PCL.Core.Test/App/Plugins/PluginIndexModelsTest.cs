@@ -149,7 +149,7 @@ public class PluginIndexModelsTest
               "packageUrl": "https://example.test/releases/hello-1.5.0.pclx",
               "sha256": "ABCDEF",
               "minApiVersion": "1.0.0",
-              "maxApiVersion": "1.1.0",
+              "maxApiVersion": "2.0.0",
               "minHostVersion": "2.15.0",
               "maxHostVersion": "2.16.0",
               "releaseNotes": "stable"
@@ -169,7 +169,7 @@ public class PluginIndexModelsTest
         Assert.AreEqual("https://example.test/releases/hello-1.5.0.pclx", selected.PackageUrl);
         Assert.AreEqual("ABCDEF", selected.Sha256);
         Assert.AreEqual(new Version(1, 0, 0), selected.MinApiVersion);
-        Assert.AreEqual(new Version(1, 1, 0), selected.MaxApiVersion);
+        Assert.AreEqual(new Version(2, 0, 0), selected.MaxApiVersion);
         Assert.AreEqual("stable", selected.ReleaseNotes);
     }
 
@@ -241,14 +241,14 @@ public class PluginIndexModelsTest
               Version = "1.5.0",
               PackageUrl = "https://example.test/releases/hello-1.5.0.pclx",
               MinApiVersion = new Version(1, 0, 0),
-              MaxApiVersion = new Version(1, 1, 0)
+              MaxApiVersion = new Version(2, 0, 0)
             },
             new PluginMarketVersion
             {
               Version = "2.0.0",
               PackageUrl = "https://example.test/releases/hello-2.0.0.pclx",
               MinApiVersion = new Version(1, 0, 0),
-              MaxApiVersion = new Version(1, 1, 0)
+              MaxApiVersion = new Version(2, 0, 0)
             }
           ]
         };
@@ -257,6 +257,36 @@ public class PluginIndexModelsTest
 
         Assert.AreEqual("2.0.0", selected.Version);
         Assert.AreEqual("https://example.test/releases/hello-2.0.0.pclx", selected.PackageUrl);
+      }
+
+      [TestMethod]
+      public void PluginMarketManifest_SelectCompatibleVersion_ShouldPickEasyTierStyleUpdate()
+      {
+        var manifest = new PluginMarketManifest
+        {
+          Versions =
+          [
+            new PluginMarketVersion
+            {
+              Version = "1.0.6",
+              PackageUrl = "https://example.test/releases/pclnex.easytier-v1.0.6.pclx",
+              MinApiVersion = new Version(1, 1, 0),
+              MinHostVersion = "3.0.0"
+            },
+            new PluginMarketVersion
+            {
+              Version = "1.0.0",
+              PackageUrl = "https://example.test/releases/pclnex.easytier-v1.0.0.pclx",
+              MinApiVersion = new Version(1, 1, 0),
+              MinHostVersion = "3.0.0"
+            }
+          ]
+        };
+
+        var selected = PluginRemoteInstallService.SelectCompatibleManifestVersion(manifest, "3.0.1");
+
+        Assert.AreEqual("1.0.6", selected.Version);
+        Assert.AreEqual("https://example.test/releases/pclnex.easytier-v1.0.6.pclx", selected.PackageUrl);
       }
 
     [TestMethod]

@@ -757,20 +757,6 @@ public static class ModLocalComp
         private int? _litematicTotalVolume;
 
         /// <summary>
-        ///     原版结构文件的游戏版本。
-        /// </summary>
-        public string StructureGameVersion
-        {
-            get
-            {
-                LoadNbtDataIfNeeded();
-                return _structureGameVersion;
-            }
-        }
-
-        private string _structureGameVersion;
-
-        /// <summary>
         ///     原版结构文件的数据版本。
         /// </summary>
         public int? StructureDataVersion
@@ -896,27 +882,6 @@ public static class ModLocalComp
 
         private Exception _FileUnavailableReason;
 
-        // 2. 进行 .class 以外的信息获取
-        // 成功：标记 IsInfoWithoutClassAvailable。
-        // 失败：什么也不干。如果需要补充信息的话，检测到 IsInfoWithoutClassAvailable 为 False，会自动继续加载。
-        /// <summary>
-        ///     是否已在不获取 .class 文件的前提下完成了所需信息的加载。
-        /// </summary>
-        private bool isInfoWithoutClassAvailable = false;
-
-        // 3. 尝试从 .class 文件中获取信息
-        // 成功：标记 IsInfoWithClassAvailable。
-        // 失败：什么也不干。
-        /// <summary>
-        ///     是否已进行 .class 文件的信息获取。
-        /// </summary>
-        private bool isInfoWithClassLoaded;
-
-        /// <summary>
-        ///     是否已在 .class 文件中完成了所需信息的加载。
-        /// </summary>
-        private bool isInfoWithClassAvailable;
-
         #endregion
 
         #region 加载
@@ -934,8 +899,6 @@ public static class ModLocalComp
             _Dependencies = new Dictionary<string, string>();
             isLoaded = false;
             _FileUnavailableReason = null;
-            isInfoWithClassLoaded = false;
-            isInfoWithClassAvailable = false;
         }
 
         /// <summary>

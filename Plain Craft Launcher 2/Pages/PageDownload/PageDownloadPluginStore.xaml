@@ -3,18 +3,26 @@
                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                    xmlns:local="clr-namespace:PCL"
                    PanScroll="{Binding ElementName=PanBack}">
-    <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
-        <StackPanel x:Name="PanMain" Margin="25">
-            <local:MyCard HorizontalAlignment="Center" SnapsToDevicePixels="True" x:Name="PanLoad" UseAnimation="False" Margin="0,0,0,15">
-                <local:MyLoading Text="正在从插件市场获取插件列表..." Margin="20" x:Name="Load"
-                                 HorizontalAlignment="Center" VerticalAlignment="Center" />
-            </local:MyCard>
-            <local:MyCard x:Name="CardPlugins" UseAnimation="False">
-                <StackPanel Margin="12">
-                    <local:MySearchBox x:Name="PanSearchBox" Margin="0,0,0,12" SearchButtonVisibility="Visible" HintText="搜索插件名称、作者或 ID" />
-                    <StackPanel x:Name="PanPlugins" />
-                </StackPanel>
-            </local:MyCard>
-        </StackPanel>
-    </local:MyScrollViewer>
+    <Grid>
+        <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
+            <StackPanel x:Name="PanMain" Margin="25">
+                <local:MySearchBox x:Name="PanSearchBox" Margin="0,0,0,15" SearchButtonVisibility="Visible" HintText="搜索插件名称、作者或 ID" />
+                <local:MyCard Margin="0,0,0,15" Visibility="Collapsed">
+                    <StackPanel Margin="19,17,19,14">
+                        <TextBlock x:Name="TextRepoInfo"
+                                   Text="正在加载插件列表..."
+                                   FontSize="13" TextWrapping="Wrap" />
+                    </StackPanel>
+                </local:MyCard>
+                <local:MyCard x:Name="CardPlugins" UseAnimation="False">
+                    <StackPanel x:Name="PanPlugins" Margin="12" />
+                </local:MyCard>
+            </StackPanel>
+        </local:MyScrollViewer>
+        <local:MyCard HorizontalAlignment="Center" VerticalAlignment="Center" SnapsToDevicePixels="True"
+                      x:Name="PanLoad" UseAnimation="False" Margin="40,50">
+            <local:MyLoading Text="正在获取插件商店列表" TextError="插件商店列表获取失败" Margin="20,20,20,17"
+                             x:Name="Load" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </local:MyCard>
+    </Grid>
 </local:MyPageRight>

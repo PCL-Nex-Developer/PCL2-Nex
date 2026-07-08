@@ -11,8 +11,6 @@ namespace PCL;
 
 public partial class PageSetupJava
 {
-    private bool isLoad = false;
-
     public ModLoader.LoaderTask<bool, List<JavaEntry>> loader;
 
     public PageSetupJava()

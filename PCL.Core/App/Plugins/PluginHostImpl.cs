@@ -73,7 +73,4 @@ internal sealed class PluginHostImpl : IPluginHost
     public ICliCommandRegistrar? Commands => _commands.Value;
     public IUriActionRegistrar? UriActions => _uriActions.Value;
     public IPluginExtensionApi? Extensions => _extensions.Value;
-
-    public object? GetOptionalService(string serviceId)
-        => PluginHostBridge.Current?.GetOptionalService(serviceId);
 }
