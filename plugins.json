@@ -10,6 +10,14 @@
       "description": "实现 EasyTier 联机大厅功能的插件",
       "manifestUrl": "https://github.com/PCL-Nex-Developer/PCL2-EasytierPlugin/raw/refs/heads/main/manifest.json",
       "repository": "https://github.com/PCL-Nex-Developer/PCL2-EasytierPlugin"
+    },
+    {
+      "id": "cn.pclnex.offline-login",
+      "name": "档案创建解锁",
+      "author": "AnxunBCX",
+      "description": "无需先登录正版账号，即可在新建档案时选择第三方或离线验证",
+      "manifestUrl": "https://github.com/AnxunBCX/PCL2-Nex-ProfileUnlock/raw/refs/heads/main/manifest.json",
+      "repository": "https://github.com/AnxunBCX/PCL2-Nex-ProfileUnlock"
     }
   ]
 }
