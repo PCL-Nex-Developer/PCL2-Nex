@@ -1,0 +1,85 @@
+name: Bug 反馈
+description: 报告 PCL Nex 的问题或错误
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢你提交 Bug 反馈！请填写以下信息以帮助我们更好地定位和解决问题。
+        
+  - type: input
+    id: version
+    attributes:
+      label: PCL Nex 版本
+      description: 请提供你使用的 PCL Nex 版本号
+      placeholder: 例如：v1.0.0
+    validations:
+      required: true
+      
+  - type: input
+    id: windows-version
+    attributes:
+      label: Windows 版本
+      description: 请提供你的 Windows 系统版本
+      placeholder: 例如：Windows 11 22H2 (Build 22621.1000)
+    validations:
+      required: true
+      
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 请清楚地描述遇到的问题
+      placeholder: 描述你遇到的问题...
+    validations:
+      required: true
+      
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 请提供详细的复现步骤
+      placeholder: |
+        1. 打开...
+        2. 点击...
+        3. 看到错误...
+    validations:
+      required: true
+      
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期行为
+      description: 描述你期望发生什么
+      placeholder: 我期望...
+    validations:
+      required: false
+      
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 相关截图
+      description: 如果可以，请提供相关截图（可直接拖拽图片到此处）
+      placeholder: 拖拽截图到这里...
+    validations:
+      required: true
+      
+  - type: textarea
+    id: logs
+    attributes:
+      label: 完整日志
+      description: 请提供完整的日志信息（如果有）
+      placeholder: 粘贴完整日志...
+      render: shell
+    validations:
+      required: true
+      
+  - type: textarea
+    id: additional
+    attributes:
+      label: 附加信息
+      description: 其他可能有帮助的信息
+      placeholder: 任何其他相关信息...
+    validations:
+      required: false
