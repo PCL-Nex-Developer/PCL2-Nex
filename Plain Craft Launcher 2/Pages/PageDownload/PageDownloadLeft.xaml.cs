@@ -274,6 +274,7 @@ public partial class PageDownloadLeft : IRefreshable
             {
                 if (ModMain.frmDownloadPluginStore is null)
                     ModMain.frmDownloadPluginStore = new PageDownloadPluginStore();
+                ModMain.frmDownloadPluginStore.LoadStore();
                 return ModMain.frmDownloadPluginStore;
             }
             case FormMain.PageSubType.DownloadPack:
