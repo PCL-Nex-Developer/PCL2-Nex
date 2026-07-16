@@ -14,13 +14,13 @@ namespace PCL;
 public partial class PageDownloadPluginStore
 {
     private CancellationTokenSource? _cts;
+    private bool _isLoading;
     private IReadOnlyList<PluginRepositoryEntry>? _allEntries;
     private readonly Dictionary<string, PluginUpdateService.PluginLatestManifestVersion> _latestVersionCache = new(StringComparer.OrdinalIgnoreCase);
 
     public PageDownloadPluginStore()
     {
         InitializeComponent();
-        Loaded += (_, _) => LoadStore();
         PanSearchBox.Search += (_, _) => Search();
         PanSearchBox.KeyDown += (_, e) => { if (e.Key == Key.Enter) Search(); };
         Load.Click += (_, _) => { if (Load.State.LoadingState == MyLoading.MyLoadingState.Error) RefreshStore(); };
@@ -28,7 +28,15 @@ public partial class PageDownloadPluginStore
 
     public void LoadStore()
     {
-        _ = LoadStoreAsync();
+        if (_allEntries is not null)
+        {
+            RenderCurrentSearchResults();
+            PanLoad.Visibility = Visibility.Collapsed;
+            CardPlugins.Visibility = Visibility.Visible;
+            return;
+        }
+
+        if (!_isLoading) _ = LoadStoreAsync();
     }
 
     public void RefreshStore()
@@ -38,6 +46,8 @@ public partial class PageDownloadPluginStore
 
     private async System.Threading.Tasks.Task LoadStoreAsync(bool clearLatestVersionCache = false)
     {
+        if (_isLoading) return;
+        _isLoading = true;
         _cts?.Cancel();
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
@@ -97,6 +107,10 @@ public partial class PageDownloadPluginStore
             PanLoad.Visibility = Visibility.Visible;
             CardPlugins.Visibility = Visibility.Collapsed;
             TextRepoInfo.Text = "加载失败";
+        }
+        finally
+        {
+            _isLoading = false;
         }
     }
 

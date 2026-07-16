@@ -14,7 +14,7 @@
                                    FontSize="13" TextWrapping="Wrap" />
                     </StackPanel>
                 </local:MyCard>
-                <local:MyCard x:Name="CardPlugins" UseAnimation="False">
+                <local:MyCard x:Name="CardPlugins" UseAnimation="False" Visibility="Collapsed">
                     <StackPanel x:Name="PanPlugins" Margin="12" />
                 </local:MyCard>
             </StackPanel>
