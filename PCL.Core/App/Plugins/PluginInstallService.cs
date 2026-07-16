@@ -68,7 +68,7 @@ public static class PluginInstallService
                 Directory.Delete(installDir, recursive: true);
 
             Directory.CreateDirectory(Path.GetDirectoryName(installDir)!);
-            Directory.Move(tempDir, installDir);
+            _CopyDirectory(tempDir, installDir);
 
             var record = new PluginInstallRecord
             {
