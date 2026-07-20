@@ -2,7 +2,6 @@ using System.Windows;
 using System.Windows.Controls;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
-using PCL.Plugins;
 
 namespace PCL;
 
@@ -10,12 +9,9 @@ public partial class PageSetupLeft
 {
     private bool isLoad;
     private bool isPageSwitched; // 如果在 Loaded 前切换到其他页面，会导致触发 Loaded 时再次切换一次
-    private readonly Dictionary<int, UiExtensionEntry> _pluginEntries = new();
-    private int _nextPluginTag = 1000;
 
     private void PageSetupLeft_Loaded(object sender, RoutedEventArgs e)
     {
-        RebuildPluginEntries();
         // 是否处于隐藏的子页面
         var isHiddenPage = false;
         var hide = Config.Preference.Hide;
@@ -30,7 +26,6 @@ public partial class PageSetupLeft
         if (ItemUpdate.Checked && hide.SetupUpdate) isHiddenPage = true;
         if (ItemFeedback.Checked && hide.SetupFeedback) isHiddenPage = true;
         if (ItemLog.Checked && hide.SetupLog) isHiddenPage = true;
-        if ((int)pageID >= 1000 && !_pluginEntries.ContainsKey((int)pageID)) isHiddenPage = true;
         if (PageSetupUI.HiddenForceShow)
             isHiddenPage = false;
         // 若页面错误，或尚未加载，则继续
@@ -49,8 +44,6 @@ public partial class PageSetupLeft
             ItemJava.SetChecked(true, false, false);    
         else if (!hideCfg.SetupGameManage) 
             ItemGameManage.SetChecked(true, false, false);
-        else if (SelectFirstPluginEntry())
-            return;
         else if (!hideCfg.SetupUi) 
             ItemUI.SetChecked(true, false, false);
         else if (!hideCfg.SetupLauncherLanguage)
@@ -64,83 +57,6 @@ public partial class PageSetupLeft
     private void PageOtherLeft_Unloaded(object sender, RoutedEventArgs e)
     {
         isPageSwitched = false;
-    }
-
-    private void RebuildPluginEntries()
-    {
-        var toRemove = new List<UIElement>();
-        foreach (UIElement child in PanItem.Children)
-        {
-            if (child is MyListItem item && item.Tag is double tag && tag >= 1000)
-                toRemove.Add(child);
-            if (child is TextBlock { Tag: "PluginSettingsGroup" })
-                toRemove.Add(child);
-        }
-        foreach (var child in toRemove) PanItem.Children.Remove(child);
-
-        _pluginEntries.Clear();
-        _nextPluginTag = 1000;
-
-        var pages = PluginHostBootstrap.UiExtensions.GetSettings();
-        if (pages.Count == 0) return;
-
-        string? currentGroup = null;
-        foreach (var entry in pages)
-        {
-            var group = string.IsNullOrWhiteSpace(entry.Group) ? null : entry.Group;
-            if (!string.Equals(currentGroup, group, StringComparison.Ordinal))
-            {
-                currentGroup = group;
-                if (group is not null)
-                    InsertPluginElement(new TextBlock
-                    {
-                        Tag = "PluginSettingsGroup",
-                        Text = group,
-                        Margin = new Thickness(13, 5, 5, 3),
-                        Opacity = 0.6,
-                        FontSize = 12
-                    });
-            }
-
-            var tag = _nextPluginTag++;
-            _pluginEntries[tag] = entry;
-
-            var item = new MyListItem
-            {
-                IsScaleAnimationEnabled = false,
-                Type = MyListItem.CheckType.RadioBox,
-                Tag = (double)tag,
-                MinPaddingRight = 35,
-                Height = 36,
-                VerticalAlignment = VerticalAlignment.Top,
-                Title = entry.Title,
-                LogoScale = 0.9,
-                SvgIcon = string.IsNullOrWhiteSpace(entry.Icon) ? "lucide/sliders" : entry.Icon
-            };
-            if ((int)pageID == tag) item.Checked = true;
-            item.Check += PageCheck;
-            InsertPluginElement(item);
-        }
-    }
-
-    private void InsertPluginElement(UIElement element)
-    {
-        var index = PanItem.Children.IndexOf(TextLauncherCategory);
-        if (index < 0) PanItem.Children.Add(element);
-        else PanItem.Children.Insert(index, element);
-    }
-
-    private bool SelectFirstPluginEntry()
-    {
-        foreach (UIElement child in PanItem.Children)
-        {
-            if (child is MyListItem { Tag: double tag } item && tag >= 1000)
-            {
-                item.SetChecked(true, false, false);
-                return true;
-            }
-        }
-        return false;
     }
 
     public void Reset(object sender, EventArgs e)
@@ -265,7 +181,6 @@ public partial class PageSetupLeft
     public PageSetupLeft()
     {
         InitializeComponent();
-        RebuildPluginEntries();
         // 选择第一个未被禁用的子页面
         var hideCfg = Config.Preference.Hide;
         if (!hideCfg.SetupLaunch)
@@ -274,8 +189,6 @@ public partial class PageSetupLeft
             pageID = FormMain.PageSubType.SetupJava;
         else if (!hideCfg.SetupGameManage)
             pageID = FormMain.PageSubType.SetupGameManage;
-        else if (PluginHostBootstrap.UiExtensions.GetSettings().Count > 0)
-            pageID = (FormMain.PageSubType)1000;
         else if (!hideCfg.SetupUi)
             pageID = FormMain.PageSubType.SetupUI;
         else if (!hideCfg.SetupLauncherLanguage)
@@ -287,11 +200,6 @@ public partial class PageSetupLeft
         AnimatedControl = PanItem;
         Loaded += PageSetupLeft_Loaded;
         Unloaded += PageOtherLeft_Unloaded;
-        PluginHostBootstrap.UiExtensions.Changed += (_, _) => ModBase.RunInUi(() =>
-        {
-            RebuildPluginEntries();
-            PageSetupUI.HiddenRefresh();
-        });
     }
 
     /// <summary>
@@ -384,45 +292,9 @@ public partial class PageSetupLeft
 
             default:
             {
-                var tagVal = (int)targetID;
-                if (tagVal >= 1000 && _pluginEntries.TryGetValue(tagVal, out var entry))
-                {
-                    try
-                    {
-                        var page = (FrameworkElement)entry.Factory.DynamicInvoke()!;
-                        return WrapPluginPage(page, entry.Title);
-                    }
-                    catch (Exception ex)
-                    {
-                        ModBase.Log(ex, "[Setup] 创建插件设置页面失败: " + entry.PluginId, ModBase.LogLevel.Debug);
-                        throw;
-                    }
-                }
                 throw new Exception("未知的设置子页面种类：" + (int)targetID);
             }
         }
-    }
-
-    private static MyPageRight WrapPluginPage(FrameworkElement content, string title)
-    {
-        if (content is MyPageRight pageRight) return pageRight;
-
-        var scrollViewer = new MyScrollViewer
-        {
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            Name = "PanBack"
-        };
-        var stackPanel = new StackPanel { Margin = new Thickness(25, 10, 25, 10), Name = "PanMain" };
-        var card = new MyCard { Title = title, Margin = new Thickness(0, 15, 0, 15) };
-        content.Margin = new Thickness(25, 40, 25, 15);
-        card.Children.Add(content);
-        stackPanel.Children.Add(card);
-        scrollViewer.Content = stackPanel;
-
-        var page = new MyPageRight();
-        page.Child = scrollViewer;
-        return page;
     }
 
     /// <summary>
