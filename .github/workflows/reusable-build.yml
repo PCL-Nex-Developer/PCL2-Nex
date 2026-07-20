@@ -24,10 +24,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set Describe
+      - name: Resolve BaseVersion
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          describe=`git describe --tags --always`
-          echo "describe=$describe" >> $GITHUB_ENV
+          tag="${RELEASE_TAG:-${GITHUB_REF_NAME:-}}"
+          if [[ "$tag" == v* ]]; then
+            base_version="${tag#v}"
+          elif [[ -z "$tag" || "$GITHUB_REF_TYPE" != "tag" ]]; then
+            base_version="2026.07.1"
+          else
+            echo "Release tag must use vyyyy.MM.patch format." >&2
+            exit 1
+          fi
+          if [[ ! "$base_version" =~ ^[0-9]{4}\.(0[1-9]|1[0-2])\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Invalid BaseVersion parsed from release tag: $base_version" >&2
+            exit 1
+          fi
+          echo "base_version=$base_version" >> "$GITHUB_ENV"
 
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v5
@@ -43,6 +57,7 @@ jobs:
         run: |
           dotnet publish "Plain Craft Launcher 2/Plain Craft Launcher 2.csproj" \
           -p:Configuration=${{ inputs.configuration }} -p:Platform=${{ inputs.architecture }} \
+          -p:BaseVersion="$base_version" \
           -p:DeleteExistingFiles=true -o ./artifact --no-self-contained
 
       - name: Upload the Build Artifact
