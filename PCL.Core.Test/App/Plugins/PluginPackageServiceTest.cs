@@ -1,10 +1,11 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using PCL.Core.App.Plugins;
-using PCL.Plugin.Abstractions;
 
 namespace PCL.Core.Test.App.Plugins;
 
@@ -14,306 +15,175 @@ public class PluginPackageServiceTest
     [TestMethod]
     public void ValidatePackageManifest_ShouldRejectMissingEntryAssembly()
     {
-        var manifest = new PluginPackageManifest
-        {
-            Id = "com.example.hello",
-            Name = "Hello",
-            Version = new Version(1, 0, 0, 0),
-            Author = "Example",
-            EntryAssembly = "",
-            MinApiVersion = new Version(1, 0, 0, 0)
-        };
+        var result = PluginPackageService.ValidatePackageManifest(CreateValidManifest());
+        Assert.IsTrue(result.IsValid);
 
-        var result = PluginPackageService.ValidatePackageManifest(manifest);
+        var manifest = CreateValidManifest();
+        manifest.EntryAssembly = string.Empty;
+        result = PluginPackageService.ValidatePackageManifest(manifest);
 
         Assert.IsFalse(result.IsValid);
         StringAssert.Contains(result.ErrorMessage!, "EntryAssembly");
     }
 
     [TestMethod]
-    public void ValidatePackageManifest_ShouldRejectMissingEntryScriptForJavaScript()
+    public void ValidatePackageManifest_ShouldRejectMissingMixinConfiguration()
     {
-        var manifest = new PluginPackageManifest
-        {
-            Id = "com.example.js",
-            Name = "JS Plugin",
-            Version = new Version(1, 0, 0, 0),
-            Author = "Example",
-            Runtime = PluginPackageManifest.RuntimeJavaScriptV8,
-            EntryScript = "",
-            MinApiVersion = new Version(1, 0, 0, 0)
-        };
+        var manifest = CreateValidManifest();
+        manifest.MixinConfig = null;
+        manifest.MixinConfigs = [];
 
         var result = PluginPackageService.ValidatePackageManifest(manifest);
 
         Assert.IsFalse(result.IsValid);
-        StringAssert.Contains(result.ErrorMessage!, "EntryScript");
+        StringAssert.Contains(result.ErrorMessage!, "mixinConfig");
+        StringAssert.Contains(result.ErrorMessage!, "LoadAsync/UnloadAsync");
     }
 
     [TestMethod]
-    public void ValidatePackageManifest_ShouldAcceptJavaScriptManifest()
+    public void ValidatePackageManifest_ShouldRejectLegacyLifecycleFieldsEvenWithMixinConfig()
     {
-        var manifest = new PluginPackageManifest
-        {
-            Id = "com.example.js",
-            Name = "JS Plugin",
-            Version = new Version(1, 0, 0, 0),
-            Author = "Example",
-            Runtime = PluginPackageManifest.RuntimeJavaScriptV8,
-            EntryScript = "main.js",
-            MinApiVersion = new Version(1, 0, 0, 0),
-            Capabilities = [PluginCapabilities.ContributePluginPage]
-        };
-
-        var result = PluginPackageService.ValidatePackageManifest(manifest);
-
-        Assert.IsTrue(result.IsValid);
-        Assert.IsNull(result.ErrorMessage);
-    }
-
-    [TestMethod]
-    public void ValidatePackageManifest_ShouldRejectMissingId()
-    {
-        var manifest = new PluginPackageManifest
-        {
-            Id = "",
-            Name = "Hello",
-            Version = new Version(1, 0, 0, 0),
-            EntryAssembly = "lib/test.dll",
-            MinApiVersion = new Version(1, 0, 0, 0)
-        };
+        var manifest = JsonSerializer.Deserialize<PluginPackageManifest>(
+            """{"id":"com.example.legacy","name":"Legacy","version":"1.0.0","pclCoreVersion":"2026.07.1","entryAssembly":"lib/Legacy.dll","mixinConfig":"mixins.json","loadMethod":"LoadAsync"}""",
+            PluginJson.SerializerOptions)!;
 
         var result = PluginPackageService.ValidatePackageManifest(manifest);
 
         Assert.IsFalse(result.IsValid);
-        StringAssert.Contains(result.ErrorMessage!, "Id");
+        StringAssert.Contains(result.ErrorMessage!, "loadMethod");
     }
 
     [TestMethod]
-    public void ValidatePackageManifest_ShouldRejectMissingName()
+    public void ValidatePackageManifest_ShouldRejectMissingIdNameAndInvalidVersion()
     {
-        var manifest = new PluginPackageManifest
+        var missingId = CreateValidManifest();
+        missingId.Id = string.Empty;
+        StringAssert.Contains(PluginPackageService.ValidatePackageManifest(missingId).ErrorMessage!, "Id");
+
+        var missingName = CreateValidManifest();
+        missingName.Name = string.Empty;
+        StringAssert.Contains(PluginPackageService.ValidatePackageManifest(missingName).ErrorMessage!, "Name");
+
+        var invalidVersion = CreateValidManifest();
+        invalidVersion.Version = "invalid";
+        StringAssert.Contains(PluginPackageService.ValidatePackageManifest(invalidVersion).ErrorMessage!, "Version");
+    }
+
+    [TestMethod]
+    public void ValidatePackageManifest_ShouldApplyPclCoreVersionRules()
+    {
+        var compatible = CreateValidManifest();
+        compatible.PclCoreVersion = "2026.07.1";
+        Assert.AreEqual(
+            PluginCoreCompatibilityStatus.Compatible,
+            PluginPackageService.ValidatePackageManifest(compatible, "2026.07.1").CompatibilityStatus);
+
+        var old = CreateValidManifest();
+        old.PclCoreVersion = "2026.06.9";
+        Assert.IsFalse(PluginPackageService.ValidatePackageManifest(old, "2026.07.1").IsValid);
+
+        var future = CreateValidManifest();
+        future.PclCoreVersion = "2026.08.1";
+        var futureResult = PluginPackageService.ValidatePackageManifest(future, "2026.07.1");
+        Assert.IsTrue(futureResult.IsValid);
+        Assert.AreEqual(PluginCoreCompatibilityStatus.Future, futureResult.CompatibilityStatus);
+    }
+
+    [TestMethod]
+    [DoNotParallelize]
+    public async Task StartupCompatibility_ShouldConfirmFuturePluginBeforeApplyingMixins()
+    {
+        var manifest = CreateValidManifest();
+        manifest.PclCoreVersion = "2026.08.1";
+        var originalHandler = PluginCompatibility.ConfirmationAsync;
+        try
         {
-            Id = "com.example.hello",
-            Name = "",
-            Version = new Version(1, 0, 0, 0),
-            EntryAssembly = "lib/test.dll",
-            MinApiVersion = new Version(1, 0, 0, 0)
-        };
+            var calls = 0;
+            PluginCompatibility.ConfirmationAsync = (context, _) =>
+            {
+                calls++;
+                Assert.AreEqual(PluginCompatibilityAction.Enable, context.Action);
+                Assert.AreEqual(PluginCoreCompatibilityStatus.Future, context.Status);
+                return Task.FromResult(false);
+            };
 
-        var result = PluginPackageService.ValidatePackageManifest(manifest);
+            Assert.IsFalse(await PluginLoaderService.IsPackageCompatibleAsync(manifest, CancellationToken.None));
+            Assert.AreEqual(1, calls);
 
-        Assert.IsFalse(result.IsValid);
-        StringAssert.Contains(result.ErrorMessage!, "Name");
-    }
-
-    [TestMethod]
-    public void ValidatePackageManifest_ShouldRejectInvalidVersion()
-    {
-        var manifest = new PluginPackageManifest
+            PluginCompatibility.ConfirmationAsync = (_, _) => Task.FromResult(true);
+            Assert.IsTrue(await PluginLoaderService.IsPackageCompatibleAsync(manifest, CancellationToken.None));
+        }
+        finally
         {
-            Id = "com.example.hello",
-            Name = "Hello",
-            Version = new Version(0, 0, 0, 0),
-            EntryAssembly = "lib/test.dll",
-            MinApiVersion = new Version(1, 0, 0, 0)
-        };
-
-        var result = PluginPackageService.ValidatePackageManifest(manifest);
-
-        Assert.IsFalse(result.IsValid);
-        StringAssert.Contains(result.ErrorMessage!, "Version");
+            PluginCompatibility.ConfirmationAsync = originalHandler;
+        }
     }
 
     [TestMethod]
-    public void ValidatePackageManifest_ShouldRejectIncompatibleApiVersion()
+    public void MixinConfigurationPaths_ShouldCombineSingularAndPluralWithoutDuplicates()
     {
-        var manifest = new PluginPackageManifest
-        {
-            Id = "com.example.hello",
-            Name = "Hello",
-            Version = new Version(1, 0, 0, 0),
-            EntryAssembly = "lib/test.dll",
-            MinApiVersion = new Version(2, 0, 0, 0) // 主版本号不兼容
-        };
+        var manifest = CreateValidManifest();
+        manifest.MixinConfig = "mixins.main.json";
+        manifest.MixinConfigs = ["mixins.extra.json", "MIXINS.MAIN.JSON"];
 
-        var result = PluginPackageService.ValidatePackageManifest(manifest);
-
-        Assert.IsFalse(result.IsValid);
-        StringAssert.Contains(result.ErrorMessage!, "不兼容");
+        CollectionAssert.AreEqual(
+            new[] { "mixins.main.json", "mixins.extra.json" },
+            manifest.GetMixinConfigurationPaths().ToArray());
     }
 
     [TestMethod]
-    public void ValidatePackageManifest_ShouldAcceptNewerApiWhenNoMaximumDeclared()
+    public void ValidatePackageManifest_ShouldAllowNetworkOrLocalLogoAndRejectTraversal()
     {
-        var manifest = new PluginPackageManifest
-        {
-            Id = "com.example.hello",
-            Name = "Hello",
-            Version = new Version(1, 0, 0, 0),
-            EntryAssembly = "lib/test.dll",
-            MinApiVersion = new Version(1, 0, 0, 0)
-        };
+        var local = CreateValidManifest();
+        local.Logo = "assets/logo.png";
+        Assert.IsTrue(PluginPackageService.ValidatePackageManifest(local).IsValid);
 
-        var result = PluginPackageService.ValidatePackageManifest(manifest);
+        var network = CreateValidManifest();
+        network.Logo = "https://cdn.example.test/logo.png";
+        Assert.IsTrue(PluginPackageService.ValidatePackageManifest(network).IsValid);
 
-        Assert.IsTrue(result.IsValid);
-        Assert.IsNull(result.ErrorMessage);
+        var traversal = CreateValidManifest();
+        traversal.Logo = "../logo.png";
+        Assert.IsFalse(PluginPackageService.ValidatePackageManifest(traversal).IsValid);
     }
 
     [TestMethod]
-    public void ValidatePackageManifest_ShouldRejectApiVersionAbovePluginMaximum()
-    {
-        var manifest = new PluginPackageManifest
-        {
-            Id = "com.example.hello",
-            Name = "Hello",
-            Version = new Version(1, 0, 0, 0),
-            EntryAssembly = "lib/test.dll",
-            MinApiVersion = new Version(1, 0, 0, 0),
-            MaxApiVersion = new Version(0, 9, 0, 0)
-        };
-
-        var result = PluginPackageService.ValidatePackageManifest(manifest, "2.15.0");
-
-        Assert.IsFalse(result.IsValid);
-        StringAssert.Contains(result.ErrorMessage!, "API 版本不兼容");
-    }
-
-    [TestMethod]
-    public void ValidatePackageManifest_ShouldRejectHostVersionAbovePluginMaximum()
-    {
-        var manifest = new PluginPackageManifest
-        {
-            Id = "com.example.hello",
-            Name = "Hello",
-            Version = new Version(1, 0, 0, 0),
-            EntryAssembly = "lib/test.dll",
-            MinApiVersion = new Version(1, 0, 0, 0),
-            MaxHostVersion = "2.14.0"
-        };
-
-        var result = PluginPackageService.ValidatePackageManifest(manifest, "2.15.0");
-
-        Assert.IsFalse(result.IsValid);
-        StringAssert.Contains(result.ErrorMessage!, "启动器版本不兼容");
-    }
-
-    [TestMethod]
-    public void ValidatePackageManifest_ShouldAcceptHostVersionWithinRange()
-    {
-        var manifest = new PluginPackageManifest
-        {
-            Id = "com.example.hello",
-            Name = "Hello",
-            Version = new Version(1, 0, 0, 0),
-            EntryAssembly = "lib/test.dll",
-            MinApiVersion = new Version(1, 0, 0, 0),
-            MinHostVersion = "2.15.0-beta.1",
-            MaxHostVersion = "2.15.0"
-        };
-
-        var result = PluginPackageService.ValidatePackageManifest(manifest, "2.15.0");
-
-        Assert.IsTrue(result.IsValid);
-        Assert.IsNull(result.ErrorMessage);
-    }
-
-    [TestMethod]
-    public void ValidatePackageManifest_ShouldRejectInvalidHostVersionConstraint()
-    {
-        var manifest = new PluginPackageManifest
-        {
-            Id = "com.example.hello",
-            Name = "Hello",
-            Version = new Version(1, 0, 0, 0),
-            EntryAssembly = "lib/test.dll",
-            MinApiVersion = new Version(1, 0, 0, 0),
-            MinHostVersion = "2.15"
-        };
-
-        var result = PluginPackageService.ValidatePackageManifest(manifest, "2.15.0");
-
-        Assert.IsFalse(result.IsValid);
-        StringAssert.Contains(result.ErrorMessage!, "MinHostVersion");
-    }
-
-    [TestMethod]
-    public void ValidatePackageManifest_ShouldAcceptValidManifest()
-    {
-        var manifest = new PluginPackageManifest
-        {
-            Id = "com.example.hello",
-            Name = "Hello",
-            Version = new Version(1, 0, 0, 0),
-            Author = "Example",
-            EntryAssembly = "lib/HelloPlugin.dll",
-            MinApiVersion = new Version(1, 0, 0, 0),
-            Capabilities = [PluginCapabilities.ContributeTools]
-        };
-
-        var result = PluginPackageService.ValidatePackageManifest(manifest);
-
-        Assert.IsTrue(result.IsValid);
-        Assert.IsNull(result.ErrorMessage);
-    }
-
-    [TestMethod]
-    public void ValidatePackageManifest_ShouldAcceptNullManifest()
-    {
-        var result = PluginPackageService.ValidatePackageManifest(null!);
-
-        Assert.IsFalse(result.IsValid);
-    }
-
-    [TestMethod]
-    public void ValidatePackageManifest_NullMinApiVersion_ShouldReject()
-    {
-        var manifest = new PluginPackageManifest
-        {
-            Id = "com.example.hello",
-            Name = "Hello",
-            Version = new Version(1, 0, 0, 0),
-            EntryAssembly = "lib/test.dll",
-            MinApiVersion = null!
-        };
-
-        var result = PluginPackageService.ValidatePackageManifest(manifest);
-
-        Assert.IsFalse(result.IsValid);
-        StringAssert.Contains(result.ErrorMessage!, "MinApiVersion");
-    }
-
-    [TestMethod]
-    public async Task ReadAndValidateDirectoryAsync_ShouldReadPluginJsonFromDirectory()
+    public async Task ReadAndValidateDirectoryAsync_ShouldReadMixinPluginJson()
     {
         var tempDir = Path.Combine(Path.GetTempPath(), "pcl_plugin_manifest_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempDir);
         try
         {
-            var manifest = new PluginPackageManifest
-            {
-                Id = "com.example.js",
-                Name = "JS Plugin",
-                Version = new Version(1, 0, 0, 0),
-                Author = "Example",
-                Runtime = PluginPackageManifest.RuntimeJavaScriptV8,
-                EntryScript = "main.js",
-                MinApiVersion = new Version(1, 0, 0, 0),
-                Capabilities = [PluginCapabilities.ContributeTools]
-            };
-            await File.WriteAllTextAsync(Path.Combine(tempDir, "plugin.json"),
+            var manifest = CreateValidManifest();
+            await File.WriteAllTextAsync(
+                Path.Combine(tempDir, "plugin.json"),
                 JsonSerializer.Serialize(manifest, PluginJson.SerializerOptions));
 
             var (readManifest, result) = await PluginPackageService.ReadAndValidateDirectoryAsync(tempDir);
 
             Assert.IsTrue(result.IsValid);
             Assert.IsNotNull(readManifest);
-            Assert.AreEqual("com.example.js", readManifest.Id);
+            Assert.AreEqual("com.example.mixin", readManifest.Id);
+            Assert.AreEqual("mixins.json", readManifest.MixinConfig);
         }
         finally
         {
             Directory.Delete(tempDir, recursive: true);
         }
     }
+
+    [TestMethod]
+    public void ValidatePackageManifest_Null_ShouldReject()
+        => Assert.IsFalse(PluginPackageService.ValidatePackageManifest(null!).IsValid);
+
+    private static PluginPackageManifest CreateValidManifest() => new()
+    {
+        Id = "com.example.mixin",
+        Name = "Mixin Plugin",
+        Version = "1.0.0",
+        Author = "Example",
+        PclCoreVersion = "2026.07.1",
+        EntryAssembly = "lib/Example.Plugin.dll",
+        MixinConfig = "mixins.json"
+    };
 }

@@ -6,11 +6,15 @@ using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using PCL.Core.App;
 using PCL.Core.IO.Net.Http;
 using PCL.Core.Logging;
+using PCL.Core.Utils;
 
 namespace PCL.Core.App.Plugins;
 
@@ -19,6 +23,8 @@ namespace PCL.Core.App.Plugins;
 /// </summary>
 public static class PluginRemoteInstallService
 {
+    private const int MaxManifestBytes = PluginMarketQueryOptions.DefaultManifestSizeLimit;
+
     public static async Task<PluginPreparedInstall> PrepareAsync(PluginInstallSourceEntry source, CancellationToken ct = default)
     {
         if (source is null || string.IsNullOrWhiteSpace(source.Url))
@@ -27,7 +33,7 @@ public static class PluginRemoteInstallService
         var type = source.Type.Trim().ToLowerInvariant();
         return type switch
         {
-            "package" => await PreparePackageAsync(source.Url, source.Sha256, ct).ConfigureAwait(false),
+            "package" => await PrepareRepositoryPackageAsync(source.Url, source.Sha256, ct).ConfigureAwait(false),
             "manifest" => await PrepareManifestAsync(source.Url, ct).ConfigureAwait(false),
             "git" => await PrepareGitAsync(source.Url, source.Ref, ct).ConfigureAwait(false),
             _ => throw new NotSupportedException("仅支持 manifest、.pclx 或 .zip 插件安装源。")
@@ -66,17 +72,26 @@ public static class PluginRemoteInstallService
             throw new ArgumentException("插件 manifest 地址不能为空。", nameof(manifestUrl));
         if (version is null)
             throw new ArgumentNullException(nameof(version));
-        if (!LooksLikePackageUrl(version.PackageUrl))
+        if (!LooksLikePackageUrl(version.ResolvedPackageUrl))
             throw new InvalidDataException("插件 manifest 版本缺少指向 .pclx 或 .zip 的 packageUrl。");
+        if (!PluginRepositoryService.IsValidSha256(version.ResolvedSha256))
+            throw new InvalidDataException("插件 manifest 版本缺少有效的 64 位十六进制 SHA-256。");
 
-        var prepared = await PreparePackageAsync(version.PackageUrl, version.Sha256, ct).ConfigureAwait(false);
+        var prepared = await PreparePackageAsync(
+            version.ResolvedPackageUrl,
+            version.ResolvedSha256,
+            ct,
+            version.PluginId,
+            version.Version,
+            version.ResolvedDependencies).ConfigureAwait(false);
         var sourceLabel = string.IsNullOrWhiteSpace(version.Version) ? "市场 manifest" : "市场 manifest（v" + version.Version + "）";
-        return new PluginPreparedInstall(prepared.PluginRoot, prepared.Manifest, PluginInstallSourceType.Repository, manifestUrl, sourceLabel, prepared.CleanupPath);
+        return new PluginPreparedInstall(prepared.PluginRoot, prepared.Manifest, PluginInstallSourceType.Manifest,
+            manifestUrl, sourceLabel, prepared.CleanupPath, prepared.VerifiedSha256);
     }
 
     /// <summary>
     /// 仅获取 manifest（不下载插件包），用于检查更新等轻量场景。<br/>
-    /// 会依次尝试配置的镜像、所有 GitHub 加速镜像，确保在网络受限时仍能获取最新版本。
+    /// 仅在用户启用 GitHub 加速时尝试已配置镜像，并始终以原始 URL 作为回退。
     /// </summary>
     public static async Task<PluginMarketManifest?> FetchManifestAsync(string manifestUrl, CancellationToken ct = default)
     {
@@ -91,14 +106,15 @@ public static class PluginRemoteInstallService
             {
                 using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 timeoutCts.CancelAfter(TimeSpan.FromSeconds(8));
-                using var resp = await HttpRequest.Create(url)
-                    .SendAsync(retryTimes: 1, cancellationToken: timeoutCts.Token)
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                ApplyGitHubHeaders(request, manifestUrl, Config.Plugin.GitHubToken, "application/vnd.github.raw+json");
+                using var resp = await request.SendAsync(retryTimes: 1, cancellationToken: timeoutCts.Token)
                     .ConfigureAwait(false);
                 if (!resp.IsSuccessStatusCode) continue;
-                var manifest = await resp.AsJsonAsync<PluginMarketManifest>(cancellationToken: timeoutCts.Token)
-                    .ConfigureAwait(false);
+                var manifest = await ReadManifestAsync(resp, timeoutCts.Token).ConfigureAwait(false);
                 if (manifest is not null)
                 {
+                    PluginRepositoryService.ValidateMarketManifest(manifest);
                     if (!string.Equals(url, manifestUrl, StringComparison.OrdinalIgnoreCase))
                         LogWrapper.Debug("Plugin", "Manifest fetched via " + label + ": " + manifestUrl);
                     return manifest;
@@ -112,24 +128,21 @@ public static class PluginRemoteInstallService
         return null;
     }
 
-    private static IReadOnlyList<(string Url, string Label)> GetManifestFetchCandidates(string manifestUrl)
+    internal static IReadOnlyList<(string Url, string Label)> GetManifestFetchCandidates(
+        string manifestUrl,
+        int? configuredMirror = null)
     {
         var candidates = new List<(string Url, string Label)>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        // 优先：通过 RewriteByConfig 应用用户配置的镜像
-        candidates.Add((manifestUrl, "configured"));
-        seen.Add(manifestUrl);
-
-        // 回退：所有 GitHub 加速镜像
-        if (GitHubAccelerator.ShouldRewrite(manifestUrl))
+        foreach (var candidate in configuredMirror.HasValue
+                     ? GitHubAccelerator.GetRequestCandidates(manifestUrl, configuredMirror.Value)
+                     : GitHubAccelerator.GetRequestCandidatesByConfig(manifestUrl))
         {
-            foreach (var mirror in GitHubAccelerator.Mirrors)
-            {
-                var mirrored = mirror + manifestUrl;
-                if (seen.Add(mirrored))
-                    candidates.Add((mirrored, mirror.TrimEnd('/')));
-            }
+            if (seen.Add(candidate))
+                candidates.Add((candidate, string.Equals(candidate, manifestUrl, StringComparison.OrdinalIgnoreCase)
+                    ? "original"
+                    : "configured"));
         }
 
         return candidates;
@@ -138,21 +151,28 @@ public static class PluginRemoteInstallService
     public static PluginMarketVersion SelectCompatibleManifestVersion(PluginMarketManifest manifest, string? currentHostVersion = null)
     {
         if (manifest is null) throw new ArgumentNullException(nameof(manifest));
+        PluginRepositoryService.ValidateMarketManifest(manifest);
 
         var candidates = (manifest.Versions ?? [])
-            .Where(version => LooksLikePackageUrl(version.PackageUrl))
-            .Select((version, index) => new
+            .Select(version => new
             {
                 Version = version,
+                Download = PluginRepositoryService.SelectDownload(version, RuntimeInformation.OSArchitecture)
+            })
+            .Where(item => item.Download is not null)
+            .Select((version, index) => new
+            {
+                Version = version.Version,
+                Download = version.Download!,
                 Index = index,
-                ParsedVersion = TryParsePackageVersion(version.Version)
+                ParsedVersion = TryParsePackageVersion(version.Version.Version)
             })
             .ToList();
 
         if (candidates.Count == 0)
             throw new InvalidDataException("插件 manifest 缺少指向 .pclx 或 .zip 的 versions 条目。");
 
-        currentHostVersion ??= PluginCompatibility.CurrentHostVersion;
+        currentHostVersion ??= PluginCompatibility.CurrentPclCoreVersion;
         var selected = candidates
             .Where(candidate => IsManifestVersionCompatible(candidate.Version, currentHostVersion))
             .OrderByDescending(candidate => candidate.ParsedVersion is not null)
@@ -161,12 +181,20 @@ public static class PluginRemoteInstallService
             .FirstOrDefault();
 
         if (selected is null)
-            throw new InvalidDataException("插件 manifest 中没有兼容当前启动器和插件 API 的版本。");
+            throw new InvalidDataException("插件 manifest 中没有当前平台可安装且未过旧的版本。");
 
+        selected.Version.ResolvedPackageUrl = selected.Download.PackageUrl;
+        selected.Version.ResolvedSha256 = selected.Download.Sha256;
         return selected.Version;
     }
 
-    public static async Task<PluginPreparedInstall> PreparePackageAsync(string packageUrl, string? expectedSha256 = null, CancellationToken ct = default)
+    public static async Task<PluginPreparedInstall> PreparePackageAsync(
+        string packageUrl,
+        string? expectedSha256 = null,
+        CancellationToken ct = default,
+        string? expectedPluginId = null,
+        string? expectedVersion = null,
+        IReadOnlyList<PluginDependency>? expectedDependencies = null)
     {
         if (string.IsNullOrWhiteSpace(packageUrl))
             throw new ArgumentException("插件包地址不能为空。", nameof(packageUrl));
@@ -184,25 +212,55 @@ public static class PluginRemoteInstallService
 
         try
         {
-            using (var response = await HttpRequest.Create(packageUrl)
-                       .SendAsync(httpCompletionOption: HttpCompletionOption.ResponseHeadersRead, cancellationToken: ct)
-                       .ConfigureAwait(false))
+            HttpResponseMessage? response = null;
+            try
             {
+                Exception? lastDownloadError = null;
+                var downloadCandidates = GitHubAccelerator.GetRequestCandidatesByConfig(packageUrl);
+                for (var index = 0; index < downloadCandidates.Count; index++)
+                {
+                    try
+                    {
+                        using var request = new HttpRequestMessage(HttpMethod.Get, downloadCandidates[index]);
+                        ApplyGitHubHeaders(request, packageUrl, Config.Plugin.GitHubToken);
+                        response = await request.SendAsync(
+                                httpCompletionOption: HttpCompletionOption.ResponseHeadersRead,
+                                cancellationToken: ct)
+                            .ConfigureAwait(false);
+                        if (response.IsSuccessStatusCode || index == downloadCandidates.Count - 1) break;
+                        response.Dispose();
+                        response = null;
+                    }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+                    catch (Exception ex)
+                    {
+                        lastDownloadError = ex;
+                        if (index == downloadCandidates.Count - 1) throw;
+                    }
+                }
+
+                if (response is null) throw lastDownloadError ?? new HttpRequestException("插件包下载失败。");
                 response.EnsureSuccessStatusCode();
                 await using var remoteStream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
                 await using var fileStream = File.Create(packagePath);
                 await remoteStream.CopyToAsync(fileStream, ct).ConfigureAwait(false);
             }
+            finally
+            {
+                response?.Dispose();
+            }
 
-            ValidateSha256(packagePath, expectedSha256);
+            var verifiedSha256 = ValidateSha256(packagePath, expectedSha256);
             await Task.Run(() => ExtractZipSafely(packagePath, extractDir), ct).ConfigureAwait(false);
             var pluginRoot = FindPluginRoot(extractDir)
                 ?? throw new InvalidDataException("插件包中未找到 plugin.json。请确认该文件是 PCL 插件包。");
             var (manifest, result) = await PluginPackageService.ReadAndValidateDirectoryAsync(pluginRoot, ct).ConfigureAwait(false);
             if (!result.IsValid || manifest is null)
                 throw new InvalidDataException(result.ErrorMessage ?? "插件包校验失败。");
+            ValidateSelectedMarketIdentity(manifest, expectedPluginId, expectedVersion, expectedDependencies);
 
-            return new PluginPreparedInstall(pluginRoot, manifest, PluginInstallSourceType.Repository, packageUrl, "远程插件包", workDir);
+            return new PluginPreparedInstall(pluginRoot, manifest, PluginInstallSourceType.Repository,
+                packageUrl, "远程插件包", workDir, verifiedSha256);
         }
         catch
         {
@@ -237,20 +295,94 @@ public static class PluginRemoteInstallService
 
     private static bool IsManifestVersionCompatible(PluginMarketVersion version, string? currentHostVersion)
     {
-        if (PluginCompatibility.TryGetApiCompatibilityError(version.MinApiVersion, version.MaxApiVersion, out _))
-            return false;
-
-        if (PluginCompatibility.TryGetHostCompatibilityError(version.MinHostVersion, version.MaxHostVersion, currentHostVersion, out _))
-            return false;
-
-        return true;
+        return PluginCompatibility.EvaluatePclCoreVersion(version.PclCoreVersion, currentHostVersion)
+            != PluginCoreCompatibilityStatus.TooOld;
     }
 
-    private static Version? TryParsePackageVersion(string? value)
+    private static Task<PluginPreparedInstall> PrepareRepositoryPackageAsync(string packageUrl, string? expectedSha256, CancellationToken ct)
     {
-        return !string.IsNullOrWhiteSpace(value) && Version.TryParse(value, out var version)
-            ? version
-            : null;
+        if (!PluginRepositoryService.IsValidSha256(expectedSha256))
+            throw new InvalidDataException("市场插件包必须提供有效的 64 位十六进制 SHA-256。");
+        return PreparePackageAsync(packageUrl, expectedSha256, ct);
+    }
+
+    internal static async Task<PluginMarketManifest?> ReadManifestAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        if (response.Content.Headers.ContentLength is > MaxManifestBytes)
+            throw new InvalidDataException($"manifest.json exceeds the {MaxManifestBytes} byte size limit.");
+
+        await using var input = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+        using var output = new MemoryStream();
+        var buffer = new byte[16 * 1024];
+        int read;
+        while ((read = await input.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
+        {
+            if (output.Length + read > MaxManifestBytes)
+                throw new InvalidDataException($"manifest.json exceeds the {MaxManifestBytes} byte size limit.");
+            output.Write(buffer, 0, read);
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<PluginMarketManifest>(
+                Encoding.UTF8.GetString(output.ToArray()),
+                PluginJson.SerializerOptions);
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidDataException("manifest.json contains invalid JSON.", ex);
+        }
+    }
+
+    internal static void ValidateSelectedMarketIdentity(
+        PluginPackageManifest packageManifest,
+        string? expectedPluginId,
+        string? expectedVersion,
+        IReadOnlyList<PluginDependency>? expectedDependencies = null)
+    {
+        if (!string.IsNullOrWhiteSpace(expectedPluginId)
+            && !string.Equals(packageManifest.Id, expectedPluginId, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException(
+                $"插件包 ID {packageManifest.Id} 与市场 manifest 的 {expectedPluginId} 不一致。");
+
+        if (!string.IsNullOrWhiteSpace(expectedVersion))
+        {
+            var expected = TryParsePackageVersion(expectedVersion)
+                ?? throw new InvalidDataException("市场 manifest 包含无效的插件版本。");
+            var actual = TryParsePackageVersion(packageManifest.Version)
+                ?? throw new InvalidDataException("插件包包含无效的 SemVer 版本。");
+            if (actual != expected)
+                throw new InvalidDataException(
+                    $"插件包版本 {packageManifest.Version} 与市场 manifest 的 {expectedVersion} 不一致。");
+        }
+
+        if (expectedDependencies is not null
+            && !PluginDependencyService.DependencyListsEqual(packageManifest.Dependencies, expectedDependencies))
+            throw new InvalidDataException("插件包 dependencies 与市场 manifest 声明不一致。");
+    }
+
+    internal static void ApplyGitHubHeaders(
+        HttpRequestMessage request,
+        string originalUrl,
+        string? token,
+        string? accept = null)
+    {
+        // GitHub authentication/API headers are determined by the original trusted GitHub host,
+        // not by whether the user selected that host for mirror acceleration.
+        if (!GitHubAccelerator.ShouldRewrite(originalUrl)) return;
+        request.Headers.TryAddWithoutValidation("User-Agent", $"PCL-Nex/{Basics.VersionName}");
+        if (!string.IsNullOrWhiteSpace(accept)) request.Headers.TryAddWithoutValidation("Accept", accept);
+        request.Headers.TryAddWithoutValidation("X-GitHub-Api-Version", "2022-11-28");
+        if (!string.IsNullOrWhiteSpace(token))
+            request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + token.Trim());
+    }
+
+    private static SemVer? TryParsePackageVersion(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var text = value.Trim();
+        if (text.StartsWith("v", StringComparison.OrdinalIgnoreCase)) text = text[1..];
+        return SemVer.TryParse(text, out var version) ? version : null;
     }
 
     public static PluginGitSource ParseGitSource(string source, string? reference = null)
@@ -324,7 +456,7 @@ public static class PluginRemoteInstallService
             .FirstOrDefault(path => !string.IsNullOrWhiteSpace(path));
     }
 
-    private static void ExtractZipSafely(string archivePath, string destinationDirectory)
+    internal static void ExtractZipSafely(string archivePath, string destinationDirectory)
     {
         var destinationRoot = Path.GetFullPath(destinationDirectory) + Path.DirectorySeparatorChar;
         using var archive = ZipFile.OpenRead(archivePath);
@@ -346,20 +478,23 @@ public static class PluginRemoteInstallService
         }
     }
 
-    private static void ValidateSha256(string filePath, string? expectedSha256)
+    internal static string ValidateSha256(string filePath, string? expectedSha256)
     {
-        if (string.IsNullOrWhiteSpace(expectedSha256)) return;
+        if (!string.IsNullOrWhiteSpace(expectedSha256) && !PluginRepositoryService.IsValidSha256(expectedSha256))
+            throw new InvalidDataException("插件包 SHA-256 格式无效。");
 
         using var stream = File.OpenRead(filePath);
         var actual = Convert.ToHexString(SHA256.HashData(stream));
+        if (string.IsNullOrWhiteSpace(expectedSha256)) return actual;
         var expected = expectedSha256.Trim().Replace(" ", string.Empty).Replace("-", string.Empty);
         if (!string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("插件包 SHA-256 校验失败。");
+        return actual;
     }
 
     public static string RewriteGitCloneUrl(string cloneUrl, int mirror)
     {
-        return GitHubAccelerator.Rewrite(cloneUrl, mirror);
+        return GitHubAccelerator.Rewrite(cloneUrl, mirror, GitHubAccelerator.GetConfiguredDomains());
     }
 
     private static async Task RunGitAsync(string arguments, CancellationToken ct)
@@ -423,7 +558,8 @@ public sealed class PluginPreparedInstall : IDisposable
         PluginInstallSourceType sourceType,
         string sourceUrl,
         string sourceLabel,
-        string cleanupPath)
+        string cleanupPath,
+        string? verifiedSha256 = null)
     {
         PluginRoot = pluginRoot;
         Manifest = manifest;
@@ -431,6 +567,7 @@ public sealed class PluginPreparedInstall : IDisposable
         SourceUrl = sourceUrl;
         SourceLabel = sourceLabel;
         CleanupPath = cleanupPath;
+        VerifiedSha256 = verifiedSha256;
     }
 
     public string PluginRoot { get; }
@@ -444,6 +581,9 @@ public sealed class PluginPreparedInstall : IDisposable
     public string SourceLabel { get; }
 
     public string CleanupPath { get; }
+
+    /// <summary>实际下载或导入包的 SHA-256；目录/Git 来源为空。</summary>
+    public string? VerifiedSha256 { get; }
 
     public void Dispose()
     {

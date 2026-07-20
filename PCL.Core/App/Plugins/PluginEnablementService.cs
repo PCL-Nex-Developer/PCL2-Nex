@@ -13,7 +13,7 @@ public static class PluginEnablementService
 
     public static bool IsEnabled(string pluginId)
     {
-        if (string.IsNullOrWhiteSpace(pluginId)) return false;
+        if (!PluginPackageService.IsValidPluginId(pluginId)) return false;
         if (IsDisabledBySelfProtection(pluginId)) return false;
 
         try
@@ -27,9 +27,9 @@ public static class PluginEnablementService
         }
     }
 
-    public static void SetEnabled(string pluginId, bool enabled)
+    internal static void SetEnabled(string pluginId, bool enabled)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(pluginId);
+        if (!PluginPackageService.IsValidPluginId(pluginId)) throw new ArgumentException("插件 Id 无效。", nameof(pluginId));
         if (enabled) ClearSelfProtectionDisabled(pluginId);
 
         var states = NormalizeEnabledStates(ReadEnabledStates()).ToList();
@@ -47,14 +47,14 @@ public static class PluginEnablementService
 
     public static void MarkSelfProtectionDisabled(string pluginId)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(pluginId);
+        if (!PluginPackageService.IsValidPluginId(pluginId)) throw new ArgumentException("插件 Id 无效。", nameof(pluginId));
         Directory.CreateDirectory(_GetSelfProtectionDirectory());
         File.WriteAllText(_GetSelfProtectionMarkerPath(pluginId), DateTimeOffset.UtcNow.ToString("O"));
     }
 
     public static void ClearSelfProtectionDisabled(string pluginId)
     {
-        if (string.IsNullOrWhiteSpace(pluginId)) return;
+        if (!PluginPackageService.IsValidPluginId(pluginId)) return;
         var markerPath = _GetSelfProtectionMarkerPath(pluginId);
         if (File.Exists(markerPath)) File.Delete(markerPath);
     }
@@ -81,7 +81,7 @@ public static class PluginEnablementService
 
     public static bool MoveEnabledPlugin(string pluginId, int offset)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(pluginId);
+        if (!PluginPackageService.IsValidPluginId(pluginId)) throw new ArgumentException("插件 Id 无效。", nameof(pluginId));
         if (offset == 0) return false;
 
         var states = NormalizeEnabledStates(ReadEnabledStates()).ToList();
@@ -146,7 +146,8 @@ public static class PluginEnablementService
 
     private static string _SafeFileName(string value)
     {
-        var invalid = Path.GetInvalidFileNameChars();
-        return new string(value.Select(c => invalid.Contains(c) ? '_' : c).ToArray());
+        if (!PluginPackageService.IsValidPluginId(value))
+            throw new ArgumentException("插件 Id 无效。", nameof(value));
+        return value;
     }
 }

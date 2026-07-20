@@ -1,6 +1,5 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using PCL.Core.App.Plugins;
-using PCL.Plugin.Abstractions;
 
 namespace PCL.Core.Test.App.Plugins;
 
@@ -8,40 +7,65 @@ namespace PCL.Core.Test.App.Plugins;
 public class PluginTrustServiceTest
 {
     [TestMethod]
-    public void EvaluateUpdate_ShouldRequireReconfirm_WhenCapabilitiesExpand()
+    public void UpdateSourceMatching_ShouldKeepGitAndManifestPluginsOnTheirRecordedSource()
+    {
+        var git = new PluginInstallRecord
+        {
+            PluginId = "example.plugin",
+            InstalledFrom = "https://github.com/example/plugin",
+            SourceType = PluginInstallSourceType.Git
+        };
+        var manifest = new PluginInstallRecord
+        {
+            PluginId = "example.plugin",
+            InstalledFrom = "https://plugins.example/manifest.json",
+            SourceType = PluginInstallSourceType.Manifest
+        };
+        var entry = new PluginRepositoryEntry
+        {
+            Id = "example.plugin",
+            SourceRepoUrl = "https://github.com/example/plugin",
+            ManifestUrl = "https://plugins.example/manifest.json"
+        };
+
+        Assert.IsTrue(PluginUpdateService.MatchesInstalledSource(git, entry));
+        Assert.IsTrue(PluginUpdateService.MatchesInstalledSource(manifest, entry));
+        entry.SourceRepoUrl = "https://github.com/other/plugin";
+        entry.ManifestUrl = "https://other.example/manifest.json";
+        Assert.IsFalse(PluginUpdateService.MatchesInstalledSource(git, entry));
+        Assert.IsFalse(PluginUpdateService.MatchesInstalledSource(manifest, entry));
+    }
+    [TestMethod]
+    public void EvaluateUpdate_ShouldAllow_WhenSourceIsUnchanged()
     {
         var installed = new PluginInstallRecord
         {
             PluginId = "com.example.hello",
-            InstalledFrom = "https://repo-a",
-            CapabilitiesSnapshot = [PluginCapabilities.ContributeTools]
+            InstalledFrom = "https://repo-a"
         };
         var incoming = new PluginRepositoryEntry
         {
             Id = "com.example.hello",
-            SourceRepoUrl = "https://repo-a",
-            Capabilities = [PluginCapabilities.ContributeTools, PluginCapabilities.ReadInstanceInfo]
+            SourceRepoUrl = "https://repo-a"
         };
 
         var decision = PluginTrustService.EvaluateUpdate(installed, incoming);
 
-        Assert.AreEqual(PluginTrustDecision.RequireReconfirm, decision);
+        Assert.AreEqual(PluginTrustDecision.Allow, decision);
     }
 
     [TestMethod]
-    public void EvaluateUpdate_ShouldAllow_WhenNoCapabilityChange()
+    public void EvaluateUpdate_ShouldAllow_WhenNoLegacyCapabilityMetadataExists()
     {
         var installed = new PluginInstallRecord
         {
             PluginId = "com.example.hello",
-            InstalledFrom = "https://repo-a",
-            CapabilitiesSnapshot = [PluginCapabilities.ContributeTools]
+            InstalledFrom = "https://repo-a"
         };
         var incoming = new PluginRepositoryEntry
         {
             Id = "com.example.hello",
-            SourceRepoUrl = "https://repo-a",
-            Capabilities = [PluginCapabilities.ContributeTools]
+            SourceRepoUrl = "https://repo-a"
         };
 
         var decision = PluginTrustService.EvaluateUpdate(installed, incoming);
@@ -55,14 +79,12 @@ public class PluginTrustServiceTest
         var installed = new PluginInstallRecord
         {
             PluginId = "com.example.hello",
-            InstalledFrom = "https://repo-a/hello/manifest.json",
-            CapabilitiesSnapshot = [PluginCapabilities.ContributeTools]
+            InstalledFrom = "https://repo-a/hello/manifest.json"
         };
         var incoming = new PluginRepositoryEntry
         {
             Id = "com.example.hello",
-            SourceRepoUrl = "https://repo-a/index.json",
-            Capabilities = [PluginCapabilities.ContributeTools]
+            SourceRepoUrl = "https://repo-a/index.json"
         };
 
         var decision = PluginTrustService.EvaluateUpdate(installed, incoming, "https://repo-a/hello/manifest.json");
@@ -76,14 +98,12 @@ public class PluginTrustServiceTest
         var installed = new PluginInstallRecord
         {
             PluginId = "com.example.hello",
-            InstalledFrom = "https://repo-a",
-            CapabilitiesSnapshot = [PluginCapabilities.ContributeTools]
+            InstalledFrom = "https://repo-a"
         };
         var incoming = new PluginRepositoryEntry
         {
             Id = "com.example.hello",
-            SourceRepoUrl = "https://repo-b", // 不同来源
-            Capabilities = [PluginCapabilities.ContributeTools]
+            SourceRepoUrl = "https://repo-b" // 不同来源
         };
 
         var decision = PluginTrustService.EvaluateUpdate(installed, incoming);
@@ -136,5 +156,23 @@ public class PluginTrustServiceTest
         var decision = PluginTrustService.EvaluateInstall(entry, PluginInstallSourceType.Repository);
 
         Assert.AreEqual(PluginTrustDecision.RequireRepositoryTrust, decision);
+    }
+
+    [TestMethod]
+    public void EvaluateInstall_ShouldTrustCustomManifestSourceInsteadOfPluginGitHubRepository()
+    {
+        var entry = new PluginRepositoryEntry
+        {
+            Id = "com.example.hello",
+            SourceKind = "Manifest",
+            ManifestUrl = "https://plugins.example.test/hello/manifest.json",
+            SourceRepoUrl = "https://github.com/Owner/hello",
+            GitHubLogin = "Owner"
+        };
+
+        Assert.AreEqual("https://plugins.example.test/hello/manifest.json",
+            PluginTrustService.GetRepositoryTrustUrl(entry));
+        Assert.AreEqual(PluginTrustDecision.RequireRepositoryTrust,
+            PluginTrustService.EvaluateInstall(entry, PluginInstallSourceType.Repository));
     }
 }

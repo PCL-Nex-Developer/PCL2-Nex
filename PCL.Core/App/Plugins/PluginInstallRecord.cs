@@ -1,5 +1,4 @@
 using System;
-using PCL.Plugin.Abstractions;
 
 namespace PCL.Core.App.Plugins;
 
@@ -13,11 +12,11 @@ public sealed class PluginInstallRecord
     public string PluginId { get; set; } = string.Empty;
 
     /// <summary>已安装版本号。</summary>
-    public Version InstalledVersion { get; set; } = new(0, 0, 0, 0);
+    public string InstalledVersion { get; set; } = string.Empty;
 
     /// <summary>
     /// 安装来源标识。
-    /// 对于市场安装为 index.json 或 manifest URL，包安装为来源地址。
+    /// GitHub 商店安装保存 Git 仓库；非 Git 与自定义 manifest 安装保存可重新获取更新的 JSON/manifest 地址。
     /// </summary>
     public string InstalledFrom { get; set; } = string.Empty;
 
@@ -26,9 +25,6 @@ public sealed class PluginInstallRecord
 
     /// <summary>已安装包的 SHA-256 哈希。</summary>
     public string? InstalledSha256 { get; set; }
-
-    /// <summary>安装时的能力快照，用于检测能力升级。</summary>
-    public PluginCapabilities[] CapabilitiesSnapshot { get; set; } = [];
 
     /// <summary>首次信任/安装时间（UTC）。</summary>
     public DateTime TrustedAt { get; set; } = DateTime.UtcNow;
@@ -47,6 +43,9 @@ public enum PluginInstallSourceType
 {
     /// <summary>从市场注册表安装（官方或第三方）。</summary>
     Repository,
+
+    /// <summary>从可持续获取更新的 manifest 或市场 JSON 地址安装。</summary>
+    Manifest,
 
     /// <summary>从 Git 仓库安装。</summary>
     Git,
@@ -75,6 +74,16 @@ public sealed class PluginRepositoryTrustRecord
 
     /// <summary>来源类型。</summary>
     public PluginRepositorySourceType SourceType { get; set; } = PluginRepositorySourceType.Custom;
+
+    /// <summary>第三方源内容类型。旧记录未声明时按 JSON 处理。</summary>
+    public PluginRepositorySourceKind SourceKind { get; set; } = PluginRepositorySourceKind.Json;
+}
+
+public enum PluginRepositorySourceKind
+{
+    Json,
+    Topic,
+    Manifest
 }
 
 /// <summary>
