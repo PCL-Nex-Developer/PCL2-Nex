@@ -48,12 +48,12 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
         return GetChannelInfo(channel, arch);
     }
 
-    public bool IsLatest(UpdateChannel channel, UpdateArch arch, SemVer currentVersion, int currentVersionCode)
+    public bool IsLatest(UpdateChannel channel, UpdateArch arch, LauncherBaseVersion currentVersion)
     {
         if (_remoteCache is null)
             RefreshCache();
         var latestVersion = GetChannelInfo(channel, arch);
-        return currentVersion >= SemVer.Parse(latestVersion.VersionName);
+        return currentVersion >= latestVersion.BaseVersion;
     }
 
     public VersionAnnouncementDataModel GetAnnouncementList()
@@ -148,8 +148,7 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
             throw new NullReferenceException("Can not get remote update info!");
         return new VersionDataModel
         {
-            VersionName = deJsonData.Version.Name,
-            VersionCode = deJsonData.Version.Code,
+            BaseVersion = deJsonData.Version.BaseVersion,
             Sha256 = deJsonData.Sha256,
             Source = SourceName,
             Changelog = deJsonData.Changelog
@@ -270,7 +269,8 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
         public string FileName { get; set; }
 
         [JsonPropertyName("version")]
-        public MinioUpdateAssetVersionInfo Version { get; set; }
+        [JsonRequired]
+        public LauncherVersionModel Version { get; set; }
 
         [JsonPropertyName("upd_time")]
         public string UpdTime { get; set; }
@@ -288,15 +288,4 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
         public string Changelog { get; set; }
     }
 
-    private class MinioUpdateAssetVersionInfo
-    {
-        [JsonPropertyName("channel")]
-        public string Channel { get; set; }
-
-        [JsonPropertyName("name")]
-        public string Name { get; set; }
-
-        [JsonPropertyName("code")]
-        public int Code { get; set; }
-    }
 }

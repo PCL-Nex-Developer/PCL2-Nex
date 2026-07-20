@@ -31,8 +31,8 @@ public static class RequestSigning
         var userAgent = !string.IsNullOrEmpty(customUserAgent)
             ? customUserAgent
             : useBrowserUserAgent
-                ? $"PCL2/{ModBase.upstreamVersion}.{ModBase.versionBranchCode} PCLNex/{ModBase.versionStandardCode} Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0"
-                : $"PCL2/{ModBase.upstreamVersion}.{ModBase.versionBranchCode} PCLNex/{ModBase.versionStandardCode}";
+                ? $"PCLNex/{Basics.VersionName} Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0"
+                : $"PCLNex/{Basics.VersionName}";
         client.Headers.Add("User-Agent", userAgent);
     }
 }

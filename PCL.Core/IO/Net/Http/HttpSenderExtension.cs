@@ -27,7 +27,7 @@ public static class HttpSenderExtension
             {
                 request
                     .WithHeader("User-Agent", $"PCL-Nex-Developer/PCL2-Nex/{Basics.VersionName} (pclc.cc)")
-                    .WithHeader("Referer", $"https://{Basics.VersionCode}.ce.open.pcl2.server/");
+                    .WithHeader("Referer", $"https://{Basics.VersionName}.ce.open.pcl2.server/");
             }
 
             var requestId = Guid.NewGuid().ToString();

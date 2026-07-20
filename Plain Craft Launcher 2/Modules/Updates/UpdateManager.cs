@@ -19,37 +19,19 @@ public static class UpdateManager
         new UpdatesMinioModel("https://github.com/PCL-Nex-Developer/Nex_Server/raw/main/", "GitHub")
     });
 
-    public static bool IsCurrentVersionBeta
-    {
-        get
-        {
-            if (ModBase.versionBaseName.Contains("beta"))
-                return true;
-            return (int)Config.Update.UpdateChannel == 1;
-        }
-    }
+    public static UpdateChannel SelectedUpdateChannel => Config.Update.UpdateChannel == Core.App.UpdateChannel.Beta
+        ? UpdateChannel.beta
+        : UpdateChannel.stable;
+
+    public static UpdateArch CurrentUpdateArchitecture => SystemInfo.IsArm64System
+        ? UpdateArch.arm64
+        : UpdateArch.x64;
     
     public static UpdateEnums.VersionStatus GetVersionStatus()
     {
         try
         {
-            if (IsCurrentVersionBeta && (int)Config.Update.UpdateChannel != 1)
-            {
-                var isNewerThanStable = remoteServer.IsLatest(UpdateChannel.stable,
-                    SystemInfo.IsArm64System ? UpdateArch.arm64 : UpdateArch.x64, SemVer.Parse(ModBase.versionBaseName),
-                    ModBase.versionCode);
-                var isBetaLatest = remoteServer.IsLatest(UpdateChannel.beta,
-                    SystemInfo.IsArm64System ? UpdateArch.arm64 : UpdateArch.x64, SemVer.Parse(ModBase.versionBaseName),
-                    ModBase.versionCode);
-                return isNewerThanStable && isBetaLatest
-                    ? UpdateEnums.VersionStatus.Latest
-                    : UpdateEnums.VersionStatus.NotLatest;
-            }
-
-            return remoteServer.IsLatest(
-                IsCurrentVersionBeta ? UpdateChannel.beta : UpdateChannel.stable,
-                SystemInfo.IsArm64System ? UpdateArch.arm64 : UpdateArch.x64, SemVer.Parse(ModBase.versionBaseName),
-                ModBase.versionCode)
+            return remoteServer.IsLatest(SelectedUpdateChannel, CurrentUpdateArchitecture, Basics.BaseVersion)
                 ? UpdateEnums.VersionStatus.Latest
                 : UpdateEnums.VersionStatus.NotLatest;
         }
@@ -70,20 +52,20 @@ public static class UpdateManager
             try
             {
                 var version = remoteServer.GetLatestVersion(
-                    IsCurrentVersionBeta ? UpdateChannel.beta : UpdateChannel.stable,
-                    SystemInfo.IsArm64System ? UpdateArch.arm64 : UpdateArch.x64
+                    SelectedUpdateChannel,
+                    CurrentUpdateArchitecture
                 );
 
                 ModBase.WriteFile(Path.Combine(ModBase.pathTemp, UpdateLogFileName), version.Changelog);
-                ModBase.Log($"[Update] 远程最新版本: {version.VersionName}, 当前版本: {ModBase.versionBaseName}");
-                if (!(SemVer.Parse(version.VersionName) > SemVer.Parse(ModBase.versionBaseName)))
+                ModBase.Log($"[Update] 远程最新版本: {version.BaseVersion}, 当前版本: {Basics.BaseVersion}");
+                if (!(version.BaseVersion > Basics.BaseVersion))
                     return;
                 if (type == UpdateEnums.UpdateType.PromptOnly)
                 {
                     ModBase.RunInUi(() =>
                     {
                         if (ModMain.MyMsgBox(
-                                Lang.Text("Update.Available", ModBase.versionBaseName, version.VersionName),
+                                Lang.Text("Update.Available", Basics.BaseVersion, version.BaseVersion),
                                 Lang.Text("Update.Title"),
                                 Lang.Text("Update.Action"),
                                 Lang.Text("Common.Action.Cancel")
@@ -97,8 +79,7 @@ public static class UpdateManager
                 var loaders = new List<ModLoader.LoaderBase>();
                 // 下载
                 loaders.AddRange(remoteServer.GetDownloadLoader(
-                    IsCurrentVersionBeta ? UpdateChannel.beta : UpdateChannel.stable,
-                    SystemInfo.IsArm64System ? UpdateArch.arm64 : UpdateArch.x64, dlTargetPath));
+                    SelectedUpdateChannel, CurrentUpdateArchitecture, dlTargetPath));
                 loaders.Add(new ModLoader.LoaderTask<int, int>(Lang.Text("Update.Task.Check"), _ =>
                 {
                     var curHash = ModBase.GetFileSHA256(dlTargetPath);
@@ -116,7 +97,7 @@ public static class UpdateManager
                         ModBase.RunInUi(() =>
                         {
                             ModMain.frmMain.BtnExtraUpdateRestart.ToolTip =
-                                Lang.Text("Main.Extra.UpdateRestart.ToolTipWithVersion", ModBase.versionBaseName, version.VersionName);
+                                Lang.Text("Main.Extra.UpdateRestart.ToolTipWithVersion", Basics.BaseVersion, version.BaseVersion);
                             ModMain.frmMain.BtnExtraUpdateRestart.ShowRefresh();
                             ModMain.frmMain.BtnExtraUpdateRestart.Ribble();
                         });

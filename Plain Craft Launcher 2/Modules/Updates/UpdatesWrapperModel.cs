@@ -1,3 +1,4 @@
+using PCL.Core.App;
 using PCL.Core.App.Localization;
 using PCL.Core.Utils;
 
@@ -75,7 +76,7 @@ public class UpdatesWrapperModel : IUpdateSource
         throw new Exception(Lang.Text("Update.Task.GetVersionInfoFailed"));
     }
 
-    public bool IsLatest(UpdateChannel channel, UpdateArch arch, SemVer currentVersion, int currentVersionCode)
+    public bool IsLatest(UpdateChannel channel, UpdateArch arch, LauncherBaseVersion currentVersion)
     {
         foreach (var item in _sources)
             try
@@ -83,14 +84,14 @@ public class UpdatesWrapperModel : IUpdateSource
                 if (_versionSource is not null)
                     try
                     {
-                        return _versionSource.IsLatest(channel, arch, currentVersion, currentVersionCode);
+                        return _versionSource.IsLatest(channel, arch, currentVersion);
                     }
                     catch (Exception ex)
                     {
                         ModBase.Log(ex, $"[Update] 缓存的版本源 {_versionSource.SourceName} 不可用");
                     }
 
-                var ret = item.IsLatest(channel, arch, currentVersion, currentVersionCode);
+                var ret = item.IsLatest(channel, arch, currentVersion);
                 _versionSource = item;
                 return ret;
             }
@@ -159,9 +160,8 @@ public class UpdatesWrapperModel : IUpdateSource
         throw new Exception(Lang.Text("Update.Task.GetVersionInfoFailed"));
     }
 
-    public async Task<bool> IsLatestAsync(UpdateChannel channel, UpdateArch arch, SemVer currentVersion,
-        int currentVersionCode)
+    public async Task<bool> IsLatestAsync(UpdateChannel channel, UpdateArch arch, LauncherBaseVersion currentVersion)
     {
-        return await Task.Run(() => IsLatest(channel, arch, currentVersion, currentVersionCode));
+        return await Task.Run(() => IsLatest(channel, arch, currentVersion));
     }
 }
