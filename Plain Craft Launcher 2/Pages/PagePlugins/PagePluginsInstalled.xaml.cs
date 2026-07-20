@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -48,11 +49,11 @@ public partial class PagePluginsInstalled
         }
         catch { }
 
-        var manifests = new Dictionary<string, PluginPackageManifest>();
+        var manifests = new Dictionary<string, (PluginPackageManifest Manifest, string Directory)>();
         try
         {
-            foreach (var (manifest, _) in PluginLoaderService.EnumerateInstalledPluginPackages(Paths.PluginInstalled))
-                manifests[manifest.Id] = manifest;
+            foreach (var (manifest, directory) in PluginLoaderService.EnumerateInstalledPluginPackages(Paths.PluginInstalled))
+                manifests[manifest.Id] = (manifest, directory);
         }
         catch { }
 
@@ -77,14 +78,28 @@ public partial class PagePluginsInstalled
         foreach (var pluginId in orderedIds)
         {
             records.TryGetValue(pluginId, out var record);
-            manifests.TryGetValue(pluginId, out var manifest);
+            var hasManifest = manifests.TryGetValue(pluginId, out var manifestInfo);
+            var manifest = hasManifest ? manifestInfo.Manifest : null;
             loaded.TryGetValue(pluginId, out var loadedRecord);
 
             var row = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(42) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var noIcon = "pack://application:,,,/images/Icons/NoIcon.png";
+            row.Children.Add(new MyImage
+            {
+                Width = 42,
+                Height = 42,
+                CornerRadius = new CornerRadius(5),
+                Source = ResolveInstalledLogo(manifest, hasManifest ? manifestInfo.Directory : null) ?? noIcon,
+                FallbackSource = noIcon,
+                VerticalAlignment = VerticalAlignment.Center
+            });
 
             var info = new StackPanel();
             var name = loadedRecord?.Manifest?.Name ?? manifest?.Name ?? pluginId;
@@ -102,22 +117,11 @@ public partial class PagePluginsInstalled
             src.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
             info.Children.Add(src);
 
-            var caps = loadedRecord?.Manifest?.Capabilities ?? PCL.Plugin.Abstractions.PluginCapabilities.None;
-            var capsTextValue = caps != PCL.Plugin.Abstractions.PluginCapabilities.None
-                ? caps.ToString()
-                : manifest?.Capabilities is { Length: > 0 } manifestCaps
-                    ? string.Join(", ", manifestCaps)
-                    : string.Empty;
-            if (!string.IsNullOrWhiteSpace(capsTextValue))
-            {
-                var capsText = new TextBlock { Text = "能力: " + capsTextValue, FontSize = 11, Margin = new Thickness(0, 2, 0, 0) };
-                capsText.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
-                info.Children.Add(capsText);
-            }
+            info.SetValue(Grid.ColumnProperty, 2);
             row.Children.Add(info);
 
             var orderButtons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(8, 0, 0, 0) };
-            orderButtons.SetValue(Grid.ColumnProperty, 1);
+            orderButtons.SetValue(Grid.ColumnProperty, 3);
 
             var moveUpBtn = new MyButton { Text = "上移", Height = 28, MinWidth = 50, IsEnabled = orderIndex > 0 };
             var idMoveUp = pluginId;
@@ -131,14 +135,21 @@ public partial class PagePluginsInstalled
 
             row.Children.Add(orderButtons);
 
-            var toggleBtn = new MyButton { Text = isEnabled ? "禁用" : "启用", Height = 28, MinWidth = 60, Margin = new Thickness(8, 0, 0, 0) };
-            toggleBtn.SetValue(Grid.ColumnProperty, 2);
+            var toggleBtn = new MyButton
+            {
+                Text = isEnabled ? "禁用" : "启用",
+                Height = 28,
+                MinWidth = 60,
+                Margin = new Thickness(8, 0, 0, 0),
+                IsEnabled = true
+            };
+            toggleBtn.SetValue(Grid.ColumnProperty, 4);
             var id1 = pluginId; var en = isEnabled;
             toggleBtn.Click += (_, _) => TogglePlugin(id1, !en);
             row.Children.Add(toggleBtn);
 
-            var uninstallBtn = new MyButton { Text = "卸载", Height = 28, MinWidth = 60, Margin = new Thickness(4, 0, 0, 0), ColorType = MyButton.ColorState.Red };
-            uninstallBtn.SetValue(Grid.ColumnProperty, 3);
+            var uninstallBtn = new MyButton { Text = "卸载", Height = 28, MinWidth = 60, Margin = new Thickness(4, 0, 0, 0), ColorType = MyButton.ColorState.Red, IsEnabled = true };
+            uninstallBtn.SetValue(Grid.ColumnProperty, 5);
             var id2 = pluginId;
             uninstallBtn.Click += (_, _) => _Uninstall(id2);
             row.Children.Add(uninstallBtn);
@@ -147,11 +158,31 @@ public partial class PagePluginsInstalled
         }
     }
 
-    private void TogglePlugin(string pluginId, bool enabled)
+    private static string? ResolveInstalledLogo(PluginPackageManifest? manifest, string? pluginDirectory)
+    {
+        var logo = manifest?.Logo ?? manifest?.Icon;
+        if (string.IsNullOrWhiteSpace(logo)) return null;
+        logo = logo.Trim();
+        if (Uri.TryCreate(logo, UriKind.Absolute, out var uri)
+            && uri.Scheme is "http" or "https") return logo;
+        if (string.IsNullOrWhiteSpace(pluginDirectory)) return null;
+        try
+        {
+            var root = Path.GetFullPath(pluginDirectory);
+            var candidate = Path.GetFullPath(Path.Combine(root, logo));
+            return candidate.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+                && File.Exists(candidate)
+                ? candidate
+                : null;
+        }
+        catch { return null; }
+    }
+
+    private async void TogglePlugin(string pluginId, bool enabled)
     {
         try
         {
-            PluginInstallService.SetEnabled(pluginId, enabled);
+            if (!await PluginInstallService.SetEnabledAsync(pluginId, enabled)) return;
             ModMain.frmMain?.RefreshRestartButton(true);
             ModMain.MyMsgBox("插件 " + pluginId + (enabled ? " 已启用。" : " 已禁用。") + "\n请重启启动器后生效。", "插件状态");
             BuildInstalledList();
@@ -213,7 +244,8 @@ public partial class PagePluginsInstalled
             using var prepared = await PluginRemoteInstallService.PrepareAsync(source);
             var manifest = prepared.Manifest;
             if (ModMain.MyMsgBox("即将安装插件（" + prepared.SourceLabel + "）：\n\n名称: " + manifest.Name + "\n来源: " + prepared.SourceUrl + "\n\n未经仓库信任验证。\n\n重大安全提醒：插件会在启动器内运行代码，可能读取或修改本地文件、访问网络、修改启动器界面，甚至执行恶意操作。\n请只安装你完全信任的来源。", "确认安装", button2: "取消", isWarn: true) != 1) return;
-            await PluginInstallService.InstallFromDirectoryAsync(prepared.PluginRoot, manifest, prepared.SourceType, prepared.SourceUrl);
+            await PluginInstallService.InstallFromDirectoryAsync(prepared.PluginRoot, manifest, prepared.SourceType,
+                prepared.SourceUrl, installedSha256: prepared.VerifiedSha256);
             ModMain.frmMain?.RefreshRestartButton(true);
             ModMain.MyMsgBox("插件 " + manifest.Name + " 安装成功！\n请重启启动器后生效。", "安装完成");
             BuildInstalledList();
@@ -237,7 +269,8 @@ public partial class PagePluginsInstalled
     {
         var manifest = prepared.Manifest;
         if (ModMain.MyMsgBox("即将导入插件（" + prepared.SourceLabel + "）：\n\n名称: " + manifest.Name + "\n来源: " + prepared.SourceUrl + "\n\n重大安全提醒：插件会在启动器内运行代码，可能读取或修改本地文件、访问网络、修改启动器界面，甚至执行恶意操作。\n请只导入你完全信任的插件。", "确认导入", button2: "取消", isWarn: true) != 1) return;
-        await PluginInstallService.InstallFromDirectoryAsync(prepared.PluginRoot, manifest, prepared.SourceType, prepared.SourceUrl);
+        await PluginInstallService.InstallFromDirectoryAsync(prepared.PluginRoot, manifest, prepared.SourceType,
+            prepared.SourceUrl, installedSha256: prepared.VerifiedSha256);
         ModMain.frmMain?.RefreshRestartButton(true);
         ModMain.MyMsgBox("插件 " + manifest.Name + " 导入成功！\n请重启启动器后生效。", "导入完成");
         BuildInstalledList();
@@ -331,7 +364,12 @@ public partial class PagePluginsInstalled
             if (ModMain.MyMsgBox(confirmMsg, "确认更新", button2: "取消", isWarn: trustDecision != PluginTrustDecision.Allow) != 1) return;
 
             using var prepared = await PluginRemoteInstallService.PrepareManifestVersionAsync(candidate.Source.Url, candidate.ManifestVersion);
-            await PluginInstallService.InstallFromDirectoryAsync(prepared.PluginRoot, prepared.Manifest, prepared.SourceType, prepared.SourceUrl);
+            await PluginInstallService.InstallFromDirectoryAsync(
+                prepared.PluginRoot,
+                prepared.Manifest,
+                candidate.Installed.SourceType,
+                candidate.Installed.InstalledFrom,
+                installedSha256: prepared.VerifiedSha256);
             ModMain.frmMain?.RefreshRestartButton(true);
             ModMain.MyMsgBox("插件 " + prepared.Manifest.Name + " 已更新到 v" + PluginUpdateService.FormatVersion(prepared.Manifest.Version) + "！\n请重启启动器后生效。", "更新完成");
             BuildInstalledList();

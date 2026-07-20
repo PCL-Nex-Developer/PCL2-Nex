@@ -3,16 +3,115 @@
                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                    xmlns:local="clr-namespace:PCL"
                    PanScroll="{Binding ElementName=PanBack}">
+    <local:MyPageRight.Resources>
+        <Style x:Key="PluginSwitchStyle" TargetType="ToggleButton">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Grid Width="38" Height="20">
+                            <Border x:Name="Track" CornerRadius="10" Background="{DynamicResource ColorBrushGray6}" />
+                            <Ellipse x:Name="Knob" Width="16" Height="16" HorizontalAlignment="Left"
+                                     Margin="2,0,0,0" Fill="{DynamicResource ColorBrushGray1}" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Track" Property="Background" Value="{DynamicResource ColorBrush3}" />
+                                <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
+                                <Setter TargetName="Knob" Property="Margin" Value="0,0,2,0" />
+                                <Setter TargetName="Knob" Property="Fill" Value="White" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="PluginStatusButtonStyle" TargetType="ToggleButton">
+            <Setter Property="Height" Value="24" />
+            <Setter Property="MinWidth" Value="72" />
+            <Setter Property="Margin" Value="0,0,7,0" />
+            <Setter Property="Padding" Value="10,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="{DynamicResource ColorBrushGray2}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Border" CornerRadius="4" Padding="{TemplateBinding Padding}"
+                                Background="{DynamicResource ColorBrushGray7}"
+                                BorderBrush="{DynamicResource ColorBrushGray5}" BorderThickness="1">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="{DynamicResource ColorBrushGray6}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="{DynamicResource ColorBrush6}" />
+                                <Setter TargetName="Border" Property="BorderBrush" Value="{DynamicResource ColorBrush3}" />
+                                <Setter Property="Foreground" Value="{DynamicResource ColorBrush2}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </local:MyPageRight.Resources>
     <Grid>
         <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
             <StackPanel x:Name="PanMain" Margin="25">
-                <local:MySearchBox x:Name="PanSearchBox" Margin="0,0,0,15" SearchButtonVisibility="Visible" HintText="搜索插件名称、作者或 ID" />
-                <local:MyCard Margin="0,0,0,15" Visibility="Collapsed">
-                    <StackPanel Margin="19,17,19,14">
-                        <TextBlock x:Name="TextRepoInfo"
-                                   Text="正在加载插件列表..."
-                                   FontSize="13" TextWrapping="Wrap" />
-                    </StackPanel>
+                <local:MySearchBox x:Name="PanSearchBox" Margin="0,0,0,15"
+                                   SearchButtonVisibility="Visible" HintText="搜索插件名称、作者、ID、分组或标签" />
+                <local:MyCard Margin="0,0,0,15">
+                    <Grid Margin="7">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="28" />
+                            <RowDefinition Height="8" />
+                            <RowDefinition Height="28" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="来源" VerticalAlignment="Center" Margin="5,0" />
+                        <local:MyComboBox x:Name="ComboSourceGroup" Grid.Column="1" MaxDropDownHeight="320">
+                            <local:MyComboBoxItem Content="全部" Tag="" IsSelected="True" />
+                        </local:MyComboBox>
+                        <TextBlock Text="标签" Grid.Column="2" VerticalAlignment="Center" Margin="5,0" />
+                        <local:MyComboBox x:Name="ComboTag" Grid.Column="3" MaxDropDownHeight="320">
+                            <local:MyComboBoxItem Content="全部" Tag="" IsSelected="True" />
+                        </local:MyComboBox>
+                        <TextBlock Text="排序" Grid.Column="4" VerticalAlignment="Center" Margin="5,0" />
+                        <local:MyComboBox x:Name="ComboSort" Grid.Column="5" MaxDropDownHeight="320">
+                            <local:MyComboBoxItem Content="默认顺序" Tag="default" IsSelected="True" />
+                            <local:MyComboBoxItem Content="最近更新" Tag="updated" />
+                            <local:MyComboBoxItem Content="名称 A-Z" Tag="name-asc" />
+                            <local:MyComboBoxItem Content="名称 Z-A" Tag="name-desc" />
+                        </local:MyComboBox>
+                        <StackPanel Grid.Column="6" Orientation="Horizontal" HorizontalAlignment="Right">
+                            <local:MyIconButton x:Name="BtnFilterReset" SvgIcon="lucide/rotate-ccw" ToolTip="重置筛选" LogoScale="0.9" />
+                        </StackPanel>
+
+                        <TextBlock Text="状态" Grid.Row="2" VerticalAlignment="Center" Margin="5,0" />
+                        <StackPanel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3"
+                                    Orientation="Horizontal" VerticalAlignment="Center">
+                            <ToggleButton x:Name="CheckStatusArchived" Content="Archived"
+                                          Style="{StaticResource PluginStatusButtonStyle}" />
+                            <ToggleButton x:Name="CheckStatusDisabled" Content="Disabled"
+                                          Style="{StaticResource PluginStatusButtonStyle}" />
+                            <ToggleButton x:Name="CheckStatusFork" Content="Fork"
+                                          Style="{StaticResource PluginStatusButtonStyle}" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="2" Grid.Column="4" Grid.ColumnSpan="3" Orientation="Horizontal"
+                                    HorizontalAlignment="Right" VerticalAlignment="Center" Margin="12,0,0,0">
+                            <ToggleButton x:Name="SwitchShowOtherDevelopers" Style="{StaticResource PluginSwitchStyle}" />
+                            <TextBlock Text="显示来自非官方开发者的内容" VerticalAlignment="Center" Margin="7,0,5,0" />
+                        </StackPanel>
+                    </Grid>
                 </local:MyCard>
                 <local:MyCard x:Name="CardPlugins" UseAnimation="False" Visibility="Collapsed">
                     <StackPanel x:Name="PanPlugins" Margin="12" />

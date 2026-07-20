@@ -148,7 +148,11 @@ public partial class MyCompItem
     public MyCompItem()
     {
         InitializeComponent();
-        Click += (sender, e) => MyCompItem_Click((MyCompItem)sender, e);
+        Click += (sender, e) =>
+        {
+            if (((MyCompItem)sender).Tag is ModComp.CompProject)
+                MyCompItem_Click((MyCompItem)sender, e);
+        };
         PreviewMouseLeftButtonUp += Button_MouseUp;
         PreviewMouseLeftButtonDown += Button_MouseDown;
         MouseLeave += Button_MouseLeave;

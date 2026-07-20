@@ -10,36 +10,62 @@ internal static class PluginRepositoryListUi
     public static void BuildRepoList(StackPanel repoList)
     {
         repoList.Children.Clear();
-        repoList.Children.Add(CreateRepoRow("官方市场", PluginRepositoryService.GetOfficialIndexUrl(), PluginRepositorySourceType.Official, true, true, repoList));
+        repoList.Children.Add(CreateRepoRow("GitHub", "pclnexplugin", "内置 Topic", true, repoList));
+        repoList.Children.Add(CreateRepoRow("NexDeveloper", PluginRepositoryService.GetOfficialIndexUrl(), "内置第三方 JSON", true, repoList));
         var records = PluginTrustService.GetAllTrustRecords();
         if (records.Count == 0)
         {
-            var hint = new TextBlock { Text = "暂无自定义插件源。点击上方「添加源」按钮添加第三方市场注册表。", FontSize = 12, Margin = new Thickness(0, 8, 0, 0) };
+            var hint = new TextBlock { Text = "暂无自定义插件源。可添加 Topic 关键词、Manifest 或本地/网络 JSON。", FontSize = 12, Margin = new Thickness(0, 8, 0, 0) };
             hint.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
             repoList.Children.Add(hint);
             return;
         }
-        foreach (var record in records) repoList.Children.Add(CreateRepoRow(record.RepoName, record.RepoUrl, record.SourceType, record.Enabled, false, repoList));
+        foreach (var record in records)
+        {
+            var name = record.SourceKind == PluginRepositorySourceKind.Topic
+                ? record.RepoUrl
+                : record.RepoName;
+            var description = record.SourceKind switch
+            {
+                PluginRepositorySourceKind.Topic => "Topic",
+                PluginRepositorySourceKind.Manifest => "Manifest",
+                _ => "第三方 JSON"
+            };
+            repoList.Children.Add(CreateRepoRow(name, record.RepoUrl, description, false, repoList, record.Enabled));
+        }
     }
 
-    private static Grid CreateRepoRow(string name, string url, PluginRepositorySourceType sourceType, bool enabled, bool isOfficial, StackPanel repoList)
+    private static Grid CreateRepoRow(
+        string name,
+        string url,
+        string description,
+        bool isBuiltIn,
+        StackPanel repoList,
+        bool enabled = true)
     {
         var row = new Grid { Margin = new Thickness(0, 0, 0, 6) };
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var info = new StackPanel();
-        var titleText = new TextBlock { Text = name + "  " + (sourceType == PluginRepositorySourceType.Official ? "[Official]" : "[Custom]"), FontSize = 12, FontWeight = FontWeights.SemiBold };
+        var titleText = new TextBlock
+        {
+            Text = name,
+            FontSize = 12,
+            FontWeight = FontWeights.SemiBold
+        };
         titleText.SetResourceReference(TextBlock.ForegroundProperty, enabled ? "ColorBrush2" : "ColorBrushGray4");
         info.Children.Add(titleText);
-        if (!isOfficial)
+        var detailText = new TextBlock
         {
-            var urlText = new TextBlock { Text = url, FontSize = 11 };
-            urlText.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
-            info.Children.Add(urlText);
-        }
+            Text = description + (isBuiltIn ? string.Empty : " · " + url),
+            FontSize = 11,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+        detailText.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
+        info.Children.Add(detailText);
         row.Children.Add(info);
-        if (!isOfficial)
+        if (!isBuiltIn)
         {
             var toggleBtn = new MyButton { Text = enabled ? "禁用" : "启用", Height = 26, MinWidth = 50, Margin = new Thickness(8, 0, 0, 0) };
             toggleBtn.SetValue(Grid.ColumnProperty, 1);
@@ -57,11 +83,31 @@ internal static class PluginRepositoryListUi
     {
         try
         {
-            var url = ModMain.MyMsgBoxInput("添加插件源", "请输入插件市场索引 URL：\n（应指向一个 index.json 或 registry.json 文件）");
-            if (string.IsNullOrWhiteSpace(url)) return;
-            var name = ModMain.MyMsgBoxInput("插件源名称", "请输入插件源名称（便于识别）：", "自定义插件源");
-            if (string.IsNullOrWhiteSpace(name)) name = "自定义插件源";
-            PluginTrustService.AddTrust(url, name, PluginRepositorySourceType.Custom);
+            var input = ModMain.MyMsgBoxInput("添加插件源", "请输入来源：\n- topic:pclnexplugin 或直接输入 Topic 关键词\n- manifest:https://example.com/manifest.json\n- 网络或本地 JSON 文件地址");
+            if (string.IsNullOrWhiteSpace(input)) return;
+            input = input.Trim();
+            var sourceKind = PluginRepositorySourceKind.Json;
+            var url = input;
+            if (input.StartsWith("topic:", StringComparison.OrdinalIgnoreCase))
+            {
+                sourceKind = PluginRepositorySourceKind.Topic;
+                url = input[6..].Trim();
+            }
+            else if (input.StartsWith("manifest:", StringComparison.OrdinalIgnoreCase))
+            {
+                sourceKind = PluginRepositorySourceKind.Manifest;
+                url = input[9..].Trim();
+            }
+            else if (!Uri.TryCreate(input, UriKind.Absolute, out _) && !System.IO.File.Exists(input))
+            {
+                sourceKind = PluginRepositorySourceKind.Topic;
+            }
+            if (string.IsNullOrWhiteSpace(url)) throw new ArgumentException("插件源内容不能为空。");
+            var name = sourceKind == PluginRepositorySourceKind.Topic
+                ? url
+                : ModMain.MyMsgBoxInput("插件源名称", "请输入此来源在插件商店中显示的名称：", "自定义插件源");
+            if (string.IsNullOrWhiteSpace(name)) name = sourceKind == PluginRepositorySourceKind.Topic ? url : "自定义插件源";
+            PluginTrustService.AddTrust(url, name, PluginRepositorySourceType.Custom, sourceKind);
             BuildRepoList(repoList);
         }
         catch (Exception ex) { ModMain.MyMsgBox("添加失败: " + ex.Message, "错误"); }
