@@ -1,0 +1,24 @@
+<Project>
+  <PropertyGroup>
+    <BaseVersion Condition="'$(BaseVersion)' == ''">2026.07.1</BaseVersion>
+    <_PclInjectBaseVersion Condition="'$(MSBuildProjectName)' == 'PCL.Core' Or '$(MSBuildProjectName)' == 'Plain Craft Launcher 2'">true</_PclInjectBaseVersion>
+    <Version Condition="'$(_PclInjectBaseVersion)' == 'true'">$(BaseVersion)</Version>
+    <AssemblyVersion Condition="'$(_PclInjectBaseVersion)' == 'true'">$(BaseVersion).0</AssemblyVersion>
+    <FileVersion Condition="'$(_PclInjectBaseVersion)' == 'true'">$(BaseVersion).0</FileVersion>
+    <InformationalVersion Condition="'$(_PclInjectBaseVersion)' == 'true'">$(BaseVersion)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion Condition="'$(_PclInjectBaseVersion)' == 'true'">false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+  <Target Name="ValidatePclBaseVersion" BeforeTargets="GenerateAssemblyInfo" Condition="'$(_PclInjectBaseVersion)' == 'true'">
+    <Error
+      Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(BaseVersion)', '^\d{4}\.(0[1-9]|1[0-2])\.(0|[1-9]\d*)$'))"
+      Text="BaseVersion must use strict yyyy.MM.patch format, for example 2026.07.1." />
+  </Target>
+
+  <ItemGroup Condition="'$(_PclInjectBaseVersion)' == 'true'">
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>BaseVersion</_Parameter1>
+      <_Parameter2>$(BaseVersion)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

@@ -16,7 +16,7 @@ public static class Paths
     /// <summary>
     /// The default directory used for relative path combining.
     /// </summary>
-    public static string DefaultDirectory => Basics.ExecutableDirectory;
+    public static string DefaultDirectory => AppContext.BaseDirectory;
 
     private static string _data;
     private static string _sharedData;

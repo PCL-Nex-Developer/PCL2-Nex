@@ -8,7 +8,6 @@ using PCL.Core.App.Essentials;
 using PCL.Core.App.Plugins;
 using PCL.Network;
 using PCL.Network.Loaders;
-using PCL.Plugins;
 
 namespace PCL;
 
@@ -62,13 +61,8 @@ public static class UriActionService
                 case "plugin-source":
                     AddPluginSource(request);
                     break;
-                case "plugin":
-                case "plugin-action":
-                    DispatchPluginAction(request);
-                    break;
                 default:
-                    if (!DispatchPluginAction(request, action))
-                        HintService.Hint($"未知 URI 动作：{action}", HintType.Error);
+                    HintService.Hint($"未知 URI 动作：{action}", HintType.Error);
                     break;
             }
         }
@@ -232,7 +226,8 @@ public static class UriActionService
                     "确认安装", button2: "取消", isWarn: true));
                 if (confirm != 1) return;
 
-                await PluginInstallService.InstallFromDirectoryAsync(prepared.PluginRoot, manifest, prepared.SourceType, prepared.SourceUrl);
+                await PluginInstallService.InstallFromDirectoryAsync(prepared.PluginRoot, manifest, prepared.SourceType,
+                    prepared.SourceUrl, installedSha256: prepared.VerifiedSha256);
                 ModBase.RunInUi(() => ModMain.MyMsgBox("插件 " + manifest.Name + " 安装成功！", "安装完成"));
             }
         }
@@ -274,52 +269,6 @@ public static class UriActionService
 
         PluginTrustService.AddTrust(url, name, PluginRepositorySourceType.Custom);
         HintService.Hint("插件源已添加：" + name, HintType.Success);
-    }
-
-    private static void DispatchPluginAction(UriActionRequest request)
-    {
-        var pluginId = GetFirstValue(request, "plugin", "pluginId", "id") ?? request.PathArguments.FirstOrDefault();
-        var action = GetFirstValue(request, "action", "name");
-        var args = request.PathArguments;
-
-        if (request.PathArguments.Count >= 2)
-        {
-            pluginId ??= request.PathArguments[0];
-            action ??= request.PathArguments[1];
-            args = request.PathArguments.Skip(2).ToArray();
-        }
-
-        if (string.IsNullOrWhiteSpace(pluginId) || string.IsNullOrWhiteSpace(action))
-        {
-            HintService.Hint("插件 URI 动作缺少 plugin 或 action 参数。", HintType.Error);
-            return;
-        }
-
-        if (!DispatchPluginAction(pluginId, action, request, args))
-            HintService.Hint($"未知插件 URI 动作：{pluginId}/{action}", HintType.Error);
-    }
-
-    private static bool DispatchPluginAction(UriActionRequest request, string action)
-    {
-        var pluginId = GetFirstValue(request, "plugin", "pluginId", "id");
-        if (string.IsNullOrWhiteSpace(pluginId)) return false;
-        return DispatchPluginAction(pluginId, action, request, request.PathArguments);
-    }
-
-    private static bool DispatchPluginAction(string pluginId, string action, UriActionRequest request, IReadOnlyList<string> args)
-    {
-        var entry = PluginHostBootstrap.UriActions.Find(pluginId, action);
-        if (entry is null) return false;
-
-        entry.Handler(new HostUriActionContext
-        {
-            Scheme = request.Scheme,
-            RawUri = request.RawUri,
-            Action = action,
-            Arguments = args,
-            Query = request.Query
-        });
-        return true;
     }
 
     private static string? GetTextArgument(CommandLine model, string key)

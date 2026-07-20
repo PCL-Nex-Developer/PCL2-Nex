@@ -228,21 +228,9 @@ public static partial class States
         [ConfigItem<int>("SystemLaunchCount", 0, ConfigSource.SharedEncrypt)] public partial int LaunchCount { get; set; }
 
         /// <summary>
-        /// 上个版本。
+        /// 上次运行的 BaseVersion。
         /// </summary>
-        [ConfigItem<int>("SystemLastVersionReg", 0, ConfigSource.SharedEncrypt)] public partial int LastVersion { get; set; }
-
-        // [ConfigItem<int>("SystemHighestSavedBetaVersionReg", 0, ConfigSource.SharedEncrypt)] public partial int LastSavedBetaVersion { get; set; }
-
-        /// <summary>
-        /// 上个最高 Beta 版本。
-        /// </summary>
-        [ConfigItem<int>("SystemHighestBetaVersionReg", 0, ConfigSource.SharedEncrypt)] public partial int LastBetaVersion { get; set; }
-
-        /// <summary>
-        /// 上个最高 Alpha 版本。
-        /// </summary>
-        [ConfigItem<int>("SystemHighestAlphaVersionReg", 0, ConfigSource.SharedEncrypt)] public partial int LastAlphaVersion { get; set; }
+        [ConfigItem<string>("SystemLastBaseVersion", "", ConfigSource.SharedEncrypt)] public partial string LastBaseVersion { get; set; }
 
         /// <summary>
         /// 全局配置版本。

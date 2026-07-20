@@ -75,6 +75,8 @@ public static partial class Config
         [ConfigItem<bool>("ToolDownloadAutoSelectVersion", true)] public partial bool AutoSelectInstance { get; set; }
         [ConfigItem<bool>("ToolFixAuthlib", true)] public partial bool FixAuthLib { get; set; }
         [ConfigItem<int>("ToolPluginGitMirror", 0)] public partial int PluginGitMirror { get; set; }
+        [ConfigItem<string>("ToolPluginGitAcceleratedDomains", "github.com|api.github.com|raw.githubusercontent.com|objects.githubusercontent.com|release-assets.githubusercontent.com|gist.githubusercontent.com|avatars.githubusercontent.com")]
+        public partial string PluginGitAcceleratedDomains { get; set; }
 
         /// <summary>
         /// 第三方资源配置。
@@ -116,6 +118,15 @@ public static partial class Config
         /// 启动后自动检查并安装插件更新。
         /// </summary>
         [ConfigItem<bool>("PluginAutoUpdate", false)] public partial bool AutoUpdate { get; set; }
+
+        [ConfigItem<string>("PluginGitHubToken", "", ConfigSource.SharedEncrypt)] public partial string GitHubToken { get; set; }
+        [ConfigItem<bool>("PluginMarketShowArchived", false)] public partial bool ShowArchivedRepositories { get; set; }
+        [ConfigItem<bool>("PluginMarketShowDisabled", false)] public partial bool ShowDisabledRepositories { get; set; }
+        [ConfigItem<bool>("PluginMarketShowForks", false)] public partial bool ShowForkRepositories { get; set; }
+        [ConfigItem<bool>("PluginMarketShowOtherDevelopers", true)] public partial bool ShowNonWhitelistedDevelopers { get; set; }
+        [ConfigItem<string>("PluginMarketSortOrder", "default")] public partial string MarketSortOrder { get; set; }
+        [AnyConfigItem<List<string>>("PluginTrustedGitHubLogins")] public partial List<string> TrustedGitHubLogins { get; set; }
+        [AnyConfigItem<List<string>>("PluginManifestSubscriptions")] public partial List<string> ManifestSubscriptions { get; set; }
     }
 
     /// <summary>
