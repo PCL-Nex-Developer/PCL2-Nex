@@ -96,7 +96,7 @@
                         <RowDefinition Height="9" />
                         <RowDefinition Height="28" />
                         <RowDefinition Height="9" />
-                        <RowDefinition Height="28" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <local:MyCheckBox x:Name="CheckNetDohEnable" Tag="SystemNetEnableDoH" Grid.Row="0"
                                       Grid.ColumnSpan="2" Text="{DynamicResource Setup.Misc.Network.DoH}"
@@ -169,6 +169,16 @@
                         <local:MyButton x:Name="BtnPluginGitMirrorSpeedTest" Grid.Column="2" MinWidth="80" Text="测速" TextPadding="3"
                                         Click="BtnPluginGitMirrorSpeedTest_Click" />
                     </Grid>
+                    <TextBlock Text="加速域名" Grid.Row="8" VerticalAlignment="Center" Margin="0,0,25,0" />
+                    <WrapPanel Grid.Row="8" Grid.Column="1" VerticalAlignment="Center">
+                        <local:MyCheckBox x:Name="CheckGitDomainGithub" Text="github.com" Tag="github.com" Margin="0,0,12,6" Change="PluginGitDomain_Change" />
+                        <local:MyCheckBox x:Name="CheckGitDomainApi" Text="API" Tag="api.github.com" Margin="0,0,12,6" ToolTip="api.github.com" Change="PluginGitDomain_Change" />
+                        <local:MyCheckBox x:Name="CheckGitDomainRaw" Text="Raw" Tag="raw.githubusercontent.com" Margin="0,0,12,6" ToolTip="raw.githubusercontent.com" Change="PluginGitDomain_Change" />
+                        <local:MyCheckBox x:Name="CheckGitDomainObjects" Text="Objects" Tag="objects.githubusercontent.com" Margin="0,0,12,6" ToolTip="objects.githubusercontent.com" Change="PluginGitDomain_Change" />
+                        <local:MyCheckBox x:Name="CheckGitDomainReleases" Text="Releases" Tag="release-assets.githubusercontent.com" Margin="0,0,12,6" ToolTip="release-assets.githubusercontent.com" Change="PluginGitDomain_Change" />
+                        <local:MyCheckBox x:Name="CheckGitDomainGist" Text="Gist" Tag="gist.githubusercontent.com" Margin="0,0,12,6" ToolTip="gist.githubusercontent.com" Change="PluginGitDomain_Change" />
+                        <local:MyCheckBox x:Name="CheckGitDomainAvatars" Text="Avatars" Tag="avatars.githubusercontent.com" Margin="0,0,0,6" ToolTip="avatars.githubusercontent.com" Change="PluginGitDomain_Change" />
+                    </WrapPanel>
                 </Grid>
             </local:MyCard>
             <local:MyCard Margin="0,0,0,15" Title="插件源管理">
@@ -178,9 +188,23 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="管理第三方插件市场索引地址" FontSize="13" VerticalAlignment="Center" TextWrapping="Wrap" />
+                        <TextBlock Text="管理 Topic、Manifest 与第三方 JSON 来源" FontSize="13" VerticalAlignment="Center" TextWrapping="Wrap" />
                         <local:MyButton Grid.Column="1" Text="添加源" x:Name="BtnPluginRepoAdd" Click="BtnPluginRepoAdd_Click" Margin="10,0,0,0" Height="30" MinWidth="80" />
                     </Grid>
+                    <Grid Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="GitHub Token（可选）" VerticalAlignment="Center" Margin="0,0,18,0" />
+                        <local:MyTextBox x:Name="TextPluginGitHubToken" Grid.Column="1"
+                                         HintText="用于私有仓库和提高 API Rate Limit；留空则匿名访问"
+                                         ToolTip="Token 会加密保存，并且只发送给受支持的 GitHub 原始域或其已选镜像。"
+                                         ValidatedTextChanged="TextPluginGitHubToken_ValidatedTextChanged" />
+                    </Grid>
+                    <TextBlock Text="Token 不会发送给第三方 JSON、README 或下载域名。"
+                               Margin="0,5,0,0" FontSize="10.5" TextWrapping="Wrap"
+                               Foreground="{DynamicResource ColorBrushGray4}" />
                     <StackPanel x:Name="PanPluginRepoList" Margin="0,12,0,0" />
                 </StackPanel>
             </local:MyCard>

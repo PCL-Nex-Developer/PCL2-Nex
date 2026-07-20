@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -54,6 +56,10 @@ public partial class PageSetupLauncherMisc
         ((MyRadioBox)FindName($"RadioHttpProxyType{Config.Network.HttpProxy.Type}")).SetChecked(true, false);
         CheckNetDohEnable.Checked = Config.Network.EnableDoH;
         ComboPluginGitMirror.SelectedIndex = CoerceSelectedIndex(Config.Download.PluginGitMirror, ComboPluginGitMirror.Items.Count);
+        var acceleratedDomains = GitHubAccelerator.GetConfiguredDomains();
+        foreach (var checkBox in GetGitHubDomainCheckBoxes())
+            checkBox.Checked = acceleratedDomains.Contains(checkBox.Tag?.ToString() ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+        TextPluginGitHubToken.Text = Config.Plugin.GitHubToken;
         PluginRepositoryListUi.BuildRepoList(PanPluginRepoList);
 
         // 调试选项
@@ -132,6 +138,31 @@ public partial class PageSetupLauncherMisc
     private void BtnPluginRepoAdd_Click(object sender, MouseButtonEventArgs e)
     {
         PluginRepositoryListUi.ShowAddRepoDialog(PanPluginRepoList);
+    }
+
+    private void TextPluginGitHubToken_ValidatedTextChanged(object sender, RoutedEventArgs e)
+    {
+        if (!isLoaded || ModAnimation.AniControlEnabled != 0) return;
+        Config.Plugin.GitHubToken = TextPluginGitHubToken.Text.Trim();
+    }
+
+    private void PluginGitDomain_Change(object sender, bool user)
+    {
+        if (!user || ModAnimation.AniControlEnabled != 0) return;
+        GitHubAccelerator.SetConfiguredDomains(GetGitHubDomainCheckBoxes()
+            .Where(checkBox => checkBox.Checked == true)
+            .Select(checkBox => checkBox.Tag?.ToString() ?? string.Empty));
+    }
+
+    private IEnumerable<MyCheckBox> GetGitHubDomainCheckBoxes()
+    {
+        yield return CheckGitDomainGithub;
+        yield return CheckGitDomainApi;
+        yield return CheckGitDomainRaw;
+        yield return CheckGitDomainObjects;
+        yield return CheckGitDomainReleases;
+        yield return CheckGitDomainGist;
+        yield return CheckGitDomainAvatars;
     }
 
     private static int CoerceSelectedIndex(int value, int count)

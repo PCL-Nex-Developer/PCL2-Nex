@@ -2,10 +2,10 @@ using System.Collections.ObjectModel;
 using System.Text.Json.Serialization;
 using System.Windows;
 using System.Windows.Input;
+using PCL.Core.App;
 using PCL.Core.App.Localization;
 using PCL.Core.IO.Net.Http;
 using PCL.Core.Utils;
-using PCL.Plugins;
 
 namespace PCL;
 
@@ -15,13 +15,11 @@ public partial class PageSetupAbout
     private int clickCount;
 
     private new bool isLoaded;
-    private int _legalLinkCount;
 
     public PageSetupAbout()
     {
         InitializeComponent();
         Loaded += PageOtherAbout_Loaded;
-        PluginHostBootstrap.UiExtensions.Changed += (_, _) => ModBase.RunInUi(BuildPluginLegalLinks);
     }
 
     public ObservableCollection<GitHubContributor> Contributors { get; set; } = new();
@@ -35,10 +33,8 @@ public partial class PageSetupAbout
         if (isLoaded)
             return;
         isLoaded = true;
-        BuildPluginLegalLinks();
 
-        ItemAboutPcl.Info = ItemAboutPcl.Info.Replace("%VERSION%", ModBase.versionBaseName)
-            .Replace("%VERSIONCODE%", ModBase.versionCode.ToString()).Replace("%BRANCH%", ModBase.versionBranchName)
+        ItemAboutPcl.Info = ItemAboutPcl.Info.Replace("%VERSION%", Basics.VersionName)
             .Replace("%COMMIT_HASH%", ModBase.commitHashShort);
 
         if (!Lang.IsChineseMainland)
@@ -49,31 +45,6 @@ public partial class PageSetupAbout
         }
 
         LoadContributersAsync();
-    }
-
-    private void BuildPluginLegalLinks()
-    {
-        while (_legalLinkCount > 0)
-        {
-            PanLegalLinks.Children.RemoveAt(PanLegalLinks.Children.Count - 1);
-            _legalLinkCount -= 1;
-        }
-
-        foreach (var entry in PluginHostBootstrap.UiExtensions.GetAboutLegalLinks())
-        {
-            if (string.IsNullOrWhiteSpace(entry.Url)) continue;
-            var button = new MyButton
-            {
-                Margin = new Thickness(0, 0, 20, 0),
-                Padding = new Thickness(13, 0, 13, 0),
-                Text = entry.Title,
-                ColorType = entry.IsHighlighted ? MyButton.ColorState.Highlight : MyButton.ColorState.Normal
-            };
-            CustomEventService.SetEventType(button, EventType.OpenUrl);
-            CustomEventService.SetEventData(button, entry.Url);
-            PanLegalLinks.Children.Add(button);
-            _legalLinkCount += 1;
-        }
     }
 
     private async void LoadContributersAsync()

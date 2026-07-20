@@ -48,7 +48,7 @@ public partial class FormMain
             else
                 changelog = Lang.Text("Main.UpdateLog.Empty");
             if (ModMain.MyMsgBoxMarkdown(changelog,
-                    Lang.Text("Main.UpdateLog.Title", ModBase.versionBranchName, ModBase.versionBaseName), Lang.Text("Common.Action.Confirm"), Lang.Text("Main.UpdateLog.FullChangelog")) ==
+                    Lang.Text("Main.UpdateLog.Title", Basics.VersionName), Lang.Text("Common.Action.Confirm"), Lang.Text("Main.UpdateLog.FullChangelog")) ==
                 2) ModBase.OpenWebsite("https://github.com/PCL-Nex-Developer/PCL2-Nex/releases");
         }, "UpdateLog Output");
     }
@@ -69,16 +69,20 @@ public partial class FormMain
         ModMain.frmMain = this;
         ModMain.frmLaunchLeft = new PageLaunchLeft();
         ModMain.frmLaunchRight = new PageLaunchRight();
-        // 版本号改变
-        var lastVersion = States.System.LastVersion;
-        if (lastVersion < ModBase.versionCode)
+        // BaseVersion changed.
+        var lastVersionText = States.System.LastBaseVersion;
+        if (!LauncherBaseVersion.TryParse(lastVersionText, out var lastVersion))
         {
-            // 触发升级
+            UpgradeSub(null);
+        }
+        else if (lastVersion < Basics.BaseVersion)
+        {
             UpgradeSub(lastVersion);
         }
-        else if (lastVersion > ModBase.versionCode)
-            // 触发降级
+        else if (lastVersion > Basics.BaseVersion)
+        {
             DowngradeSub(lastVersion);
+        }
 
         _ = Config.Preference.Theme.ThemeSelected;
         // 注册拖拽事件（不能直接加 Handles，否则没用；#6340）
@@ -126,7 +130,6 @@ public partial class FormMain
         PanMainRight.Child = ModMain.frmLaunchRight;
         pageRight = ModMain.frmLaunchRight;
         ModMain.frmLaunchRight.PageState = MyPageRight.PageStates.ContentStay;
-        PCL.Plugins.PluginHostBootstrap.UiExtensions.Changed += (_, _) => ModBase.RunInUi(RefreshPluginNavigationPages);
         // 调试模式提醒
         if (ModBase.modeDebug)
             HintService.Hint(Lang.Text("Main.DebugMode.Hint"));
@@ -287,27 +290,10 @@ public partial class FormMain
     }
 
     // 升级与降级事件
-    private void UpgradeSub(int lastVersionCode)
+    private void UpgradeSub(LauncherBaseVersion? lastVersion)
     {
-        ModBase.Log("[Start] 版本号从 " + lastVersionCode + " 升高到 " + ModBase.versionCode);
-        States.System.LastVersion = ModBase.versionCode;
-        // 检查有记录的最高版本号
-        int lowerVersionCode;
-#if BETA
-        lowerVersionCode = States.System.LastBetaVersion;
-        if (lowerVersionCode < ModBase.versionCode)
-        {
-            States.System.LastBetaVersion = ModBase.versionCode;
-            ModBase.Log($"[Start] 最高版本号从 {lowerVersionCode} 升高到 {ModBase.versionCode}");
-        }
-#else
-        lowerVersionCode = States.System.LastAlphaVersion;
-        if (lowerVersionCode < ModBase.versionCode)
-        {
-            States.System.LastAlphaVersion = ModBase.versionCode;
-            ModBase.Log($"[Start] 最高版本号从 {lowerVersionCode} 升高到 {ModBase.versionCode}");
-        }
-#endif
+        ModBase.Log($"[Start] BaseVersion 从 {lastVersion?.ToString() ?? "未记录"} 升高到 {Basics.BaseVersion}");
+        States.System.LastBaseVersion = Basics.BaseVersion.ToString();
         // 被移除的窗口设置选项 (Commit 3161488 2026/1/23)
         if ((int)Config.Launch.GameWindowMode == 5)
             Config.Launch.GameWindowMode = GameWindowSizeMode.Default;
@@ -315,17 +301,14 @@ public partial class FormMain
         // 更新后展示 Nex 版提示
         UpdateManager.ShowCEAnnounce();
         // 输出更新日志
-        if (lastVersionCode <= 0)
-            return;
-        if (lowerVersionCode >= ModBase.versionCode)
-            return;
+        if (lastVersion is null) return;
         ShowUpdateLog();
     }
 
-    private void DowngradeSub(int lastVersionCode)
+    private void DowngradeSub(LauncherBaseVersion lastVersion)
     {
-        ModBase.Log("[Start] 版本号从 " + lastVersionCode + " 降低到 " + ModBase.versionCode);
-        States.System.LastVersion = ModBase.versionCode;
+        ModBase.Log($"[Start] BaseVersion 从 {lastVersion} 降低到 {Basics.BaseVersion}");
+        States.System.LastBaseVersion = Basics.BaseVersion.ToString();
     }
 
     #endregion
@@ -1354,6 +1337,11 @@ public partial class FormMain
         CompDetail = 8,
 
         /// <summary>
+        ///     插件详情。这是一个副页面。
+        /// </summary>
+        PluginDetail = 9,
+
+        /// <summary>
         ///     游戏实时日志。这是一个副页面。
         /// </summary>
         GameLog = 10,
@@ -1449,6 +1437,10 @@ public partial class FormMain
             case PageType.CompDetail:
             {
                 return Lang.Text("Main.Title.ResourceDownload", stack.additional.Value.CompProject.TranslatedName);
+            }
+            case PageType.PluginDetail:
+            {
+                return "插件详情 · " + (stack.pluginEntry?.Name ?? stack.pluginEntry?.Id ?? "未知插件");
             }
             case PageType.VersionSaves:
             {
@@ -1549,6 +1541,9 @@ public partial class FormMain
             string SavePath
         )? additional;
 
+        /// <summary>PluginDetail 页面当前展示的插件市场条目。</summary>
+        public PluginRepositoryEntry? pluginEntry;
+
         public PageType page;
 
         public override bool Equals(object other)
@@ -1560,6 +1555,10 @@ public partial class FormMain
                 var pageOther = (PageStackData)other;
                 if (page != pageOther.page)
                     return false;
+                if (page == PageType.PluginDetail)
+                    return string.Equals(pluginEntry?.Id, pageOther.pluginEntry?.Id, StringComparison.OrdinalIgnoreCase)
+                           && string.Equals(pluginEntry?.ManifestUrl, pageOther.pluginEntry?.ManifestUrl,
+                               StringComparison.OrdinalIgnoreCase);
                 if (additional is null) return pageOther.additional is null;
 
                 return pageOther.additional is not null && additional.Equals(pageOther.additional);
@@ -1598,9 +1597,6 @@ public partial class FormMain
 
     public MyPageLeft pageLeft;
     public MyPageRight pageRight;
-
-    private readonly Dictionary<int, PCL.Plugins.UiExtensionEntry> _pluginNavPages = new();
-    private string _pluginNavigationSignature = string.Empty;
 
     // 引发实际页面切换的入口
     private bool isChangingPage;
@@ -1711,126 +1707,7 @@ public partial class FormMain
         if (isChangingPage)
             return;
         var pageType = (PageType)int.Parse(sender.Tag.ToString());
-        if ((int)pageType >= 1000)
-        {
-            PageChangePluginNavigation((int)pageType);
-            return;
-        }
         PageChangeActual(pageType, PageSubType.Default);
-    }
-
-    private void RefreshPluginNavigationPages()
-    {
-        var entries = PCL.Plugins.PluginHostBootstrap.UiExtensions.GetNavigationPages();
-        var signature = string.Join("\n", entries.Select(e => e.PluginId + "\u001f" + e.Id + "\u001f" + e.Title + "\u001f" + e.Order + "\u001f" + e.Icon));
-        if (string.Equals(_pluginNavigationSignature, signature, StringComparison.Ordinal))
-            return;
-
-        var toRemove = new List<UIElement>();
-        foreach (UIElement child in PanTitleSelect.Children)
-        {
-            if (child is MyRadioButton button && button.Tag is string tagText && int.TryParse(tagText, out var tag) && tag >= 1000)
-                toRemove.Add(child);
-        }
-
-        foreach (var child in toRemove) PanTitleSelect.Children.Remove(child);
-        _pluginNavPages.Clear();
-        _pluginNavigationSignature = signature;
-
-        var nextTag = 1000;
-        var insertIndex = PanTitleSelect.Children.Count;
-        for (var i = 0; i < PanTitleSelect.Children.Count; i++)
-        {
-            if (PanTitleSelect.Children[i] is MyRadioButton button && button.Name == "BtnTitleSelect2")
-            {
-                insertIndex = i;
-                break;
-            }
-        }
-
-        foreach (var entry in entries)
-        {
-            var tag = nextTag++;
-            _pluginNavPages[tag] = entry;
-            var button = new MyRadioButton
-            {
-                Text = entry.Title,
-                Tag = tag.ToString(),
-                Margin = new Thickness(5, 0, 5, 0),
-                Padding = new Thickness(2, 0, 2, 0),
-                LogoScale = 0.9,
-                SvgIcon = string.IsNullOrWhiteSpace(entry.Icon) ? "lucide/puzzle" : entry.Icon,
-                ToolTip = entry.PluginId + ":" + entry.Id
-            };
-            button.Check += BtnTitleSelect_Click;
-            PanTitleSelect.Children.Insert(insertIndex++, button);
-        }
-    }
-
-    private void PageChangePluginNavigation(int tag)
-    {
-        if (!_pluginNavPages.TryGetValue(tag, out var entry)) return;
-        ModAnimation.AniControlEnabled += 1;
-        try
-        {
-            ModBase.Log("[Control] 开始切换插件导航页面：" + entry.PluginId + ":" + entry.Title);
-            PageChangeExit();
-            ModBase.Log("[Control] 插件导航页面已退出旧页面：" + entry.PluginId + ":" + entry.Title);
-            pageLast = pageCurrent;
-            pageCurrent = PageType.Plugins;
-            ModBase.Log("[Control] 正在创建插件导航页面：" + entry.PluginId + ":" + entry.Title);
-            var content = (UserControl)entry.Factory.DynamicInvoke()!;
-            ModBase.Log("[Control] 插件导航页面创建完成：" + entry.PluginId + ":" + entry.Title);
-            var wrappedPage = WrapPluginNavigationPage(content, entry.Title);
-            ModBase.Log("[Control] 插件导航页面包装完成：" + entry.PluginId + ":" + entry.Title);
-            PageChangeAnim(new MyPageLeft(), wrappedPage);
-            ModBase.Log("[Control] 切换插件导航页面：" + entry.PluginId + ":" + entry.Title);
-        }
-        catch (Exception ex)
-        {
-            ModBase.Log(ex, "切换插件导航页面失败（ID " + tag + "）", ModBase.LogLevel.Feedback);
-        }
-        finally
-        {
-            ModAnimation.AniControlEnabled -= 1;
-        }
-    }
-
-    private static MyPageRight WrapPluginNavigationPage(UserControl content, string title)
-    {
-        DetachPluginNavigationContent(content);
-        var scrollViewer = new MyScrollViewer
-        {
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            Name = "PanBack"
-        };
-        var stackPanel = new StackPanel { Margin = new Thickness(25, 10, 25, 10), Name = "PanMain" };
-        var card = new MyCard { Title = title, Margin = new Thickness(0, 15, 0, 15) };
-        content.Margin = new Thickness(25, 40, 25, 15);
-        card.Children.Add(content);
-        stackPanel.Children.Add(card);
-        scrollViewer.Content = stackPanel;
-
-        var page = new MyPageRight();
-        page.Child = scrollViewer;
-        return page;
-    }
-
-    private static void DetachPluginNavigationContent(FrameworkElement content)
-    {
-        switch (content.Parent)
-        {
-            case Panel panel:
-                panel.Children.Remove(content);
-                break;
-            case ContentControl contentControl when ReferenceEquals(contentControl.Content, content):
-                contentControl.Content = null;
-                break;
-            case Decorator decorator when ReferenceEquals(decorator.Child, content):
-                decorator.Child = null;
-                break;
-        }
     }
 
     private void BtnTitleInner_Click(object sender, EventArgs e)
@@ -1855,7 +1732,6 @@ public partial class FormMain
     /// </summary>
     private void PageChangeActual(PageStackData stack, PageSubType subType)
     {
-        RefreshPluginNavigationPages();
         if (pageCurrent == stack && (PageCurrentSub == subType || (int)subType == -1))
             return;
         ModAnimation.AniControlEnabled += 1;
@@ -1993,6 +1869,12 @@ public partial class FormMain
                         if (ModMain.frmDownloadCompDetail is null)
                             ModMain.frmDownloadCompDetail = new PageDownloadCompDetail();
                         PageChangeAnim(new MyPageLeft(), ModMain.frmDownloadCompDetail);
+                        break;
+                    }
+                case PageType.PluginDetail: // 插件详情
+                    {
+                        ModMain.frmDownloadPluginDetail ??= new PageDownloadPluginDetail();
+                        PageChangeAnim(new MyPageLeft(), ModMain.frmDownloadPluginDetail);
                         break;
                     }
                 case PageType.VersionSaves: // 存档管理

@@ -25,7 +25,7 @@ public partial class PageSetupUpdate
         ComboSystemUpdateChannel.SelectedIndex = (int)Config.Update.UpdateChannel;
         ComboSystemUpdateMode.SelectedIndex = (int)Config.Update.UpdateMode;
 
-        TextCurrentVersion.Text = "PCL Nex " + VersionNameFormat(ModBase.versionBaseName);
+        TextCurrentVersion.Text = "PCL Nex " + Basics.BaseVersion;
         ModAnimation.AniControlEnabled -= 1;
         CheckUpdate();
     }
@@ -34,13 +34,10 @@ public partial class PageSetupUpdate
     {
         try
         {
-            // 修复：使用 dynamic 绕过命名空间重名导致的编译期类型冲突，
-            // 或者你可以尝试替换为 PCL.Core.App.SemVer.Parse(ModBase.versionBaseName)
             if (await UpdateManager.remoteServer.IsLatestAsync(
-                    UpdateManager.IsCurrentVersionBeta ? UpdateChannel.beta : UpdateChannel.stable,
-                    SystemInfo.IsArm64System ? UpdateArch.arm64 : UpdateArch.x64,
-                    SemVer.Parse(ModBase.versionBaseName),
-                    ModBase.versionCode))
+                    UpdateManager.SelectedUpdateChannel,
+                    UpdateManager.CurrentUpdateArchitecture,
+                    Basics.BaseVersion))
             {
                 ModBase.Log("[Update] 已是最新版本");
                 return UpdateStatus.Latest;
@@ -71,10 +68,8 @@ public partial class PageSetupUpdate
                 try
                 {
                     updateInfo = UpdateManager.remoteServer.GetLatestVersion(
-                        UpdateManager.IsCurrentVersionBeta
-                            ? UpdateChannel.beta
-                            : UpdateChannel.stable, SystemInfo.IsArm64System ? UpdateArch.arm64 : UpdateArch.x64);
-                    TextUpdateName.Text = "PCL Nex " + VersionNameFormat(updateInfo.VersionName);
+                        UpdateManager.SelectedUpdateChannel, UpdateManager.CurrentUpdateArchitecture);
+                    TextUpdateName.Text = "PCL Nex " + updateInfo.BaseVersion;
                     var summary = updateInfo.Changelog.Between("<summary>", "</summary>");
                     if (!updateInfo.Changelog.Contains("<summary>") || string.IsNullOrWhiteSpace(summary.Trim()))
                         TextChangelog.Text = Lang.Text("Setup.Update.Changelog.Empty");
@@ -148,12 +143,11 @@ public partial class PageSetupUpdate
     private void BtnUpdate_Click(object sender, MouseButtonEventArgs e)
     {
         // 检查 .NET 版本
-        if (!updateInfo.VersionName.StartsWithF("2.13.") && !ModBase
-                .ShellAndGetOutput("cmd", "/c dotnet --list-runtimes")
+        if (!ModBase.ShellAndGetOutput("cmd", "/c dotnet --list-runtimes")
                 .ContainsF("Microsoft.WindowsDesktop.App 8.0.", true))
         {
             ModMain.MyMsgBox(
-                Lang.Text("Setup.Update.DotNetMissing.Message", updateInfo.VersionName,
+                Lang.Text("Setup.Update.DotNetMissing.Message", updateInfo.BaseVersion,
                     SystemInfo.IsArm64System ? "Arm64" : "x64"),
                 Lang.Text("Setup.Update.DotNetMissing.Title"),
                 Lang.Text("Setup.Update.DotNetMissing.DownloadRuntime"), Lang.Text("Common.Action.Cancel"),
@@ -248,17 +242,7 @@ public partial class PageSetupUpdate
 
     private void BtnChangelog_Click(object sender, MouseButtonEventArgs e)
     {
-        ModBase.OpenWebsite("https://github.com/PCL-Nex-Developer/PCL2-Nex/releases/v" + ModBase.versionBaseName);
-    }
-
-    public string VersionNameFormat(string str)
-    {
-        str = str.Replace("v", "");
-        if (!str.Contains("-"))
-            return str;
-        var add = str.AfterLast("-");
-        str = str.BeforeLast("-");
-        return $"{str} {add.Replace(".", " ").Replace("beta", "Beta").Replace("rc", "RC")}";
+        ModBase.OpenWebsite("https://github.com/PCL-Nex-Developer/PCL2-Nex/releases/v" + Basics.BaseVersion);
     }
 
     private void BtnCheckAgain_OnClick(object sender, MouseButtonEventArgs e)

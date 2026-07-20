@@ -25,12 +25,28 @@ public partial class Application
     {
         // 注册生命周期事件
         Lifecycle.When(LifecycleState.Loaded, _ApplicationStartup);
-        // 插件宿主桥接必须在 WindowCreated 阶段、PluginLoaderService 之前注册。
-        // Lifecycle.When 在状态切换事件中触发，先于该状态的生命周期服务初始化。
-        Lifecycle.When(LifecycleState.WindowCreated, PCL.Plugins.PluginHostBootstrap.Initialize);
+        PluginCompatibility.ConfirmationAsync = ConfirmPluginCompatibilityAsync;
         Lifecycle.When(LifecycleState.WindowCreated, _ShowEnvironmentWarning);
         Lifecycle.When(LifecycleState.WindowCreated, UriActionService.Register);
         SessionEnding += _ApplicationSessionEnding;
+    }
+
+    private static Task<bool> ConfirmPluginCompatibilityAsync(
+        PluginCompatibilityConfirmationContext context,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var action = context.Action == PluginCompatibilityAction.Install ? "安装" : "启用";
+        var message = context.Status == PluginCoreCompatibilityStatus.Future
+            ? "该插件使用了比当前启动器更新的 PCL.Core 版本，可能无法正常使用或导致崩溃。是否仍然" + action + "？"
+            : $"插件 {context.PluginName} 的 pclCoreVersion 缺失或格式错误，无法确认兼容性。是否仍然{action}？";
+        var result = ModBase.RunInUiWait(() => ModMain.MyMsgBox(
+            message,
+            "插件兼容性提示",
+            button1: "继续" + action,
+            button2: "取消",
+            isWarn: true));
+        return Task.FromResult(result == 1);
     }
 
     // 开始
@@ -85,10 +101,7 @@ public partial class Application
             // 设置初始窗口
             if (Config.Preference.ShowStartupLogo)
             {
-                var pluginStartupIcon = _GetPluginStartupIcon();
-                ModMain.frmStart = pluginStartupIcon is null
-                    ? new ResourceStartupSplash(@"Images\icon.ico")
-                    : new FileStartupSplash(pluginStartupIcon);
+                ModMain.frmStart = new ResourceStartupSplash(@"Images\icon.png");
                 ModMain.frmStart.Show(false, true);
             }
 
@@ -101,12 +114,6 @@ public partial class Application
             _ = Config.Download.ThreadLimit;
             _ = Config.Download.SpeedLimit;
             _ = Config.Preference.Font;
-            var updateBranchCfg = Config.Update.UpdateChannelConfig;
-            if (updateBranchCfg.IsDefault())
-                updateBranchCfg.SetValue(ModBase.versionBaseName.Contains("beta")
-                    ? Core.App.UpdateChannel.Beta
-                    : Core.App.UpdateChannel.Release);
-
             // 删除旧日志
             for (var i = 1; i <= 5; i++)
             {
@@ -122,6 +129,14 @@ public partial class Application
         }
         catch (Exception ex)
         {
+            try
+            {
+                LogWrapper.Error(ex, "Application initialization failed");
+            }
+            catch
+            {
+                // 初始化日志系统本身不可用时仍然保留原有错误弹窗。
+            }
             var filePath = Basics.ExecutablePath;
             MessageBox.Show(ex + "\r\n" + Lang.Text("Application.InitializationError.Path",
                     string.IsNullOrEmpty(filePath)
@@ -229,29 +244,4 @@ public partial class Application
         }
     }
 
-    private static string? _GetPluginStartupIcon()
-    {
-        try
-        {
-            foreach (var pluginDir in Directory.GetDirectories(Paths.PluginInstalled))
-            {
-                var manifestPath = Path.Combine(pluginDir, "plugin.json");
-                if (!File.Exists(manifestPath)) continue;
-
-                var manifest = JsonSerializer.Deserialize<PluginPackageManifest>(File.ReadAllText(manifestPath), PluginJson.SerializerOptions);
-                if (string.IsNullOrWhiteSpace(manifest?.StartupIcon)) continue;
-
-                var iconPath = Path.GetFullPath(Path.Combine(pluginDir, manifest.StartupIcon.Replace('/', Path.DirectorySeparatorChar)));
-                var pluginRoot = Path.GetFullPath(pluginDir) + Path.DirectorySeparatorChar;
-                if (!iconPath.StartsWith(pluginRoot, StringComparison.OrdinalIgnoreCase) || !File.Exists(iconPath)) continue;
-                return iconPath;
-            }
-        }
-        catch (Exception ex)
-        {
-            ModBase.Log(ex, "读取插件启动图标失败", ModBase.LogLevel.Debug);
-        }
-
-        return null;
-    }
 }

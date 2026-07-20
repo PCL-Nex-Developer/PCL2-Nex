@@ -4,11 +4,9 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using PCL.Core.App;
 using PCL.Core.App.Configuration;
-using PCL.Core.App.Plugins;
 using PCL.Core.UI;
 using PCL.Core.Utils;
 using PCL.Core.App.Localization;
-using PCL.Plugins;
 
 namespace PCL;
 
@@ -727,14 +725,12 @@ public partial class PageSetupUI
                 ModMain.frmSetupLeft.ItemLog.Visibility =
                     !HiddenForceShow && conf.SetupLog ? Visibility.Collapsed : Visibility.Visible;
 
-                var settingsPluginCount = PluginHostBootstrap.UiExtensions.GetSettings().Count;
-                var hasPluginSetupItems = true;
                 var categories = new[]
                 {
                     (ModMain.frmSetupLeft.TextGameCategory,
                         !(conf.SetupLaunch && conf.SetupJava && conf.SetupGameManage)),
                     (ModMain.frmSetupLeft.TextLauncherCategory, !(conf.SetupUi && conf.SetupLauncherLanguage && conf.SetupLauncherMisc)),
-                    (ModMain.frmSetupLeft.TextPluginsCategory, hasPluginSetupItems),
+                    (ModMain.frmSetupLeft.TextPluginsCategory, true),
                     (ModMain.frmSetupLeft.TextAboutCategory,
                         !(conf.SetupAbout && conf.SetupUpdate && conf.SetupFeedback && conf.SetupLog))
                 };
@@ -764,7 +760,6 @@ public partial class PageSetupUI
                 if (!conf.SetupUpdate)
                     setupCount += 1;
                 setupCount += 1;
-                setupCount += settingsPluginCount;
                 if (!conf.SetupAbout)
                     setupCount += 1;
                 if (!conf.SetupFeedback)
@@ -782,7 +777,7 @@ public partial class PageSetupUI
                     !HiddenForceShow && conf.ToolsTest ? Visibility.Collapsed : Visibility.Visible;
                 
                 // 处理分类标题
-                var isToolsVisible = !conf.ToolsTest || HiddenForceShow || PluginHostBootstrap.UiExtensions.GetTools().Count > 0;
+                var isToolsVisible = !conf.ToolsTest || HiddenForceShow;
                 ModMain.frmToolsLeft.TextToolsCategory.Visibility = isToolsVisible ? Visibility.Visible : Visibility.Collapsed;
                 if (isToolsVisible) ModMain.frmToolsLeft.TextToolsCategory.Opacity = 0.6;
                 
@@ -790,7 +785,6 @@ public partial class PageSetupUI
                 var toolsCount = 0;
                 if (!conf.ToolsTest)
                     toolsCount += 1;
-                toolsCount += PluginHostBootstrap.UiExtensions.GetTools().Count;
                 ModMain.frmToolsLeft.PanItem.Visibility =
                     toolsCount == 0 && !HiddenForceShow ? Visibility.Collapsed : Visibility.Visible;
             }
@@ -871,7 +865,7 @@ public partial class PageSetupUI
         if (!user)
             return;
         var conf = Config.Preference.Hide;
-        var allChecked = conf.ToolsTest && PluginHostBootstrap.UiExtensions.GetTools().Count == 0;
+        var allChecked = conf.ToolsTest;
         CheckHiddenPageTools.Checked = allChecked;
     }
 
