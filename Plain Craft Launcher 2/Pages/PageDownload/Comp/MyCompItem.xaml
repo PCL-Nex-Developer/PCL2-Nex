@@ -64,9 +64,9 @@
             <ColumnDefinition x:Name="ColumnVersion2" Width="Auto" SharedSizeGroup="CompItemVersion" />
             <ColumnDefinition x:Name="ColumnVersion3" Width="0.25*" />
 
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="Auto" SharedSizeGroup="LabDownload" />
-            <ColumnDefinition Width="0.25*" />
+            <ColumnDefinition x:Name="ColumnDownload1" Width="Auto" />
+            <ColumnDefinition x:Name="ColumnDownload2" Width="Auto" SharedSizeGroup="LabDownload" />
+            <ColumnDefinition x:Name="ColumnDownload3" Width="0.25*" />
 
             <ColumnDefinition x:Name="ColumnTime1" Width="Auto" />
             <ColumnDefinition x:Name="ColumnTime2" Width="Auto" MinWidth="57" SharedSizeGroup="CompItemTime" />

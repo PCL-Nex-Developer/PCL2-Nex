@@ -1,12 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
+using PCL.Core.App;
+using PCL.Core.App.Localization;
 using PCL.Core.App.Plugins;
 
 namespace PCL;
@@ -15,7 +17,10 @@ public partial class PageDownloadPluginStore
 {
     private CancellationTokenSource? _cts;
     private bool _isLoading;
+    private bool _suppressFilterEvents;
+    private int _loadGeneration;
     private IReadOnlyList<PluginRepositoryEntry>? _allEntries;
+    private PluginDeveloperAllowlist _officialAllowlist = new();
     private readonly Dictionary<string, PluginUpdateService.PluginLatestManifestVersion> _latestVersionCache = new(StringComparer.OrdinalIgnoreCase);
 
     public PageDownloadPluginStore()
@@ -24,6 +29,27 @@ public partial class PageDownloadPluginStore
         PanSearchBox.Search += (_, _) => Search();
         PanSearchBox.KeyDown += (_, e) => { if (e.Key == Key.Enter) Search(); };
         Load.Click += (_, _) => { if (Load.State.LoadingState == MyLoading.MyLoadingState.Error) RefreshStore(); };
+        BtnFilterReset.Click += (_, _) => ResetFilters();
+        CheckStatusArchived.IsChecked = Config.Plugin.ShowArchivedRepositories;
+        CheckStatusDisabled.IsChecked = Config.Plugin.ShowDisabledRepositories;
+        CheckStatusFork.IsChecked = Config.Plugin.ShowForkRepositories;
+        SelectFilter(ComboSort, Config.Plugin.MarketSortOrder);
+        SwitchShowOtherDevelopers.IsChecked = Config.Plugin.ShowNonWhitelistedDevelopers;
+        CheckStatusArchived.Checked += RepositoryStatusOption_Change;
+        CheckStatusArchived.Unchecked += RepositoryStatusOption_Change;
+        CheckStatusDisabled.Checked += RepositoryStatusOption_Change;
+        CheckStatusDisabled.Unchecked += RepositoryStatusOption_Change;
+        CheckStatusFork.Checked += RepositoryStatusOption_Change;
+        CheckStatusFork.Unchecked += RepositoryStatusOption_Change;
+        SwitchShowOtherDevelopers.Checked += LocalFilter_Change;
+        SwitchShowOtherDevelopers.Unchecked += LocalFilter_Change;
+        ComboSourceGroup.SelectionChanged += (_, _) => RenderCurrentSearchResults();
+        ComboTag.SelectionChanged += (_, _) => RenderCurrentSearchResults();
+        ComboSort.SelectionChanged += (_, _) =>
+        {
+            Config.Plugin.MarketSortOrder = GetSelectedFilter(ComboSort);
+            RenderCurrentSearchResults();
+        };
     }
 
     public void LoadStore()
@@ -46,10 +72,12 @@ public partial class PageDownloadPluginStore
 
     private async System.Threading.Tasks.Task LoadStoreAsync(bool clearLatestVersionCache = false)
     {
-        if (_isLoading) return;
-        _isLoading = true;
-        _cts?.Cancel();
+        var generation = Interlocked.Increment(ref _loadGeneration);
+        var previousCts = _cts;
         _cts = new CancellationTokenSource();
+        previousCts?.Cancel();
+        previousCts?.Dispose();
+        _isLoading = true;
         var ct = _cts.Token;
 
         if (clearLatestVersionCache) _latestVersionCache.Clear();
@@ -59,58 +87,61 @@ public partial class PageDownloadPluginStore
         Load.Text = "正在获取插件商店列表";
         Load.TextError = "插件商店列表获取失败";
         Load.State.LoadingState = MyLoading.MyLoadingState.Run;
-        TextRepoInfo.Text = "正在加载...";
         PanPlugins.Children.Clear();
 
         try
         {
-            var indexes = new List<PluginRepositoryIndex>();
-
-            var officialUrl = PluginRepositoryService.GetOfficialIndexUrl();
-            var officialIndex = await PluginRepositoryService.FetchIndexAsync(officialUrl, ct);
-            if (officialIndex is not null)
+            var marketTask = PluginMarketplaceService.LoadAsync(new PluginMarketQueryOptions
             {
-                indexes.Add(officialIndex);
-                TextRepoInfo.Text = "官方市场: " + officialIndex.Name + " (" + officialIndex.Plugins.Count + " 个插件)";
-            }
-            else
-            {
-                TextRepoInfo.Text = "官方市场: 加载失败（网络不可用或注册表未创建）";
-            }
+                GitHubToken = Config.Plugin.GitHubToken,
+                IncludeArchived = true,
+                IncludeDisabled = true,
+                IncludeForks = true
+            }, ct: ct);
+            var allowlistTask = PluginDeveloperTrustService.FetchOfficialAsync(ct: ct);
+            await Task.WhenAll(marketTask, allowlistTask);
 
-            var trustRecords = PluginTrustService.GetAllTrustRecords();
-            foreach (var repo in trustRecords.Where(r => r.Enabled))
-            {
-                try
-                {
-                    var index = await PluginRepositoryService.FetchIndexAsync(repo.RepoUrl, ct);
-                    if (index is not null) indexes.Add(index);
-                }
-                catch { }
-            }
+            var market = await marketTask;
+            _officialAllowlist = await allowlistTask;
+            var localAllowlist = PluginDeveloperTrustService.GetLocalAllowlist();
+            foreach (var entry in market.Entries)
+                entry.DeveloperTrustLevel = entry.SourceIsOfficial && string.IsNullOrWhiteSpace(entry.GitHubLogin)
+                    ? PluginDeveloperTrustLevel.Official
+                    : PluginDeveloperTrustService.GetTrustLevel(entry.GitHubLogin, _officialAllowlist, localAllowlist);
 
-            _allEntries = PluginRepositoryService.MergeIndexes(indexes);
+            _allEntries = market.Entries;
             if (ct.IsCancellationRequested) return;
 
-            RenderPluginList(_allEntries);
+            PopulateFilterOptions(_allEntries);
+            RenderCurrentSearchResults();
             Load.State.LoadingState = MyLoading.MyLoadingState.Stop;
             PanLoad.Visibility = Visibility.Collapsed;
             CardPlugins.Visibility = Visibility.Visible;
-            TextRepoInfo.Text += "  |  合计 " + _allEntries.Count + " 个插件";
+            foreach (var error in market.Errors.Take(20))
+                ModBase.Log($"[Plugins] 市场来源加载失败：{error.Repository}: {error.Message}", ModBase.LogLevel.Debug);
             _ = LoadLatestVersionsAsync(_allEntries, ct);
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            if (generation != _loadGeneration) return;
+            Load.State.LoadingState = MyLoading.MyLoadingState.Stop;
+            PanLoad.Visibility = Visibility.Collapsed;
+            CardPlugins.Visibility = Visibility.Visible;
+            if (_allEntries is not null) RenderCurrentSearchResults();
+        }
         catch (Exception ex)
         {
             Load.TextError = "加载失败: " + ex.Message;
             Load.State.LoadingState = MyLoading.MyLoadingState.Error;
             PanLoad.Visibility = Visibility.Visible;
             CardPlugins.Visibility = Visibility.Collapsed;
-            TextRepoInfo.Text = "加载失败";
         }
         finally
         {
-            _isLoading = false;
+            if (generation == _loadGeneration)
+            {
+                _isLoading = false;
+            }
         }
     }
 
@@ -175,132 +206,115 @@ public partial class PageDownloadPluginStore
         }
 
         var installed = PluginUpdateService.GetInstalledPluginRecords();
-
-        for (var i = 0; i < entries.Count; i++)
-            PanPlugins.Children.Add(CreatePluginRow(entries[i], installed, i == entries.Count - 1));
+        foreach (var entry in SortEntries(entries))
+            PanPlugins.Children.Add(CreatePluginRow(entry, installed));
     }
 
-    private Border CreatePluginRow(PluginRepositoryEntry entry, IReadOnlyDictionary<string, PluginInstallRecord> installed, bool isLast)
+    private IEnumerable<PluginRepositoryEntry> SortEntries(IEnumerable<PluginRepositoryEntry> entries)
     {
-        var row = new Border
+        return GetSelectedFilter(ComboSort) switch
         {
-            MinHeight = 44,
-            Padding = new Thickness(0, 4, 0, 4),
-            BorderThickness = new Thickness(0, 0, 0, isLast ? 0 : 1)
+            "updated" => entries
+                .OrderByDescending(entry => entry.LastUpdatedAt ?? DateTimeOffset.MinValue)
+                .ThenBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase),
+            "name-desc" => entries.OrderByDescending(entry => entry.Name, StringComparer.OrdinalIgnoreCase),
+            "name-asc" => entries.OrderBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase),
+            _ => entries
         };
-        row.SetResourceReference(Border.BorderBrushProperty, "ColorBrushGray6");
+    }
 
-        var layout = new Grid();
-        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
+    private MyVirtualizingElement<MyCompItem> CreatePluginRow(
+        PluginRepositoryEntry entry,
+        IReadOnlyDictionary<string, PluginInstallRecord> installed)
+    {
         installed.TryGetValue(entry.Id, out var installedRecord);
-
-        var main = new StackPanel { Margin = new Thickness(0, 0, 14, 0), VerticalAlignment = VerticalAlignment.Center };
-        var titleRow = new StackPanel { Orientation = Orientation.Horizontal };
-
-        var title = new TextBlock { Text = entry.Name, FontSize = 15, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 360 };
-        title.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrush1");
-        var titleUrl = GetTitleUrl(entry);
-        if (!string.IsNullOrWhiteSpace(titleUrl))
+        return new MyVirtualizingElement<MyCompItem>(() =>
         {
-            title.Cursor = Cursors.Hand;
-            title.MouseLeftButtonUp += (_, _) => ModBase.OpenWebsite(titleUrl);
-        }
-        titleRow.Children.Add(title);
-
-        var tags = CreateTagRow(entry, installedRecord);
-        titleRow.Children.Add(tags);
-        main.Children.Add(titleRow);
-
-        if (!string.IsNullOrWhiteSpace(entry.Description))
-        {
-            var description = new TextBlock
+            var item = new MyCompItem
             {
-                Text = entry.Description,
-                FontSize = 11,
-                Margin = new Thickness(0, 0, 0, 0),
-                TextTrimming = TextTrimming.CharacterEllipsis
+                Tag = entry,
+                Title = entry.Name,
+                Description = (entry.Description ?? "暂无简介").Replace("\r", "").Replace("\n", " "),
+                Logo = string.IsNullOrWhiteSpace(entry.Logo)
+                    ? "pack://application:,,,/images/Icons/NoIcon.png"
+                    : entry.Logo!,
+                ShowFavoriteBtn = installedRecord is not null
             };
-            description.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray3");
-            main.Children.Add(description);
-        }
+            var author = entry.Author ?? entry.GitHubLogin;
+            if (!string.IsNullOrWhiteSpace(author)) item.SubTitle = "  ·  " + author;
+            item.Tags = BuildPluginTags(entry, installedRecord);
+            item.LabVersion.Text = BuildVersionTag(entry, installedRecord);
 
-        layout.Children.Add(main);
+            if (entry.DownloadCount is > 0)
+                item.LabDownload.Text = Lang.CompactNumber(entry.DownloadCount.Value);
+            else
+            {
+                item.SvgIconDownload.Visibility = Visibility.Collapsed;
+                item.LabDownload.Visibility = Visibility.Collapsed;
+                item.ColumnDownload1.Width = item.ColumnDownload2.Width = item.ColumnDownload3.Width = new GridLength(0);
+            }
 
-        var actionRow = new StackPanel { Orientation = Orientation.Horizontal };
-        var installSources = PluginRepositoryService.GetInstallSources(entry).ToList();
+            if (entry.LastUpdatedAt is not null)
+                item.LabTime.Text = Lang.TimeSpan(entry.LastUpdatedAt.Value.LocalDateTime - DateTime.Now, 1);
+            else
+            {
+                item.SvgIconTime.Visibility = Visibility.Collapsed;
+                item.LabTime.Visibility = Visibility.Collapsed;
+                item.ColumnTime1.Width = item.ColumnTime2.Width = item.ColumnTime3.Width = new GridLength(0);
+            }
 
-        if (installedRecord is not null)
+            item.LabSource.Text = string.IsNullOrWhiteSpace(entry.SourceGroup) ? "未知" : entry.SourceGroup;
+            item.LabSource.ToolTip = entry.SourceRepoUrl ?? entry.ManifestUrl;
+            item.Click += (_, e) =>
+            {
+                e.Handled = true;
+                OpenPluginDetail(entry);
+            };
+
+            if (installedRecord is not null)
+            {
+                item.BtnDelete.SvgIcon = "lucide/trash-2";
+                item.BtnDelete.ToolTip = "卸载插件";
+                item.BtnDelete.Click += (_, _) => UninstallPlugin(entry.Id);
+            }
+
+            return item;
+        }) { Height = 64 };
+    }
+
+    private static void OpenPluginDetail(PluginRepositoryEntry entry)
+    {
+        ModMain.frmMain?.PageChange(new FormMain.PageStackData
+        {
+            page = FormMain.PageType.PluginDetail,
+            pluginEntry = entry
+        });
+    }
+
+    private List<string> BuildPluginTags(PluginRepositoryEntry entry, PluginInstallRecord? installed)
+    {
+        var tags = new List<string>();
+        if (installed is not null)
         {
             var hasUpdate = TryGetKnownLatestVersion(entry, out var latestVersion)
-                && PluginUpdateService.CompareVersion(latestVersion, installedRecord.InstalledVersion) > 0;
-            var status = new TextBlock { Text = hasUpdate ? "可更新" : "已安装", FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
-            status.SetResourceReference(TextBlock.ForegroundProperty, hasUpdate ? "ColorBrush2" : "ColorBrushGray3");
-            actionRow.Children.Add(status);
-
-            if (hasUpdate)
-            {
-                foreach (var source in installSources)
-                {
-                    var button = new MyButton { Text = GetActionLabel("更新", source), Height = 28, MinWidth = 72, Margin = new Thickness(actionRow.Children.Count > 0 ? 8 : 0, 0, 0, 0), ColorType = MyButton.ColorState.Highlight };
-                    button.Click += (_, _) => InstallPlugin(entry, source);
-                    actionRow.Children.Add(button);
-                }
-            }
+                            && PluginUpdateService.CompareVersion(latestVersion, installed.InstalledVersion) > 0;
+            tags.Add(hasUpdate ? "可更新" : "已安装");
         }
-        else
+        tags.Add(PluginCompatibility.GetDisplayText(entry.CompatibilityStatus));
+        tags.Add(entry.DeveloperTrustLevel switch
         {
-            foreach (var source in installSources)
-            {
-                var button = new MyButton { Text = GetActionLabel("安装", source), Height = 28, MinWidth = 72, Margin = new Thickness(actionRow.Children.Count > 0 ? 8 : 0, 0, 0, 0), ColorType = MyButton.ColorState.Highlight };
-                button.Click += (_, _) => InstallPlugin(entry, source);
-                actionRow.Children.Add(button);
-            }
-            if (installSources.Count == 0)
-            {
-                var status = new TextBlock { Text = "无可用安装源", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
-                status.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
-                actionRow.Children.Add(status);
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(entry.HomepageUrl))
-        {
-            var linkButton = new MyButton { Text = "主页", Height = 28, MinWidth = 50, Margin = new Thickness(8, 0, 0, 0) };
-            var url = entry.HomepageUrl;
-            linkButton.Click += (_, _) => ModBase.OpenWebsite(url);
-            actionRow.Children.Add(linkButton);
-        }
-
-        actionRow.VerticalAlignment = VerticalAlignment.Center;
-        actionRow.SetValue(Grid.ColumnProperty, 1);
-        layout.Children.Add(actionRow);
-        row.Child = layout;
-        return row;
-    }
-
-    private static Border CreateBadge(string text, string backgroundResource, string foregroundResource)
-    {
-        var badge = new Border
-        {
-            CornerRadius = new CornerRadius(3),
-            Padding = new Thickness(6, 2, 6, 2),
-            Margin = new Thickness(6, 0, 0, 0),
-            VerticalAlignment = VerticalAlignment.Center,
-            Child = new TextBlock { Text = text, FontSize = 10, FontWeight = FontWeights.SemiBold, MaxWidth = 150, TextTrimming = TextTrimming.CharacterEllipsis }
-        };
-        badge.SetResourceReference(Border.BackgroundProperty, backgroundResource);
-        ((TextBlock)badge.Child).SetResourceReference(TextBlock.ForegroundProperty, foregroundResource);
-        return badge;
-    }
-
-    private WrapPanel CreateTagRow(PluginRepositoryEntry entry, PluginInstallRecord? installed)
-    {
-        var row = new WrapPanel { Margin = new Thickness(2, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-        row.Children.Add(CreateBadge(string.IsNullOrWhiteSpace(entry.Author) ? "未知发布者" : entry.Author!, "ColorBrushGray7", "ColorBrushGray2"));
-        row.Children.Add(CreateBadge(BuildVersionTag(entry, installed), "ColorBrush8", "ColorBrush2"));
-        return row;
+            PluginDeveloperTrustLevel.Official => "官方开发者",
+            PluginDeveloperTrustLevel.Local => "用户信任开发者",
+            _ => "其他开发者"
+        });
+        if (entry.SelectedVersion is not null && entry.SelectedDownload is null)
+            tags.Insert(0, "平台不兼容");
+        if (entry.Archived) tags.Insert(0, "Archived");
+        if (entry.Disabled) tags.Insert(0, "Disabled");
+        if (entry.Fork) tags.Insert(0, "Fork");
+        if (!string.IsNullOrWhiteSpace(entry.Group)) tags.Add(entry.Group);
+        tags.AddRange(entry.Tags ?? []);
+        return tags.Distinct(StringComparer.OrdinalIgnoreCase).Take(4).ToList();
     }
 
     private string BuildVersionTag(PluginRepositoryEntry entry, PluginInstallRecord? installed)
@@ -316,7 +330,7 @@ public partial class PageDownloadPluginStore
         return entry.Version ?? "?";
     }
 
-    private bool TryGetKnownLatestVersion(PluginRepositoryEntry entry, out Version version)
+    private bool TryGetKnownLatestVersion(PluginRepositoryEntry entry, out string version)
     {
         if (_latestVersionCache.TryGetValue(GetEntryCacheKey(entry), out var latest))
         {
@@ -330,26 +344,6 @@ public partial class PageDownloadPluginStore
     private static string GetEntryCacheKey(PluginRepositoryEntry entry)
         => string.IsNullOrWhiteSpace(entry.ManifestUrl) ? entry.Id : entry.ManifestUrl!;
 
-    private static string? GetTitleUrl(PluginRepositoryEntry entry)
-    {
-        if (IsAbsoluteHttpUri(entry.HomepageUrl)) return entry.HomepageUrl!.Trim();
-        if (IsAbsoluteHttpUri(entry.Repository?.Url)) return entry.Repository!.Url!.Trim();
-        return null;
-    }
-
-    private static bool IsAbsoluteHttpUri(string? value)
-    {
-        return Uri.TryCreate(value, UriKind.Absolute, out var uri)
-            && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp);
-    }
-
-    private static string GetActionLabel(string action, PluginInstallSourceEntry source)
-    {
-        if (string.Equals(source.Type, "manifest", StringComparison.OrdinalIgnoreCase)) return action;
-        if (!string.IsNullOrWhiteSpace(source.Name)) return action + " " + source.Name;
-        return action;
-    }
-
     private static string FormatVersionRange(string? minVersion, string? maxVersion)
     {
         var hasMin = !string.IsNullOrWhiteSpace(minVersion);
@@ -360,42 +354,88 @@ public partial class PageDownloadPluginStore
         return "任意";
     }
 
-    private async void InstallPlugin(PluginRepositoryEntry entry, PluginInstallSourceEntry sourceEntry)
+    internal async Task<bool> InstallPluginAsync(
+        PluginRepositoryEntry entry,
+        PluginInstallSourceEntry sourceEntry,
+        PluginMarketVersion? selectedVersion = null)
     {
         try
         {
             var trustDecision = PluginTrustService.EvaluateInstall(entry, PluginInstallSourceType.Repository);
-            var capList = entry.Capabilities.Length > 0 ? string.Join(", ", entry.Capabilities.Select(c => c.ToString())) : "无特殊能力";
-            var repoSource = entry.SourceRepoUrl ?? "未知仓库";
-            var confirmMsg = "即将安装插件：\n\n名称: " + entry.Name + "\n能力: " + capList + "\n市场注册表: " + repoSource + "\n下载源: " + sourceEntry.Url + "\n\n重大安全提醒：插件会在启动器内运行代码，可能读取或修改本地文件、访问网络、修改启动器界面，甚至执行恶意操作。\n请只安装你完全信任的来源。";
+            var repoSource = PluginTrustService.GetRepositoryTrustUrl(entry);
+            if (string.IsNullOrWhiteSpace(repoSource)) repoSource = "未知来源";
+            var confirmMsg = "即将安装插件：\n\n名称: " + entry.Name + "\n更新来源: " + repoSource + "\n下载源: " + sourceEntry.Url + "\n\n重大安全提醒：插件会在启动器内运行代码，可能读取或修改本地文件、访问网络、修改启动器行为，甚至执行恶意操作。\n请只安装你完全信任的来源。";
+            if (entry.DeveloperTrustLevel == PluginDeveloperTrustLevel.Other)
+                confirmMsg += "\n\n来源提醒：该 GitHub 开发者不在官方或本地白名单中。";
             if (trustDecision == PluginTrustDecision.RequireRepositoryTrust)
             {
                 confirmMsg += "\n\n该插件来自未信任的第三方仓库。继续将信任该仓库并安装。";
-                if (ModMain.MyMsgBox(confirmMsg, "信任确认", button2: "取消", isWarn: true) != 1) return;
-                PluginTrustService.AddTrust(repoSource, repoSource, PluginRepositorySourceType.Custom);
+                if (ModMain.MyMsgBox(confirmMsg, "信任确认", button2: "取消", isWarn: true) != 1) return false;
+                var sourceKind = entry.SourceKind switch
+                {
+                    "GitHub" or "Topics" => PluginRepositorySourceKind.Topic,
+                    "Manifest" => PluginRepositorySourceKind.Manifest,
+                    _ => PluginRepositorySourceKind.Json
+                };
+                PluginTrustService.AddTrust(
+                    repoSource,
+                    string.IsNullOrWhiteSpace(entry.SourceGroup) ? repoSource : entry.SourceGroup,
+                    PluginRepositorySourceType.Custom,
+                    sourceKind);
             }
             else
             {
-                if (ModMain.MyMsgBox(confirmMsg, "确认安装", button2: "取消", isWarn: true) != 1) return;
+                if (ModMain.MyMsgBox(confirmMsg, "确认安装", button2: "取消", isWarn: true) != 1) return false;
             }
 
             ModMain.MyMsgBox("正在获取插件包，请稍候...", "安装中");
-            using var prepared = await PrepareInstallAsync(entry, sourceEntry);
-            await PluginInstallService.InstallFromDirectoryAsync(prepared.PluginRoot, prepared.Manifest, prepared.SourceType, prepared.SourceUrl);
+            using var prepared = await PrepareInstallAsync(entry, sourceEntry, selectedVersion);
+            var persistentSource = PluginRepositoryService.GetPersistentInstallSource(
+                entry, sourceEntry, prepared.SourceType, prepared.SourceUrl);
+            await PluginInstallService.InstallFromDirectoryAsync(
+                prepared.PluginRoot,
+                prepared.Manifest,
+                persistentSource.Type,
+                persistentSource.Url,
+                installedSha256: prepared.VerifiedSha256);
             ModMain.frmMain?.RefreshRestartButton(true);
 
             ModMain.MyMsgBox("插件 " + prepared.Manifest.Name + " 安装成功！\n重启启动器后生效。", "安装完成");
             _ = LoadStoreAsync();
+            return true;
         }
         catch (Exception ex)
         {
             ModBase.Log(ex, "[Plugins] Store install failed: " + entry.Id, ModBase.LogLevel.Debug);
             ModMain.MyMsgBox("安装失败: " + ex.Message, "错误");
+            return false;
         }
     }
 
-    private async Task<PluginPreparedInstall> PrepareInstallAsync(PluginRepositoryEntry entry, PluginInstallSourceEntry sourceEntry)
+    private async Task<PluginPreparedInstall> PrepareInstallAsync(
+        PluginRepositoryEntry entry,
+        PluginInstallSourceEntry sourceEntry,
+        PluginMarketVersion? selectedVersion)
     {
+        var manifestVersion = selectedVersion ?? entry.SelectedVersion;
+        if (manifestVersion is not null)
+        {
+            var download = PluginRepositoryService.SelectDownload(manifestVersion, System.Runtime.InteropServices.RuntimeInformation.OSArchitecture)
+                ?? throw new InvalidDataException("该插件版本没有适用于当前平台的安装包。");
+            manifestVersion.ResolvedPackageUrl = download.PackageUrl;
+            manifestVersion.ResolvedSha256 = download.Sha256;
+            if (entry.ManifestUrlIsDirect && !string.IsNullOrWhiteSpace(entry.ManifestUrl))
+                return await PluginRemoteInstallService.PrepareManifestVersionAsync(entry.ManifestUrl, manifestVersion)
+                    .ConfigureAwait(false);
+            return await PluginRemoteInstallService.PreparePackageAsync(
+                    download.PackageUrl,
+                    download.Sha256,
+                    expectedPluginId: entry.Id,
+                    expectedVersion: manifestVersion.Version,
+                    expectedDependencies: manifestVersion.ResolvedDependencies)
+                .ConfigureAwait(false);
+        }
+
         if (string.Equals(sourceEntry.Type, "manifest", StringComparison.OrdinalIgnoreCase)
             && _latestVersionCache.TryGetValue(GetEntryCacheKey(entry), out var latest))
         {
@@ -405,27 +445,141 @@ public partial class PageDownloadPluginStore
         return await PluginRemoteInstallService.PrepareAsync(sourceEntry).ConfigureAwait(false);
     }
 
+    internal void OnDeveloperTrustChanged()
+        => RenderCurrentSearchResults();
+
+    private async void UninstallPlugin(string pluginId)
+    {
+        if (PluginLoaderService.LoadedPlugins.Any(plugin => string.Equals(plugin.Id, pluginId, StringComparison.OrdinalIgnoreCase)))
+        {
+            ModMain.MyMsgBox("插件正在运行。请先禁用并重启启动器，再进行卸载。", "无法卸载");
+            return;
+        }
+        if (ModMain.MyMsgBox("确定卸载插件 " + pluginId + "？", "确认卸载", button2: "取消", isWarn: true) != 1) return;
+
+        try
+        {
+            PluginInstallService.SetEnabled(pluginId, false);
+            await PluginInstallService.UninstallAsync(pluginId);
+            _ = LoadStoreAsync(clearLatestVersionCache: true);
+        }
+        catch (Exception ex)
+        {
+            ModMain.MyMsgBox("卸载失败: " + ex.Message, "错误");
+        }
+    }
+
     private void Search()
     {
         RenderCurrentSearchResults();
+    }
+
+    private void RepositoryStatusOption_Change(object sender, RoutedEventArgs e)
+    {
+        if (_suppressFilterEvents) return;
+        Config.Plugin.ShowArchivedRepositories = CheckStatusArchived.IsChecked == true;
+        Config.Plugin.ShowDisabledRepositories = CheckStatusDisabled.IsChecked == true;
+        Config.Plugin.ShowForkRepositories = CheckStatusFork.IsChecked == true;
+        RenderCurrentSearchResults();
+    }
+
+    private void LocalFilter_Change(object sender, RoutedEventArgs e)
+    {
+        if (_suppressFilterEvents) return;
+        Config.Plugin.ShowNonWhitelistedDevelopers = SwitchShowOtherDevelopers.IsChecked == true;
+        RenderCurrentSearchResults();
+    }
+
+    private void ResetFilters()
+    {
+        _suppressFilterEvents = true;
+        try
+        {
+            CheckStatusArchived.IsChecked = false;
+            CheckStatusDisabled.IsChecked = false;
+            CheckStatusFork.IsChecked = false;
+            SwitchShowOtherDevelopers.IsChecked = true;
+            ComboSort.SelectedIndex = 0;
+        }
+        finally
+        {
+            _suppressFilterEvents = false;
+        }
+        ComboSourceGroup.SelectedIndex = 0;
+        ComboTag.SelectedIndex = 0;
+        Config.Plugin.ShowArchivedRepositories = false;
+        Config.Plugin.ShowDisabledRepositories = false;
+        Config.Plugin.ShowForkRepositories = false;
+        Config.Plugin.ShowNonWhitelistedDevelopers = true;
+        Config.Plugin.MarketSortOrder = "default";
+        RenderCurrentSearchResults();
+    }
+
+    private void PopulateFilterOptions(IReadOnlyList<PluginRepositoryEntry> entries)
+    {
+        var selectedSource = GetSelectedFilter(ComboSourceGroup);
+        var selectedTag = GetSelectedFilter(ComboTag);
+        ComboSourceGroup.Items.Clear();
+        ComboSourceGroup.Items.Add(new MyComboBoxItem { Content = "全部", Tag = string.Empty });
+        foreach (var group in entries.Select(entry => entry.SourceGroup)
+                     .Where(value => !string.IsNullOrWhiteSpace(value))
+                     .Distinct(StringComparer.OrdinalIgnoreCase)
+                     .OrderBy(value => value, StringComparer.OrdinalIgnoreCase))
+            ComboSourceGroup.Items.Add(new MyComboBoxItem { Content = group, Tag = group });
+
+        ComboTag.Items.Clear();
+        ComboTag.Items.Add(new MyComboBoxItem { Content = "全部", Tag = string.Empty });
+        foreach (var tag in entries.SelectMany(entry => entry.Tags ?? [])
+                     .Where(value => !string.IsNullOrWhiteSpace(value))
+                     .Distinct(StringComparer.OrdinalIgnoreCase)
+                     .OrderBy(value => value, StringComparer.OrdinalIgnoreCase))
+            ComboTag.Items.Add(new MyComboBoxItem { Content = tag, Tag = tag });
+
+        SelectFilter(ComboSourceGroup, selectedSource);
+        SelectFilter(ComboTag, selectedTag);
+    }
+
+    private static string GetSelectedFilter(MyComboBox combo)
+        => (combo.SelectedItem as FrameworkElement)?.Tag?.ToString() ?? string.Empty;
+
+    private static void SelectFilter(MyComboBox combo, string value)
+    {
+        for (var index = 0; index < combo.Items.Count; index++)
+        {
+            if (combo.Items[index] is FrameworkElement item
+                && string.Equals(item.Tag?.ToString(), value, StringComparison.OrdinalIgnoreCase))
+            {
+                combo.SelectedIndex = index;
+                return;
+            }
+        }
+        combo.SelectedIndex = 0;
     }
 
     private void RenderCurrentSearchResults()
     {
         if (_allEntries is null) return;
         var query = PanSearchBox.Text?.Trim();
-        if (string.IsNullOrEmpty(query))
-        {
-            RenderPluginList(_allEntries);
-            return;
-        }
-
+        var sourceGroup = GetSelectedFilter(ComboSourceGroup);
+        var selectedTag = GetSelectedFilter(ComboTag);
         var filtered = _allEntries.Where(entry =>
-            (entry.Name?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
-            || (entry.Id?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
-            || (entry.Description?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
-            || (entry.Author?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
-        ).ToList();
+                (Config.Plugin.ShowArchivedRepositories || !entry.Archived)
+                && (Config.Plugin.ShowDisabledRepositories || !entry.Disabled)
+                && (Config.Plugin.ShowForkRepositories || !entry.Fork)
+                && (Config.Plugin.ShowNonWhitelistedDevelopers
+                    || entry.DeveloperTrustLevel != PluginDeveloperTrustLevel.Other)
+                && (string.IsNullOrWhiteSpace(sourceGroup)
+                    || string.Equals(entry.SourceGroup, sourceGroup, StringComparison.OrdinalIgnoreCase))
+                && (string.IsNullOrWhiteSpace(selectedTag)
+                    || (entry.Tags ?? []).Contains(selectedTag, StringComparer.OrdinalIgnoreCase))
+                && (string.IsNullOrWhiteSpace(query)
+                    || (entry.Name?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || (entry.Id?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || (entry.Description?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || (entry.Author?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || (entry.SourceGroup?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || (entry.Tags ?? []).Any(tag => tag.Contains(query, StringComparison.OrdinalIgnoreCase))))
+            .ToList();
 
         RenderPluginList(filtered);
     }
