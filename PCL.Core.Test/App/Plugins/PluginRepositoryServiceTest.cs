@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using PCL.Core.App.Plugins;
-using PCL.Plugin.Abstractions;
 
 namespace PCL.Core.Test.App.Plugins;
 
@@ -10,10 +9,10 @@ namespace PCL.Core.Test.App.Plugins;
 public class PluginRepositoryServiceTest
 {
     [TestMethod]
-    public void GetOfficialIndexUrl_ShouldUseRegistryJsonDefault()
+    public void GetOfficialIndexUrl_ShouldUseNexServerSourceDocument()
     {
         Assert.AreEqual(
-            "https://raw.githubusercontent.com/PCL-Nex-Developer/PCL2-Nex/refs/heads/dev/plugins.json",
+            "https://cdn.jsdelivr.net/gh/PCL-Nex-Developer/Nex_Server@main/apiv2/plugin-market.json",
             PluginRepositoryService.GetOfficialIndexUrl());
     }
 
@@ -229,12 +228,12 @@ public class PluginRepositoryServiceTest
             ["com.example.hello"] = new()
             {
                 PluginId = "com.example.hello",
-                InstalledVersion = new System.Version(1, 0, 0)
+                InstalledVersion = "1.0.0"
             },
             ["com.example.world"] = new()
             {
                 PluginId = "com.example.world",
-                InstalledVersion = new System.Version(2, 0, 0)
+                InstalledVersion = "2.0.0"
             }
         };
         var entries = new List<PluginRepositoryEntry>
@@ -266,7 +265,7 @@ public class PluginRepositoryServiceTest
 
         Assert.AreEqual(1, updates.Count);
         Assert.AreEqual("com.example.hello", updates[0].Entry.Id);
-        Assert.AreEqual(new System.Version(1, 1, 0), updates[0].LatestVersion);
+        Assert.AreEqual("1.1.0", updates[0].LatestVersion);
     }
 
     [TestMethod]
@@ -277,7 +276,7 @@ public class PluginRepositoryServiceTest
             ["com.example.hello"] = new()
             {
                 PluginId = "com.example.hello",
-                InstalledVersion = new System.Version(1, 0, 0, 0)
+                InstalledVersion = "1.0.0"
             }
         };
         var entries = new List<PluginRepositoryEntry>
@@ -294,5 +293,35 @@ public class PluginRepositoryServiceTest
         var updates = PluginUpdateService.FindUpdates(entries, installed);
 
         Assert.AreEqual(0, updates.Count);
+    }
+
+    [TestMethod]
+    public void FindUpdates_ShouldUseSemVerPrereleasePrecedenceAndDisplay()
+    {
+        var installed = new Dictionary<string, PluginInstallRecord>
+        {
+            ["com.example.hello"] = new()
+            {
+                PluginId = "com.example.hello",
+                InstalledVersion = "1.0.0"
+            }
+        };
+        var entries = new List<PluginRepositoryEntry>
+        {
+            new()
+            {
+                Id = "com.example.hello",
+                Name = "Hello",
+                Version = "1.1.0-beta.2",
+                ManifestUrl = "https://example.test/hello/manifest.json"
+            }
+        };
+
+        var updates = PluginUpdateService.FindUpdates(entries, installed);
+
+        Assert.AreEqual(1, updates.Count);
+        Assert.AreEqual("1.1.0-beta.2", updates[0].LatestVersion);
+        Assert.AreEqual("1.1.0-beta.2", PluginUpdateService.FormatVersion(updates[0].LatestVersion));
+        Assert.IsTrue(PluginUpdateService.CompareVersion("1.1.0", "1.1.0-beta.2") > 0);
     }
 }

@@ -23,6 +23,7 @@ public static class PluginLocalInstallService
 
         try
         {
+            var verifiedSha256 = PluginRemoteInstallService.ValidateSha256(archivePath, null);
             await Task.Run(() => ExtractZipSafely(archivePath, extractDir), ct).ConfigureAwait(false);
             var pluginRoot = FindPluginRoot(extractDir)
                 ?? throw new InvalidDataException("zip 中未找到 plugin.json。请确认该 zip 是 PCL 插件包。");
@@ -31,7 +32,8 @@ public static class PluginLocalInstallService
                 throw new InvalidDataException(result.ErrorMessage ?? "插件目录校验失败。");
 
             var sourceLabel = archivePath.EndsWith(".pclx", StringComparison.OrdinalIgnoreCase) ? "本地 pclx" : "本地 zip";
-            return new PluginPreparedInstall(pluginRoot, manifest, PluginInstallSourceType.Local, archivePath, sourceLabel, workDir);
+            return new PluginPreparedInstall(pluginRoot, manifest, PluginInstallSourceType.Local,
+                archivePath, sourceLabel, workDir, verifiedSha256);
         }
         catch
         {

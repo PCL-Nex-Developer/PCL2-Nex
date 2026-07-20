@@ -1,9 +1,9 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using PCL.Plugin.Abstractions;
 
 namespace PCL.Core.App.Plugins;
 
@@ -19,15 +19,15 @@ public static class PluginPackageService
     /// <param name="manifest">要校验的清单。</param>
     /// <returns>校验结果。</returns>
     public static PluginPackageValidationResult ValidatePackageManifest(PluginPackageManifest manifest)
-        => ValidatePackageManifest(manifest, PluginCompatibility.CurrentHostVersion);
+        => ValidatePackageManifest(manifest, PluginCompatibility.CurrentPclCoreVersion);
 
     /// <summary>
     /// 校验包清单是否合法。
     /// </summary>
     /// <param name="manifest">要校验的清单。</param>
-    /// <param name="currentHostVersion">当前启动器版本。传入 <c>null</c> 时仅在清单声明启动器版本约束时失败。</param>
+    /// <param name="currentPclCoreVersion">当前 PCL.Core BaseVersion。</param>
     /// <returns>校验结果。</returns>
-    public static PluginPackageValidationResult ValidatePackageManifest(PluginPackageManifest manifest, string? currentHostVersion)
+    public static PluginPackageValidationResult ValidatePackageManifest(PluginPackageManifest manifest, string? currentPclCoreVersion)
     {
         if (manifest is null)
             return new PluginPackageValidationResult(false, "清单对象为 null。");
@@ -35,64 +35,101 @@ public static class PluginPackageService
         if (string.IsNullOrWhiteSpace(manifest.Id))
             return new PluginPackageValidationResult(false, "缺少必填字段 Id。");
 
+        if (!IsValidPluginId(manifest.Id))
+            return new PluginPackageValidationResult(false, "插件 Id 无效。请使用至少两个非空点分段，且仅包含 ASCII 字母、数字、下划线和连字符。");
+
         if (string.IsNullOrWhiteSpace(manifest.Name))
             return new PluginPackageValidationResult(false, "缺少必填字段 Name。");
 
-        var runtime = string.IsNullOrWhiteSpace(manifest.Runtime)
-            ? PluginPackageManifest.RuntimeDotNet
-            : manifest.Runtime.Trim();
+        var legacyField = manifest.AdditionalProperties?.Keys.FirstOrDefault(key => key.Equals("entryType", StringComparison.OrdinalIgnoreCase)
+            || key.Equals("loadMethod", StringComparison.OrdinalIgnoreCase)
+            || key.Equals("unloadMethod", StringComparison.OrdinalIgnoreCase)
+            || key.Equals("entryScript", StringComparison.OrdinalIgnoreCase)
+            || key.Equals("runtime", StringComparison.OrdinalIgnoreCase));
+        if (legacyField is not null)
+            return new PluginPackageValidationResult(
+                false,
+                $"旧插件入口字段 {legacyField} 已移除；LoadAsync/UnloadAsync 与 JavaScript 插件不再支持。");
 
-        if (string.Equals(runtime, PluginPackageManifest.RuntimeJavaScriptV8, StringComparison.OrdinalIgnoreCase))
-        {
-            if (string.IsNullOrWhiteSpace(manifest.EntryScript))
-                return new PluginPackageValidationResult(false, "JavaScript 插件缺少必填字段 EntryScript。");
-        }
-        else if (string.Equals(runtime, PluginPackageManifest.RuntimeDotNet, StringComparison.OrdinalIgnoreCase))
-        {
-            if (string.IsNullOrWhiteSpace(manifest.EntryAssembly))
-                return new PluginPackageValidationResult(false, "缺少必填字段 EntryAssembly。");
-        }
-        else
-        {
-            return new PluginPackageValidationResult(false, $"不支持的插件运行时：{manifest.Runtime}。");
-        }
+        if (string.IsNullOrWhiteSpace(manifest.EntryAssembly))
+            return new PluginPackageValidationResult(false, "缺少必填字段 EntryAssembly。");
 
-        if (manifest.Version is null || manifest.Version == new Version(0, 0, 0, 0))
+        if (manifest.GetMixinConfigurationPaths().Count == 0)
+            return new PluginPackageValidationResult(
+                false,
+                "缺少必填字段 mixinConfig 或 mixinConfigs；LoadAsync/UnloadAsync 与 JavaScript 插件已不再支持。");
+
+        if (!PluginUpdateService.TryParseVersion(manifest.Version, out _))
             return new PluginPackageValidationResult(false, "Version 无效或未设置。");
 
-        if (manifest.MinApiVersion is null || manifest.MinApiVersion == new Version(0, 0, 0, 0))
-            return new PluginPackageValidationResult(false, "MinApiVersion 无效或未设置。");
+        var dependencyValidation = PluginDependencyService.ValidateDeclarations(manifest.Id, manifest.Dependencies);
+        if (!dependencyValidation.IsValid)
+            return new PluginPackageValidationResult(false, dependencyValidation.ErrorMessage);
 
-        var compatibility = ValidateRuntimeCompatibility(manifest, currentHostVersion);
+        var logo = string.IsNullOrWhiteSpace(manifest.Logo) ? manifest.Icon : manifest.Logo;
+        if (!string.IsNullOrWhiteSpace(logo)
+            && !IsHttpUrl(logo)
+            && !IsSafeRelativePackagePath(logo))
+            return new PluginPackageValidationResult(false, "Logo 必须是 HTTP/HTTPS URL 或插件包内的安全相对路径。");
+
+        var compatibility = ValidateRuntimeCompatibility(manifest, currentPclCoreVersion);
         if (!compatibility.IsValid) return compatibility;
 
-        return new PluginPackageValidationResult(true, null);
+        return new PluginPackageValidationResult(
+            true,
+            compatibility.ErrorMessage,
+            compatibility.CompatibilityStatus);
+    }
+
+    public static bool IsValidPluginId(string? pluginId)
+    {
+        if (string.IsNullOrWhiteSpace(pluginId) || pluginId.Length > 128) return false;
+        var segments = pluginId.Split('.');
+        if (segments.Length < 2) return false;
+        foreach (var segment in segments)
+        {
+            if (segment.Length == 0) return false;
+            foreach (var character in segment)
+            {
+                var isAsciiLetter = character is >= 'A' and <= 'Z' or >= 'a' and <= 'z';
+                var isDigit = character is >= '0' and <= '9';
+                if (!isAsciiLetter && !isDigit && character is not ('_' or '-')) return false;
+            }
+        }
+        return true;
+    }
+
+    private static bool IsHttpUrl(string value)
+        => Uri.TryCreate(value.Trim(), UriKind.Absolute, out var uri)
+           && uri.Scheme is "http" or "https";
+
+    private static bool IsSafeRelativePackagePath(string value)
+    {
+        var path = value.Trim().Replace('\\', '/');
+        return !Path.IsPathRooted(path)
+               && path.Split('/', StringSplitOptions.RemoveEmptyEntries).All(segment => segment != "..");
     }
 
     /// <summary>
     /// 校验插件运行时兼容性。用于已安装插件在启动器升级后的加载前检查。
     /// </summary>
     public static PluginPackageValidationResult ValidateRuntimeCompatibility(PluginPackageManifest manifest)
-        => ValidateRuntimeCompatibility(manifest, PluginCompatibility.CurrentHostVersion);
+        => ValidateRuntimeCompatibility(manifest, PluginCompatibility.CurrentPclCoreVersion);
 
     /// <summary>
     /// 校验插件运行时兼容性。用于已安装插件在启动器升级后的加载前检查。
     /// </summary>
-    public static PluginPackageValidationResult ValidateRuntimeCompatibility(PluginPackageManifest manifest, string? currentHostVersion)
+    public static PluginPackageValidationResult ValidateRuntimeCompatibility(PluginPackageManifest manifest, string? currentPclCoreVersion)
     {
         if (manifest is null)
             return new PluginPackageValidationResult(false, "清单对象为 null。");
 
-        if (manifest.MaxApiVersion == new Version(0, 0, 0, 0))
-            return new PluginPackageValidationResult(false, "MaxApiVersion 无效。");
-
-        if (PluginCompatibility.TryGetApiCompatibilityError(manifest.MinApiVersion, manifest.MaxApiVersion, out var apiError))
-            return new PluginPackageValidationResult(false, apiError);
-
-        if (PluginCompatibility.TryGetHostCompatibilityError(manifest.MinHostVersion, manifest.MaxHostVersion, currentHostVersion, out var hostError))
-            return new PluginPackageValidationResult(false, hostError);
-
-        return new PluginPackageValidationResult(true, null);
+        var status = PluginCompatibility.EvaluatePclCoreVersion(manifest.PclCoreVersion, currentPclCoreVersion);
+        return status == PluginCoreCompatibilityStatus.TooOld
+            ? new PluginPackageValidationResult(false, PluginCompatibility.GetBlockingMessage(status, manifest.PclCoreVersion), status)
+            : new PluginPackageValidationResult(true, status == PluginCoreCompatibilityStatus.Compatible
+                ? null
+                : PluginCompatibility.GetBlockingMessage(status, manifest.PclCoreVersion), status);
     }
 
     /// <summary>
@@ -134,4 +171,7 @@ public static class PluginPackageService
 /// </summary>
 /// <param name="IsValid">是否通过校验。</param>
 /// <param name="ErrorMessage">未通过时的错误信息。</param>
-public sealed record PluginPackageValidationResult(bool IsValid, string? ErrorMessage);
+public sealed record PluginPackageValidationResult(
+    bool IsValid,
+    string? ErrorMessage,
+    PluginCoreCompatibilityStatus CompatibilityStatus = PluginCoreCompatibilityStatus.Compatible);

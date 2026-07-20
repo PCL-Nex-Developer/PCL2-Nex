@@ -8,179 +8,108 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using PCL.Core.App.IoC;
-using PCL.Core.App.Plugins.JavaScript;
-using PCL.Core.App.Plugins;
 using PCL.Core.Logging;
-using PCL.Plugin.Abstractions;
+using PCL.Mixin;
 
 namespace PCL.Core.App.Plugins;
 
 /// <summary>
-/// 插件加载与生命周期管理。<br/>
-/// 扫描 <see cref="Paths.PluginInstalled"/> 下的结构化插件目录，
-/// 读取 <c>plugin.json</c> 定位入口程序集，在隔离的可收集
-/// <see cref="AssemblyLoadContext"/> 中加载并运行。
-/// 同时兼容旧布局（根目录平铺 DLL）。
+/// PCLX Mixin 引擎入口。Core 只发现包、加载程序集、读取 Mixin 配置并应用注入，
+/// 不反射调用通用插件生命周期，也不向插件提供 Host API 或服务注入。
 /// </summary>
-[LifecycleService(LifecycleState.WindowCreated, Priority = -100)]
+[LifecycleService(LifecycleState.Loaded, Priority = int.MaxValue)]
 public sealed class PluginLoaderService : GeneralService
 {
-    private static readonly List<PluginRecord> _Records = [];
-    private static readonly object _Lock = new();
-    private static readonly object _SelfProtectionLock = new();
-    private static readonly HashSet<string> _SelfProtectionDisabledPluginIds = new(StringComparer.OrdinalIgnoreCase);
-    private static bool _selfProtectionRestartRequired;
+    private static readonly List<PluginRecord> Records = [];
+    private static readonly object SyncRoot = new();
     private static LifecycleContext? _context;
 
-    public PluginLoaderService() : base("plugin-loader", "插件加载器", asyncStart: false)
+    internal static MixinRuntime Runtime { get; } = new("pclnex.core.mixin");
+
+    /// <summary>安全模式下跳过所有第三方 PCLX Mixin。</summary>
+    public static bool SafeMode { get; set; } =
+        string.Equals(Environment.GetEnvironmentVariable("PCL_NEX_SAFE_MODE"), "1", StringComparison.Ordinal);
+
+    public PluginLoaderService() : base("plugin-loader", "PCL.Mixin 插件引擎", asyncStart: false)
     {
         _context = ServiceContext;
     }
 
-    /// <summary>
-    /// 当前已加载的插件记录（只读快照）。
-    /// </summary>
     public static IReadOnlyList<PluginRecord> LoadedPlugins
     {
-        get { lock (_Lock) { return _Records.ToList(); } }
+        get { lock (SyncRoot) return Records.ToArray(); }
     }
 
-    /// <inheritdoc />
-    public override void Start()
-    {
-        LoadAll();
-    }
+    public override void Start() => LoadAll();
 
-    /// <inheritdoc />
-    public override void Stop()
-    {
-        _UnloadAll();
-    }
+    // 不提供运行时热卸载。进程退出时由操作系统回收 Patch 和插件程序集。
+    public override void Stop() { }
 
-    /// <summary>
-    /// 扫描插件目录并加载所有合法插件。
-    /// 优先从结构化安装目录加载，兼容旧布局（根目录平铺 DLL）。
-    /// </summary>
-    public static void LoadAll()
-    {
-        _BeginSelfProtectionPass();
+    public static void LoadAll() => LoadAllAsync().GetAwaiter().GetResult();
 
-        try
+    public static async Task LoadAllAsync(CancellationToken cancellationToken = default)
+    {
+        var enabledOrder = PluginEnablementService.GetEnabledPluginOrder();
+        var installedPackages = EnumerateInstalledPluginPackages(Paths.PluginInstalled)
+            .Select(item => new PluginPackageLocation(item.Manifest, item.PluginDir))
+            .ToArray();
+        var loadPlan = PluginDependencyService.CreateLoadPlan(
+            installedPackages,
+            PluginEnablementService.IsEnabled,
+            enabledOrder);
+        foreach (var (pluginId, error) in loadPlan.Errors)
+            _context?.Warn($"插件 {pluginId} 前置依赖检查失败，已跳过：{error}", actionLevel: ActionLevel.NormalLog);
+
+        var loadResults = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        foreach (var package in loadPlan.Packages)
         {
-            var enabledOrder = PluginEnablementService.GetEnabledPluginOrder();
-            var enabledOrderComparer = Comparer<string>.Create((left, right) =>
-                PluginEnablementService.CompareByEnabledOrder(left, right, enabledOrder));
-
-            // 从结构化安装目录加载
-            var installedDir = Paths.PluginInstalled;
-            if (!string.IsNullOrEmpty(installedDir) && Directory.Exists(installedDir))
+            var manifest = package.Manifest;
+            var pluginDirectory = package.PluginDirectory;
+            cancellationToken.ThrowIfCancellationRequested();
+            var failedDependency = (manifest.Dependencies ?? []).FirstOrDefault(dependency =>
+                !ContainsRecord(dependency.Id)
+                && (!loadResults.TryGetValue(dependency.Id, out var loaded) || !loaded));
+            if (failedDependency is not null)
             {
-                foreach (var (manifest, pluginDir) in EnumerateInstalledPluginPackages(installedDir)
-                             .OrderBy(item => item.Manifest.Id, enabledOrderComparer))
-                {
-                    if (!PluginEnablementService.IsEnabled(manifest.Id)) continue;
-                    if (!_IsPackageCompatible(manifest))
-                    {
-                        _DisablePluginForSelfProtection(manifest.Id, "运行兼容性检查失败");
-                        continue;
-                    }
-
-                    if (manifest.IsJavaScriptPlugin())
-                    {
-                        _LoadJavaScriptPlugin(manifest, pluginDir);
-                        continue;
-                    }
-
-                    if (!manifest.IsDotNetPlugin() || string.IsNullOrWhiteSpace(manifest.EntryAssembly)) continue;
-                    var assemblyPath = Path.Combine(pluginDir, manifest.EntryAssembly.Replace('/', Path.DirectorySeparatorChar));
-                    if (!File.Exists(assemblyPath))
-                    {
-                        _context?.Warn($"插件入口程序集不存在: {assemblyPath}");
-                        _DisablePluginForSelfProtection(manifest.Id, $"入口程序集不存在: {assemblyPath}");
-                        continue;
-                    }
-
-                    var loaded = _TryLoadAssembly(assemblyPath);
-                    if (loaded is null)
-                    {
-                        _DisablePluginForSelfProtection(manifest.Id, $"程序集无法加载或没有可用入口: {Path.GetFileName(assemblyPath)}");
-                        continue;
-                    }
-                    foreach (var (loadedManifest, entryType) in loaded.Value.Entries
-                                 .OrderBy(entry => entry.Manifest.Id, enabledOrderComparer))
-                    {
-                        _LoadPlugin(assemblyPath, loaded.Value.Context, loadedManifest, entryType);
-                    }
-                }
+                loadResults[manifest.Id] = false;
+                _context?.Warn(
+                    $"插件 {manifest.Id} 的前置插件 {failedDependency.Id} 未成功加载，已跳过",
+                    actionLevel: ActionLevel.NormalLog);
+                continue;
             }
-
-            // 兼容旧布局：扫描根目录的平铺 DLL
-            var dir = Paths.Plugins;
-            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return;
-
-            string[] assemblies;
-            try
+            if (ShouldSkipThirdPartyMixins(manifest))
             {
-                assemblies = Directory.GetFiles(dir, "*.dll", SearchOption.TopDirectoryOnly);
+                loadResults[manifest.Id] = false;
+                _context?.Warn($"安全模式已跳过第三方 Mixin：{manifest.Id}", actionLevel: ActionLevel.NormalLog);
+                continue;
             }
-            catch (Exception ex)
+            if (!await IsPackageCompatibleAsync(manifest, cancellationToken).ConfigureAwait(false))
             {
-                _context?.Warn($"扫描插件目录失败: {dir}", ex);
-                return;
+                loadResults[manifest.Id] = false;
+                continue;
             }
-
-            var flatEntries = new List<(string AssemblyPath, CollectiblePluginLoadContext Context, PluginManifest Manifest, Type EntryType)>();
-            foreach (var path in assemblies)
-            {
-                var loaded = _TryLoadAssembly(path);
-                if (loaded is null) continue;
-                foreach (var (manifest, entryType) in loaded.Value.Entries)
-                {
-                    if (!PluginEnablementService.IsEnabled(manifest.Id)) continue;
-                    flatEntries.Add((path, loaded.Value.Context, manifest, entryType));
-                }
-                if (!flatEntries.Any(entry => ReferenceEquals(entry.Context, loaded.Value.Context))) loaded.Value.Context.Unload();
-            }
-
-            foreach (var entry in flatEntries.OrderBy(entry => entry.Manifest.Id, enabledOrderComparer))
-            {
-                _LoadPlugin(entry.AssemblyPath, entry.Context, entry.Manifest, entry.EntryType);
-            }
+            loadResults[manifest.Id] = await LoadPackageAsync(manifest, pluginDirectory, cancellationToken)
+                .ConfigureAwait(false);
         }
-        finally
-        {
-            _RestartIfSelfProtectionTriggered();
-        }
+
+        WarnAboutUnsupportedFlatPlugins();
     }
 
-    /// <summary>
-    /// 枚举已安装插件目录结构中的入口程序集路径。
-    /// 遍历 <c>installed/*/plugin.json</c>，读取 <c>entryAssembly</c> 字段。
-    /// </summary>
-    public static IEnumerable<(PluginPackageManifest Manifest, string AssemblyPath, string PluginDir)> EnumerateInstalledPluginAssemblies(string installedDir)
+    public static IEnumerable<(PluginPackageManifest Manifest, string AssemblyPath, string PluginDir)>
+        EnumerateInstalledPluginAssemblies(string installedDir)
     {
         foreach (var (manifest, pluginDir) in EnumerateInstalledPluginPackages(installedDir))
         {
-            if (!manifest.IsDotNetPlugin()) continue;
             if (string.IsNullOrWhiteSpace(manifest.EntryAssembly)) continue;
-
-            var assemblyPath = Path.Combine(pluginDir, manifest.EntryAssembly.Replace('/', Path.DirectorySeparatorChar));
-            if (!File.Exists(assemblyPath))
-            {
-                _context?.Warn($"插件入口程序集不存在: {assemblyPath}");
-                continue;
-            }
-
-            yield return (manifest, assemblyPath, pluginDir);
+            var assemblyPath = ResolvePackagePath(pluginDir, manifest.EntryAssembly);
+            if (File.Exists(assemblyPath)) yield return (manifest, assemblyPath, pluginDir);
         }
     }
 
-    /// <summary>
-    /// 枚举已安装插件目录结构中的包清单。
-    /// </summary>
-    public static IEnumerable<(PluginPackageManifest Manifest, string PluginDir)> EnumerateInstalledPluginPackages(string installedDir)
+    public static IEnumerable<(PluginPackageManifest Manifest, string PluginDir)>
+        EnumerateInstalledPluginPackages(string installedDir)
     {
-        if (!Directory.Exists(installedDir)) yield break;
+        if (string.IsNullOrWhiteSpace(installedDir) || !Directory.Exists(installedDir)) yield break;
 
         foreach (var pluginDir in Directory.GetDirectories(installedDir))
         {
@@ -191,324 +120,321 @@ public sealed class PluginLoaderService : GeneralService
             try
             {
                 var json = File.ReadAllText(manifestPath);
+                if (TryGetLegacyPluginReason(json, out var reason))
+                {
+                    _context?.Warn($"插件包不兼容，已跳过：{manifestPath}：{reason}", actionLevel: ActionLevel.NormalLog);
+                    continue;
+                }
                 manifest = JsonSerializer.Deserialize<PluginPackageManifest>(json, PluginJson.SerializerOptions);
             }
-            catch (Exception ex)
+            catch (Exception exception) when (exception is IOException or JsonException)
             {
-                _context?.Warn($"读取插件清单失败: {manifestPath}", ex);
+                _context?.Warn($"读取插件清单失败：{manifestPath}", exception);
                 continue;
             }
 
-            if (manifest is null) continue;
-
-            yield return (manifest, pluginDir);
+            if (manifest is not null) yield return (manifest, pluginDir);
         }
     }
 
-    private static void _UnloadAll()
+    private static Task<bool> LoadPackageAsync(
+        PluginPackageManifest manifest,
+        string pluginDirectory,
+        CancellationToken cancellationToken)
     {
-        List<PluginRecord> snapshot;
-        lock (_Lock) { snapshot = _Records.ToList(); _Records.Clear(); }
-
-        foreach (var record in snapshot)
+        if (ContainsRecord(manifest.Id))
         {
-            try
+            _context?.Warn($"插件 {manifest.Id} 已应用，跳过重复条目");
+            return Task.FromResult(true);
+        }
+
+        CollectiblePluginLoadContext? loadContext = null;
+        Assembly? assembly = null;
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var assemblyPath = ResolvePackagePath(pluginDirectory, manifest.EntryAssembly);
+            if (!File.Exists(assemblyPath))
+                throw new FileNotFoundException("插件主程序集不存在。", assemblyPath);
+
+            loadContext = new CollectiblePluginLoadContext(
+                assemblyPath,
+                GetSharedDependencyAssemblies(manifest));
+            assembly = loadContext.LoadFromAssemblyPath(Path.GetFullPath(assemblyPath));
+            var configPaths = manifest.GetMixinConfigurationPaths();
+            if (configPaths.Count == 0)
+                throw new MixinApplyException("插件未声明 mixinConfig 或 mixinConfigs；旧 LoadAsync 插件不再受支持。");
+
+            var warnings = new List<string>();
+            var appliedConfigs = new List<string>();
+            foreach (var relativeConfigPath in configPaths)
             {
-                record.Instance.UnloadAsync().Wait(TimeSpan.FromSeconds(3));
+                cancellationToken.ThrowIfCancellationRequested();
+                var configPath = ResolvePackagePath(pluginDirectory, relativeConfigPath);
+                MixinConfiguration configuration;
+                try
+                {
+                    configuration = ReadMixinConfiguration(configPath);
+                    var result = Runtime.ApplyConfiguration(assembly, configuration, relativeConfigPath);
+                    appliedConfigs.Add(relativeConfigPath);
+                    warnings.AddRange(result.Warnings);
+                    _context?.Info(
+                        $"Mixin 配置已应用：{manifest.Id}/{relativeConfigPath}，" +
+                        $"Mixin={result.MixinCount}，目标方法={result.TargetMethodCount}");
+                }
+                catch (Exception exception) when (TryReadOptionalConfiguration(configPath))
+                {
+                    warnings.Add($"可选 Mixin 配置失败：{relativeConfigPath}：{exception.Message}");
+                    _context?.Warn(
+                        $"可选 Mixin 配置失败，继续加载其他配置：{manifest.Id}/{relativeConfigPath}",
+                        exception,
+                        ActionLevel.NormalLog);
+                }
             }
-            catch (Exception ex)
+
+            var record = new PluginRecord
             {
-                _context?.Warn($"停止插件 {record.Id} 时出错", ex);
+                Manifest = manifest,
+                Assembly = assembly,
+                LoadContext = loadContext,
+                AssemblyPath = assemblyPath,
+                PluginDirectory = pluginDirectory,
+                AppliedMixinConfigurations = appliedConfigs,
+                Warnings = warnings,
+                State = PluginState.Running
+            };
+            lock (SyncRoot) Records.Add(record);
+
+            foreach (var warning in warnings)
+                _context?.Warn($"Mixin 诊断：{manifest.Id}：{warning}", actionLevel: ActionLevel.NormalLog);
+            foreach (var patch in Runtime.Patches.Where(patch => patch.SourceAssembly == assembly))
+            {
+                _context?.Info(
+                    $"Mixin 已应用：插件={manifest.Id}；类={patch.MixinType.FullName}；" +
+                    $"目标={patch.TargetMethod.DeclaringType?.FullName}.{patch.TargetMethod.Name}；" +
+                    $"操作={patch.Kind}；注入点={patch.InjectionPoint}；" +
+                    $"定位={patch.TargetDescriptor ?? "<method>"}；处理器={patch.Handler.Name}；优先级={patch.Priority}");
             }
+            foreach (var conflict in Runtime.Conflicts.Where(conflict =>
+                         conflict.ApplicationOrder.Any(patch => patch.SourceAssembly == assembly)))
+            {
+                _context?.Warn(
+                    $"Mixin 冲突：{conflict.TargetMethod.DeclaringType?.FullName}.{conflict.TargetMethod.Name}；" +
+                    "应用顺序=" + string.Join(" -> ", conflict.ApplicationOrder.Select(patch =>
+                        $"{patch.MixinType.FullName}.{patch.Handler.Name}" +
+                        $"[{patch.Kind}@{patch.InjectionPoint}, target={patch.TargetDescriptor ?? "<method>"}, {patch.Priority}]")),
+                    actionLevel: ActionLevel.NormalLog);
+            }
+            return Task.FromResult(true);
+        }
+        catch (Exception exception)
+        {
+            if (assembly is not null) Runtime.RollbackAssembly(assembly);
+            loadContext?.Unload();
+            PluginEnablementService.MarkSelfProtectionDisabled(manifest.Id);
+            PluginEnablementService.SetEnabled(manifest.Id, false);
+            _context?.Error(
+                $"required Mixin 加载失败，插件已禁用：{manifest.Id}；" +
+                $"程序集={manifest.EntryAssembly}；原因={exception.Message}",
+                exception,
+                ActionLevel.NormalLog);
+            return Task.FromResult(false);
         }
     }
 
-    private readonly record struct LoadedAssembly(CollectiblePluginLoadContext Context, List<(PluginManifest Manifest, Type EntryType)> Entries);
-
-    private static LoadedAssembly? _TryLoadAssembly(string path)
+    private static MixinConfiguration ReadMixinConfiguration(string configPath)
     {
-        var context = new CollectiblePluginLoadContext(path);
-        Assembly asm;
+        if (!File.Exists(configPath))
+            throw new FileNotFoundException("Mixin 配置文件不存在。", configPath);
         try
         {
-            asm = context.LoadFromAssemblyPath(path);
+            return JsonSerializer.Deserialize<MixinConfiguration>(
+                       File.ReadAllText(configPath),
+                       MixinJsonOptions)
+                   ?? throw new JsonException("Mixin 配置根对象为空。");
         }
-        catch (Exception ex)
+        catch (Exception exception) when (exception is IOException or JsonException)
         {
-            _context?.Warn($"加载插件程序集失败: {Path.GetFileName(path)}", ex);
-            context.Unload();
-            return null;
+            throw new MixinApplyException($"读取 Mixin 配置失败：{configPath}", exception);
         }
-
-        var entries = new List<(PluginManifest, Type)>();
-        Type[] types;
-        try
-        {
-            types = asm.GetTypes();
-        }
-        catch (ReflectionTypeLoadException ex)
-        {
-            _context?.Warn($"读取插件类型失败: {Path.GetFileName(path)}", ex);
-            types = ex.Types.Where(t => t is not null).ToArray()!;
-        }
-
-        foreach (var type in types)
-        {
-            if (type is null) continue;
-            PluginAttribute? attr;
-            try { attr = type.GetCustomAttribute<PluginAttribute>(); }
-            catch (Exception ex) { _context?.Warn($"读取插件特性失败: {type.FullName}", ex); continue; }
-            if (attr is null) continue;
-            if (!typeof(IPclPlugin).IsAssignableFrom(type))
-            {
-                _context?.Warn($"插件入口 {type.FullName} 未实现 IPclPlugin，已跳过");
-                continue;
-            }
-            var manifest = attr.ToManifest();
-            if (!_IsRuntimeManifestCompatible(manifest)) continue;
-            manifest.EntryPointTypeName = type.AssemblyQualifiedName;
-            entries.Add((manifest, type));
-        }
-
-        if (entries.Count == 0)
-        {
-            context.Unload();
-            return null;
-        }
-        return new LoadedAssembly(context, entries);
     }
 
-    private static bool _LoadPlugin(string assemblyPath, CollectiblePluginLoadContext context, PluginManifest manifest, Type entryType)
+    private static bool TryReadOptionalConfiguration(string configPath)
     {
-        IPclPlugin instance;
         try
         {
-            instance = (IPclPlugin)Activator.CreateInstance(entryType)!;
+            using var document = JsonDocument.Parse(File.ReadAllText(configPath), JsonDocumentOptions);
+            return document.RootElement.TryGetProperty("required", out var required) &&
+                   required.ValueKind == JsonValueKind.False;
         }
-        catch (Exception ex)
+        catch
         {
-            _DisablePluginForSelfProtection(manifest.Id, "实例化插件入口失败", ex);
-            _context?.Error($"实例化插件入口失败: {manifest.Id}", ex, ActionLevel.NormalLog);
             return false;
         }
-
-        return _LoadPluginInstance(assemblyPath, entryType.Assembly, manifest, instance);
     }
 
-    private static void _LoadJavaScriptPlugin(PluginPackageManifest packageManifest, string pluginDir)
+    private static bool TryGetLegacyPluginReason(string json, out string reason)
     {
-        var manifest = _ToRuntimeManifest(packageManifest);
-        if (!_IsRuntimeManifestCompatible(manifest, "JavaScript 插件")) return;
-
-        var entryPath = Path.Combine(pluginDir, packageManifest.EntryScript.Replace('/', Path.DirectorySeparatorChar));
-        if (!File.Exists(entryPath))
+        using var document = JsonDocument.Parse(json, JsonDocumentOptions);
+        var root = document.RootElement;
+        if (root.TryGetProperty("runtime", out var runtime) &&
+            runtime.ValueKind == JsonValueKind.String &&
+            runtime.GetString()?.Contains("javascript", StringComparison.OrdinalIgnoreCase) == true)
         {
-            _context?.Warn($"JavaScript 插件入口脚本不存在: {entryPath}");
-            _DisablePluginForSelfProtection(packageManifest.Id, $"入口脚本不存在: {entryPath}");
-            return;
+            reason = "JavaScript/Jint 插件运行时已移除";
+            return true;
         }
 
-        var instance = new JavaScriptPlugin(packageManifest, pluginDir);
-        _LoadPluginInstance(entryPath, typeof(JavaScriptPlugin).Assembly, manifest, instance);
-    }
-
-    private static bool _LoadPluginInstance(string entryPath, Assembly assembly, PluginManifest manifest, IPclPlugin instance)
-    {
-        lock (_Lock)
+        foreach (var propertyName in new[] { "entryType", "loadMethod", "unloadMethod", "entryScript" })
         {
-            if (_Records.Any(r => r.Id == manifest.Id))
-            {
-                _context?.Warn($"插件 {manifest.Id} 已加载，跳过重复条目");
-                return false;
-            }
+            if (!root.TryGetProperty(propertyName, out _)) continue;
+            reason = $"旧插件入口字段 {propertyName} 已移除；插件必须声明 Mixin 配置";
+            return true;
         }
 
-        var dataDir = Path.Combine(Paths.Data, "PluginData", _SafeFolderName(manifest.Id));
-        try { Directory.CreateDirectory(dataDir); }
-        catch (Exception ex) { _context?.Warn($"创建插件数据目录失败: {dataDir}", ex); }
-
-        var record = new PluginRecord
-        {
-            Manifest = manifest,
-            Instance = instance,
-            Assembly = assembly,
-            AssemblyPath = entryPath,
-            DataDirectory = dataDir,
-            State = PluginState.Created
-        };
-
-        var host = new PluginHostImpl(record);
-        var ctx = new PluginContextImpl(record, dataDir, host);
-
-        try
-        {
-            _context?.Info($"正在加载插件: {manifest.Id}");
-            var loadTask = instance.LoadAsync(ctx, CancellationToken.None);
-            if (!loadTask.Wait(TimeSpan.FromSeconds(30)))
-                throw new TimeoutException($"插件 {manifest.Id} 加载超过 30 秒，已中止等待。");
-            record.State = PluginState.Running;
-            _context?.Info($"插件已加载: {manifest.Id} v{manifest.Version}");
-        }
-        catch (Exception ex)
-        {
-            record.LastException = ex;
-            record.State = PluginState.Disabled;
-            _DisablePluginForSelfProtection(manifest.Id, "插件加载失败", ex);
-            _context?.Error($"插件加载失败: {manifest.Id}", ex, ActionLevel.NormalLog);
-        }
-
-        lock (_Lock) { _Records.Add(record); }
-        return record.State == PluginState.Running;
-    }
-
-    private static PluginManifest _ToRuntimeManifest(PluginPackageManifest packageManifest)
-    {
-        return new PluginManifest
-        {
-            Id = packageManifest.Id,
-            Name = packageManifest.Name,
-            Version = packageManifest.Version,
-            Author = packageManifest.Author,
-            Description = packageManifest.Description ?? string.Empty,
-            HomePageUrl = packageManifest.HomepageUrl,
-            MinApiVersion = packageManifest.MinApiVersion,
-            MaxApiVersion = packageManifest.MaxApiVersion,
-            MinHostVersion = packageManifest.MinHostVersion,
-            MaxHostVersion = packageManifest.MaxHostVersion,
-            EntryPointTypeName = packageManifest.EntryScript,
-            Capabilities = _CombineCapabilities(packageManifest.Capabilities),
-            LoadTiming = PluginLoadTiming.WindowCreated
-        };
-    }
-
-    private static bool _IsPackageCompatible(PluginPackageManifest manifest)
-    {
-        var result = PluginPackageService.ValidateRuntimeCompatibility(manifest);
-        if (result.IsValid) return true;
-
-        _context?.Warn($"插件 {manifest.Id} 运行兼容性检查失败：{result.ErrorMessage}，已跳过", actionLevel: ActionLevel.NormalLog);
+        reason = string.Empty;
         return false;
     }
 
-    private static bool _IsRuntimeManifestCompatible(PluginManifest manifest, string label = "插件")
+    internal static string ResolvePackagePath(string pluginDirectory, string relativePath)
     {
-        if (PluginCompatibility.TryGetApiCompatibilityError(manifest.MinApiVersion, manifest.MaxApiVersion, out var apiError))
+        ArgumentException.ThrowIfNullOrWhiteSpace(pluginDirectory);
+        ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
+        var root = Path.GetFullPath(pluginDirectory).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var fullPath = Path.GetFullPath(Path.Combine(
+            pluginDirectory,
+            relativePath.Replace('/', Path.DirectorySeparatorChar)));
+        if (!fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"插件文件不能位于插件目录之外：{relativePath}");
+        return fullPath;
+    }
+
+    private static bool ContainsRecord(string pluginId)
+    {
+        lock (SyncRoot)
+            return Records.Any(record => string.Equals(record.Id, pluginId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static IReadOnlyList<Assembly> GetSharedDependencyAssemblies(PluginPackageManifest manifest)
+    {
+        lock (SyncRoot)
         {
-            _DisablePluginForSelfProtection(manifest.Id, apiError);
-            _context?.Warn($"{label} {manifest.Id} {apiError} 已跳过", actionLevel: ActionLevel.NormalLog);
+            var records = Records
+                .Where(record => record.State == PluginState.Running && record.Assembly is not null)
+                .ToDictionary(record => record.Id, StringComparer.OrdinalIgnoreCase);
+            var result = new List<Assembly>();
+            var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            void AddDependencies(PluginPackageManifest current)
+            {
+                foreach (var dependency in current.Dependencies ?? [])
+                {
+                    if (!visited.Add(dependency.Id) || !records.TryGetValue(dependency.Id, out var record)) continue;
+                    result.Add(record.Assembly!);
+                    AddDependencies(record.Manifest);
+                }
+            }
+
+            AddDependencies(manifest);
+            return result;
+        }
+    }
+
+    internal static bool ShouldSkipThirdPartyMixins(PluginPackageManifest manifest)
+    {
+        ArgumentNullException.ThrowIfNull(manifest);
+        return SafeMode;
+    }
+
+    internal static async Task<bool> IsPackageCompatibleAsync(
+        PluginPackageManifest manifest,
+        CancellationToken cancellationToken)
+    {
+        var result = PluginPackageService.ValidatePackageManifest(manifest);
+        if (!result.IsValid)
+        {
+            _context?.Warn(
+                $"插件 {manifest.Id} Core 兼容性检查失败：{result.ErrorMessage}，已跳过",
+                actionLevel: ActionLevel.NormalLog);
             return false;
         }
 
-        if (PluginCompatibility.TryGetHostCompatibilityError(manifest.MinHostVersion, manifest.MaxHostVersion, PluginCompatibility.CurrentHostVersion, out var hostError))
-        {
-            _DisablePluginForSelfProtection(manifest.Id, hostError);
-            _context?.Warn($"{label} {manifest.Id} {hostError} 已跳过", actionLevel: ActionLevel.NormalLog);
-            return false;
-        }
+        if (result.CompatibilityStatus == PluginCoreCompatibilityStatus.Compatible) return true;
 
-        return true;
+        var confirmed = await PluginCompatibility.ConfirmIfRequiredAsync(
+            manifest,
+            PluginCompatibilityAction.Enable,
+            cancellationToken).ConfigureAwait(false);
+        if (confirmed) return true;
+
+        _context?.Warn(
+            $"插件 {manifest.Id} Core 兼容性需要用户确认但未获允许：{result.ErrorMessage}，已跳过",
+            actionLevel: ActionLevel.NormalLog);
+        return false;
     }
 
-    private static void _BeginSelfProtectionPass()
+    private static void WarnAboutUnsupportedFlatPlugins()
     {
-        lock (_SelfProtectionLock)
-        {
-            _SelfProtectionDisabledPluginIds.Clear();
-            _selfProtectionRestartRequired = false;
-        }
+        if (string.IsNullOrWhiteSpace(Paths.Plugins) || !Directory.Exists(Paths.Plugins)) return;
+        foreach (var assemblyPath in Directory.GetFiles(Paths.Plugins, "*.dll", SearchOption.TopDirectoryOnly))
+            _context?.Warn(
+                $"旧平铺 DLL 插件不再受支持，已跳过：{Path.GetFileName(assemblyPath)}。请改用包含 Mixin 配置的 PCLX 包。",
+                actionLevel: ActionLevel.NormalLog);
     }
 
-    private static void _DisablePluginForSelfProtection(string? pluginId, string reason, Exception? ex = null)
+    private static readonly JsonDocumentOptions JsonDocumentOptions = new()
     {
-        if (string.IsNullOrWhiteSpace(pluginId)) return;
+        AllowTrailingCommas = true,
+        CommentHandling = JsonCommentHandling.Skip
+    };
 
-        lock (_SelfProtectionLock)
-        {
-            if (!_SelfProtectionDisabledPluginIds.Add(pluginId)) return;
-        }
-
-        try
-        {
-            PluginEnablementService.MarkSelfProtectionDisabled(pluginId);
-            PluginEnablementService.SetEnabled(pluginId, false);
-            lock (_SelfProtectionLock)
-            {
-                _selfProtectionRestartRequired = true;
-            }
-            _context?.Warn($"插件自保机制已禁用 {pluginId}：{reason}", ex, ActionLevel.NormalLog);
-        }
-        catch (Exception disableEx)
-        {
-            lock (_SelfProtectionLock)
-            {
-                _SelfProtectionDisabledPluginIds.Remove(pluginId);
-            }
-            _context?.Error($"插件自保机制禁用 {pluginId} 失败", disableEx, ActionLevel.NormalLog);
-        }
-    }
-
-    private static void _RestartIfSelfProtectionTriggered()
+    private static readonly JsonSerializerOptions MixinJsonOptions = new(JsonSerializerDefaults.Web)
     {
-        string[] disabledIds;
-        lock (_SelfProtectionLock)
-        {
-            if (!_selfProtectionRestartRequired || _SelfProtectionDisabledPluginIds.Count == 0) return;
-            disabledIds = _SelfProtectionDisabledPluginIds.OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToArray();
-            _selfProtectionRestartRequired = false;
-        }
-
-        _context?.Warn("插件自保机制已禁用异常插件，将自动重启启动器以恢复正常运行：" + string.Join(", ", disabledIds), actionLevel: ActionLevel.NormalLog);
-        try
-        {
-            _context?.RequestRestartOnExit();
-            Lifecycle.ForceShutdown();
-        }
-        catch (Exception ex)
-        {
-            _context?.Error("插件自保机制请求重启失败", ex);
-        }
-    }
-
-    private static PluginCapabilities _CombineCapabilities(IEnumerable<PluginCapabilities>? capabilities)
-    {
-        var result = PluginCapabilities.None;
-        if (capabilities is null) return result;
-        foreach (var capability in capabilities) result |= capability;
-        return result;
-    }
-
-    private static string _SafeFolderName(string id)
-    {
-        var invalid = Path.GetInvalidFileNameChars();
-        var sb = new System.Text.StringBuilder(id.Length);
-        foreach (var c in id) sb.Append(invalid.Contains(c) ? '_' : c);
-        return sb.ToString();
-    }
+        PropertyNameCaseInsensitive = true,
+        ReadCommentHandling = JsonCommentHandling.Skip,
+        AllowTrailingCommas = true
+    };
 }
 
-/// <summary>
-/// 可收集的插件程序集加载上下文。<br/>
-/// 卸载时调用 <see cref="Unload"/> 可释放程序集占用的内存与文件锁。
-/// </summary>
-internal sealed class CollectiblePluginLoadContext(string mainAssemblyPath) : AssemblyLoadContext(isCollectible: true)
+/// <summary>插件程序集隔离上下文；PCL.Core/PCL.Mixin 类型始终由默认上下文共享。</summary>
+internal sealed class CollectiblePluginLoadContext : AssemblyLoadContext
 {
-    private readonly AssemblyDependencyResolver _resolver = new(mainAssemblyPath);
+    private readonly AssemblyDependencyResolver _resolver;
+    private readonly IReadOnlyDictionary<string, Assembly> _sharedDependencyAssemblies;
+
+    public CollectiblePluginLoadContext(
+        string mainAssemblyPath,
+        IEnumerable<Assembly>? sharedDependencyAssemblies = null) : base(isCollectible: true)
+    {
+        _resolver = new AssemblyDependencyResolver(mainAssemblyPath);
+        _sharedDependencyAssemblies = (sharedDependencyAssemblies ?? [])
+            .Where(assembly => !assembly.IsDynamic && !string.IsNullOrWhiteSpace(assembly.GetName().Name))
+            .GroupBy(assembly => assembly.GetName().Name!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+    }
 
     protected override Assembly? Load(AssemblyName assemblyName)
     {
-        // 将共享契约与 BCL 委托给默认上下文，使插件与宿主持有同一份类型。
-        if (assemblyName.Name == "PCL.Plugin.Abstractions") return null;
-        if (assemblyName.Name?.StartsWith("PCL.Core", StringComparison.Ordinal) == true) return null;
-        if (assemblyName.Name?.StartsWith("System.", StringComparison.Ordinal) == true) return null;
-        if (assemblyName.Name?.StartsWith("Microsoft.", StringComparison.Ordinal) == true) return null;
+        var shared = AssemblyLoadContext.Default.Assemblies.FirstOrDefault(assembly =>
+            !assembly.IsDynamic &&
+            string.Equals(assembly.GetName().Name, assemblyName.Name, StringComparison.OrdinalIgnoreCase));
+        if (shared is not null) return shared;
 
-        var path = _resolver.ResolveAssemblyToPath(assemblyName);
-        return path is not null ? LoadFromAssemblyPath(path) : null;
+        if (assemblyName.Name is not null
+            && _sharedDependencyAssemblies.TryGetValue(assemblyName.Name, out var dependencyAssembly))
+            return dependencyAssembly;
+
+        if (assemblyName.Name?.StartsWith("System.", StringComparison.Ordinal) == true ||
+            assemblyName.Name?.StartsWith("Microsoft.", StringComparison.Ordinal) == true)
+            return null;
+
+        var resolvedPath = _resolver.ResolveAssemblyToPath(assemblyName);
+        return resolvedPath is null ? null : LoadFromAssemblyPath(resolvedPath);
     }
 
     protected override IntPtr LoadUnmanagedDll(string unmanagedDllName)
     {
         var path = _resolver.ResolveUnmanagedDllToPath(unmanagedDllName);
-        return path is not null ? LoadUnmanagedDllFromPath(path) : IntPtr.Zero;
+        return path is null ? IntPtr.Zero : LoadUnmanagedDllFromPath(path);
     }
 }

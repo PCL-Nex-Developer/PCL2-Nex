@@ -1,101 +1,87 @@
 using System;
-using PCL.Core.Utils;
-using PCL.Plugin.Abstractions;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace PCL.Core.App.Plugins;
 
-internal static class PluginCompatibility
+public enum PluginCoreCompatibilityStatus
 {
-    public static string? CurrentHostVersion
-    {
-        get
-        {
-            var bridgeVersion = PluginHostBridge.Current?.HostVersion;
-            if (!string.IsNullOrWhiteSpace(bridgeVersion)) return bridgeVersion;
+    Compatible,
+    TooOld,
+    Future,
+    Unknown
+}
 
-            try { return Basics.VersionName; }
-            catch { return null; }
-        }
+public enum PluginCompatibilityAction
+{
+    Install,
+    Enable
+}
+
+public sealed record PluginCompatibilityConfirmationContext(
+    PluginCompatibilityAction Action,
+    string PluginId,
+    string PluginName,
+    string? PclCoreVersion,
+    PluginCoreCompatibilityStatus Status);
+
+public static class PluginCompatibility
+{
+    public const string MinimumSupportedPclCoreVersion = "2026.07.1";
+
+    public static string CurrentPclCoreVersion => Basics.VersionName;
+
+    /// <summary>
+    /// Launcher UI hook for Future and Unknown compatibility confirmations.
+    /// </summary>
+    public static Func<PluginCompatibilityConfirmationContext, CancellationToken, Task<bool>>? ConfirmationAsync { get; set; }
+
+    public static PluginCoreCompatibilityStatus EvaluatePclCoreVersion(
+        string? pclCoreVersion,
+        string? currentPclCoreVersion = null,
+        string? minimumSupportedPclCoreVersion = null)
+    {
+        if (!LauncherBaseVersion.TryParse(pclCoreVersion, out var pluginVersion))
+            return PluginCoreCompatibilityStatus.Unknown;
+        if (!LauncherBaseVersion.TryParse(minimumSupportedPclCoreVersion ?? MinimumSupportedPclCoreVersion, out var minimumVersion))
+            return PluginCoreCompatibilityStatus.Unknown;
+        if (!LauncherBaseVersion.TryParse(currentPclCoreVersion ?? CurrentPclCoreVersion, out var currentVersion))
+            return PluginCoreCompatibilityStatus.Unknown;
+
+        if (pluginVersion < minimumVersion) return PluginCoreCompatibilityStatus.TooOld;
+        if (pluginVersion > currentVersion) return PluginCoreCompatibilityStatus.Future;
+        return PluginCoreCompatibilityStatus.Compatible;
     }
 
-    public static bool TryGetApiCompatibilityError(Version? minApiVersion, Version? maxApiVersion, out string errorMessage)
+    public static async Task<bool> ConfirmIfRequiredAsync(
+        PluginPackageManifest manifest,
+        PluginCompatibilityAction action,
+        CancellationToken ct = default)
     {
-        errorMessage = string.Empty;
-        if (!ApiVersions.IsCompatible(ApiVersions.Current, minApiVersion, maxApiVersion))
-        {
-            errorMessage = $"API 版本不兼容：插件支持 {FormatApiRange(minApiVersion, maxApiVersion)}，宿主提供 {ApiVersions.Current}。";
-            return true;
-        }
+        var status = EvaluatePclCoreVersion(manifest.PclCoreVersion);
+        if (status == PluginCoreCompatibilityStatus.Compatible) return true;
+        if (status == PluginCoreCompatibilityStatus.TooOld) return false;
 
-        return false;
+        var handler = ConfirmationAsync;
+        if (handler is null) return false;
+        return await handler(
+            new PluginCompatibilityConfirmationContext(action, manifest.Id, manifest.Name, manifest.PclCoreVersion, status),
+            ct).ConfigureAwait(false);
     }
 
-    public static bool TryGetHostCompatibilityError(
-        string? minHostVersion,
-        string? maxHostVersion,
-        string? currentHostVersion,
-        out string errorMessage)
+    public static string GetDisplayText(PluginCoreCompatibilityStatus status) => status switch
     {
-        errorMessage = string.Empty;
+        PluginCoreCompatibilityStatus.Compatible => "兼容",
+        PluginCoreCompatibilityStatus.TooOld => "Core 版本过旧",
+        PluginCoreCompatibilityStatus.Future => "插件使用未来 Core 版本",
+        _ => "未知"
+    };
 
-        var hasMin = !string.IsNullOrWhiteSpace(minHostVersion);
-        var hasMax = !string.IsNullOrWhiteSpace(maxHostVersion);
-        if (!hasMin && !hasMax) return false;
-
-        if (!TryParseOptionalSemVer(minHostVersion, nameof(PluginPackageManifest.MinHostVersion), out var minVersion, out errorMessage))
-            return true;
-
-        if (!TryParseOptionalSemVer(maxHostVersion, nameof(PluginPackageManifest.MaxHostVersion), out var maxVersion, out errorMessage))
-            return true;
-
-        if (string.IsNullOrWhiteSpace(currentHostVersion) || !SemVer.TryParse(currentHostVersion, out var hostVersion))
-        {
-            errorMessage = "无法获取当前启动器版本，不能确认插件运行兼容性。";
-            return true;
-        }
-
-        if (minVersion is not null && hostVersion < minVersion)
-        {
-            errorMessage = $"启动器版本不兼容：插件要求 {FormatHostRange(minHostVersion, maxHostVersion)}，当前版本 {hostVersion}。";
-            return true;
-        }
-
-        if (maxVersion is not null && hostVersion > maxVersion)
-        {
-            errorMessage = $"启动器版本不兼容：插件支持 {FormatHostRange(minHostVersion, maxHostVersion)}，当前版本 {hostVersion}。";
-            return true;
-        }
-
-        return false;
-    }
-
-    private static bool TryParseOptionalSemVer(string? value, string fieldName, out SemVer? version, out string errorMessage)
+    public static string GetBlockingMessage(PluginCoreCompatibilityStatus status, string? pclCoreVersion) => status switch
     {
-        version = null;
-        errorMessage = string.Empty;
-        if (string.IsNullOrWhiteSpace(value)) return true;
-
-        if (SemVer.TryParse(value.Trim(), out version)) return true;
-
-        errorMessage = $"{fieldName} 不是有效的 SemVer 版本号：{value}。";
-        return false;
-    }
-
-    private static string FormatApiRange(Version? minApiVersion, Version? maxApiVersion)
-    {
-        if (minApiVersion is not null && maxApiVersion is not null) return $"{minApiVersion} - {maxApiVersion}";
-        if (minApiVersion is not null) return $">= {minApiVersion}";
-        if (maxApiVersion is not null) return $"<= {maxApiVersion}";
-        return "任意版本";
-    }
-
-    private static string FormatHostRange(string? minHostVersion, string? maxHostVersion)
-    {
-        var hasMin = !string.IsNullOrWhiteSpace(minHostVersion);
-        var hasMax = !string.IsNullOrWhiteSpace(maxHostVersion);
-        if (hasMin && hasMax) return $"{minHostVersion!.Trim()} - {maxHostVersion!.Trim()}";
-        if (hasMin) return $">= {minHostVersion!.Trim()}";
-        if (hasMax) return $"<= {maxHostVersion!.Trim()}";
-        return "任意版本";
-    }
+        PluginCoreCompatibilityStatus.TooOld => $"插件引用的 PCL.Core 版本 {pclCoreVersion ?? "未知"} 已低于当前启动器支持范围。",
+        PluginCoreCompatibilityStatus.Future => "该插件使用了比当前启动器更新的 PCL.Core 版本，可能无法正常使用或导致崩溃。",
+        PluginCoreCompatibilityStatus.Unknown => "插件的 pclCoreVersion 缺失或格式错误，无法确认兼容性。",
+        _ => string.Empty
+    };
 }

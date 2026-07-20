@@ -5,7 +5,6 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using PCL.Plugin.Abstractions;
 
 namespace PCL.Core.App.Plugins;
 
@@ -16,6 +15,7 @@ namespace PCL.Core.App.Plugins;
 public static class PluginInstallService
 {
     private static readonly object _lock = new();
+    private static readonly SemaphoreSlim _installLock = new(1, 1);
 
     /// <summary>
     /// 获取所有已安装插件的记录。
@@ -47,28 +47,71 @@ public static class PluginInstallService
         PluginPackageManifest manifest,
         PluginInstallSourceType sourceType,
         string sourceUrl,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? installedSha256 = null)
     {
-        var pluginId = manifest.Id;
-        var installDir = Path.Combine(PCL.Core.App.Paths.PluginInstalled, _SafeFolderName(pluginId));
-        var tempDir = Path.Combine(PCL.Core.App.Paths.PluginTemp, _SafeFolderName(pluginId) + "_" + Guid.NewGuid().ToString("N")[..8]);
+        ArgumentNullException.ThrowIfNull(manifest);
+        var validation = PluginPackageService.ValidatePackageManifest(manifest);
+        if (!validation.IsValid)
+            throw new InvalidDataException(validation.ErrorMessage ?? "插件清单校验失败。");
 
+        var compatibility = validation.CompatibilityStatus;
+        if (compatibility == PluginCoreCompatibilityStatus.TooOld)
+            throw new InvalidDataException(PluginCompatibility.GetBlockingMessage(compatibility, manifest.PclCoreVersion));
+        if (compatibility is PluginCoreCompatibilityStatus.Future or PluginCoreCompatibilityStatus.Unknown
+            && !await PluginCompatibility.ConfirmIfRequiredAsync(manifest, PluginCompatibilityAction.Install, ct).ConfigureAwait(false))
+            throw new OperationCanceledException("用户取消了插件兼容性确认。", ct);
+
+        var dependencyCheck = PluginDependencyService.CheckInstalledDependencies(manifest);
+        if (!dependencyCheck.IsValid)
+            throw new InvalidDataException(dependencyCheck.ErrorMessage ?? "插件前置依赖检查失败。");
+
+        var pluginId = manifest.Id;
+        var safePluginId = _SafeFolderName(pluginId);
+        var installDir = Path.Combine(PCL.Core.App.Paths.PluginInstalled, safePluginId);
+        var operationId = Guid.NewGuid().ToString("N")[..8];
+        var tempDir = Path.Combine(PCL.Core.App.Paths.PluginTemp, safePluginId + "_" + operationId);
+        var stagingDir = Path.Combine(PCL.Core.App.Paths.PluginInstalled, "." + safePluginId + ".staging-" + operationId);
+        var backupDir = Path.Combine(PCL.Core.App.Paths.PluginInstalled, "." + safePluginId + ".backup-" + operationId);
+        var recordPath = _RecordPath(pluginId);
+        string? originalRecordJson = null;
+        List<string>? originalEnabledStates = null;
+        List<string>? originalManifestSubscriptions = null;
+        var swapStarted = false;
+        var backupCreated = false;
+
+        await _installLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            if (File.Exists(recordPath)) originalRecordJson = File.ReadAllText(recordPath);
+            try { originalEnabledStates = Config.Plugin.EnabledStates?.ToList(); }
+            catch { }
+            try { originalManifestSubscriptions = Config.Plugin.ManifestSubscriptions?.ToList(); }
+            catch { }
+
             await Task.Run(() => _CopyDirectory(sourceDirectory, tempDir), ct).ConfigureAwait(false);
 
-            var entryPath = manifest.IsJavaScriptPlugin()
-                ? manifest.EntryScript
-                : manifest.EntryAssembly;
-            var entryFullPath = Path.Combine(tempDir, entryPath.Replace('/', Path.DirectorySeparatorChar));
+            var entryPath = manifest.EntryAssembly;
+            var entryFullPath = PluginLoaderService.ResolvePackagePath(tempDir, entryPath);
             if (!File.Exists(entryFullPath))
                 throw new FileNotFoundException($"插件入口文件不存在: {entryPath}");
-
-            if (Directory.Exists(installDir))
-                Directory.Delete(installDir, recursive: true);
+            foreach (var mixinConfig in manifest.GetMixinConfigurationPaths())
+            {
+                var configFullPath = PluginLoaderService.ResolvePackagePath(tempDir, mixinConfig);
+                if (!File.Exists(configFullPath))
+                    throw new FileNotFoundException($"Mixin 配置文件不存在: {mixinConfig}");
+            }
 
             Directory.CreateDirectory(Path.GetDirectoryName(installDir)!);
-            _CopyDirectory(tempDir, installDir);
+            _CopyDirectory(tempDir, stagingDir);
+
+            swapStarted = true;
+            if (Directory.Exists(installDir))
+            {
+                Directory.Move(installDir, backupDir);
+                backupCreated = true;
+            }
+            Directory.Move(stagingDir, installDir);
 
             var record = new PluginInstallRecord
             {
@@ -76,19 +119,66 @@ public static class PluginInstallService
                 InstalledVersion = manifest.Version,
                 InstalledFrom = sourceUrl,
                 SourceType = sourceType,
-                CapabilitiesSnapshot = manifest.Capabilities,
+                InstalledSha256 = string.IsNullOrWhiteSpace(installedSha256) ? null : installedSha256.Trim(),
                 TrustedAt = DateTime.UtcNow,
                 LastUpdatedAt = DateTime.UtcNow,
                 Enabled = true
             };
             _SaveRecord(record);
+            if (sourceType == PluginInstallSourceType.Manifest && !string.IsNullOrWhiteSpace(sourceUrl))
+                AddManifestSubscription(sourceUrl);
             PluginEnablementService.SetEnabled(pluginId, true);
+
+            if (backupCreated && Directory.Exists(backupDir)) Directory.Delete(backupDir, recursive: true);
+        }
+        catch
+        {
+            if (swapStarted)
+            {
+                try
+                {
+                    if (Directory.Exists(installDir)) Directory.Delete(installDir, recursive: true);
+                    if (backupCreated && Directory.Exists(backupDir)) Directory.Move(backupDir, installDir);
+                }
+                catch { }
+
+                try
+                {
+                    if (originalRecordJson is null)
+                    {
+                        if (File.Exists(recordPath)) File.Delete(recordPath);
+                    }
+                    else
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(recordPath)!);
+                        File.WriteAllText(recordPath, originalRecordJson);
+                    }
+                    if (originalEnabledStates is not null) Config.Plugin.EnabledStates = originalEnabledStates;
+                    if (originalManifestSubscriptions is not null)
+                        Config.Plugin.ManifestSubscriptions = originalManifestSubscriptions;
+                }
+                catch { }
+            }
+            throw;
         }
         finally
         {
             try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, recursive: true); }
             catch { }
+            try { if (Directory.Exists(stagingDir)) Directory.Delete(stagingDir, recursive: true); }
+            catch { }
+            _installLock.Release();
         }
+    }
+
+    public static void AddManifestSubscription(string manifestUrl)
+    {
+        if (string.IsNullOrWhiteSpace(manifestUrl)) return;
+        var value = manifestUrl.Trim();
+        var subscriptions = Config.Plugin.ManifestSubscriptions?.ToList() ?? [];
+        if (subscriptions.Contains(value, StringComparer.OrdinalIgnoreCase)) return;
+        subscriptions.Add(value);
+        Config.Plugin.ManifestSubscriptions = subscriptions;
     }
 
     /// <summary>
@@ -98,13 +188,15 @@ public static class PluginInstallService
     {
         lock (_lock)
         {
+            if (!PluginPackageService.IsValidPluginId(pluginId))
+                throw new ArgumentException("插件 Id 无效。", nameof(pluginId));
+
             // 删除安装目录
             var installDir = Path.Combine(PCL.Core.App.Paths.PluginInstalled, _SafeFolderName(pluginId));
             if (Directory.Exists(installDir))
-            {
-                try { Directory.Delete(installDir, recursive: true); }
-                catch { /* 删除失败不阻断记录清理 */ }
-            }
+                // The install record must remain intact when the executable/plugin directory is
+                // locked. This leaves a disabled, retryable installation instead of an orphan.
+                Directory.Delete(installDir, recursive: true);
 
             // 删除数据目录
             var dataDir = Path.Combine(PCL.Core.App.Paths.Plugins, "data", _SafeFolderName(pluginId));
@@ -125,6 +217,16 @@ public static class PluginInstallService
     /// </summary>
     public static void SetEnabled(string pluginId, bool enabled)
     {
+        if (!PluginPackageService.IsValidPluginId(pluginId))
+            throw new ArgumentException("插件 Id 无效。", nameof(pluginId));
+        if (enabled)
+            throw new InvalidOperationException("启用插件必须通过 SetEnabledAsync 执行 Core 兼容性确认。");
+
+        SetEnabledState(pluginId, false);
+    }
+
+    private static void SetEnabledState(string pluginId, bool enabled)
+    {
         lock (_lock)
         {
             var record = _LoadInstalledRecords().FirstOrDefault(r => r.PluginId == pluginId);
@@ -137,6 +239,30 @@ public static class PluginInstallService
 
             PluginEnablementService.SetEnabled(pluginId, enabled);
         }
+    }
+
+    public static async Task<bool> SetEnabledAsync(string pluginId, bool enabled, CancellationToken ct = default)
+    {
+        if (enabled)
+        {
+            var pluginRoot = Path.Combine(PCL.Core.App.Paths.PluginInstalled, _SafeFolderName(pluginId));
+            var manifest = await PluginPackageService.ReadManifestFromDirectoryAsync(pluginRoot, ct).ConfigureAwait(false);
+            if (manifest is null) throw new InvalidDataException("无法读取插件清单。");
+
+            var compatibility = PluginCompatibility.EvaluatePclCoreVersion(manifest.PclCoreVersion);
+            if (compatibility == PluginCoreCompatibilityStatus.TooOld)
+                throw new InvalidDataException(PluginCompatibility.GetBlockingMessage(compatibility, manifest.PclCoreVersion));
+            if (compatibility is PluginCoreCompatibilityStatus.Future or PluginCoreCompatibilityStatus.Unknown
+                && !await PluginCompatibility.ConfirmIfRequiredAsync(manifest, PluginCompatibilityAction.Enable, ct).ConfigureAwait(false))
+                return false;
+
+            var dependencyCheck = PluginDependencyService.CheckInstalledDependencies(manifest);
+            if (!dependencyCheck.IsValid)
+                throw new InvalidOperationException(dependencyCheck.ErrorMessage ?? "插件前置依赖检查失败。");
+        }
+
+        SetEnabledState(pluginId, enabled);
+        return true;
     }
 
     /// <summary>
@@ -254,10 +380,9 @@ public static class PluginInstallService
 
     private static string _SafeFolderName(string id)
     {
-        var invalid = Path.GetInvalidFileNameChars();
-        var sb = new System.Text.StringBuilder(id.Length);
-        foreach (var c in id) sb.Append(invalid.Contains(c) ? '_' : c);
-        return sb.ToString();
+        if (!PluginPackageService.IsValidPluginId(id))
+            throw new ArgumentException("插件 Id 无效。", nameof(id));
+        return id;
     }
 
     private static void _CopyDirectory(string sourceDirectory, string targetDirectory)

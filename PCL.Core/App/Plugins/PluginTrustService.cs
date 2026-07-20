@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
-using PCL.Plugin.Abstractions;
 
 namespace PCL.Core.App.Plugins;
 
@@ -22,7 +21,7 @@ public static class PluginTrustService
     public static bool IsRepositoryTrusted(string repoUrl)
     {
         var records = _LoadRecords();
-        return records.Any(r => r.RepoUrl == repoUrl && r.Enabled);
+        return records.Any(r => string.Equals(r.RepoUrl, repoUrl, StringComparison.OrdinalIgnoreCase) && r.Enabled);
     }
 
     /// <summary>
@@ -30,7 +29,17 @@ public static class PluginTrustService
     /// </summary>
     public static bool IsOfficialRepository(string repoUrl)
     {
-        return repoUrl == PluginRepositoryService.GetOfficialIndexUrl();
+        return string.Equals(repoUrl, PluginRepositoryService.GetOfficialIndexUrl(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>返回需要建立信任的实际市场来源，而不是插件自身的代码仓库。</summary>
+    public static string GetRepositoryTrustUrl(PluginRepositoryEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        if (entry.SourceKind is "Json" or "Manifest"
+            && !string.IsNullOrWhiteSpace(entry.ManifestUrl))
+            return entry.ManifestUrl.Trim();
+        return (entry.SourceRepoUrl ?? entry.ManifestUrl ?? string.Empty).Trim();
     }
 
     /// <summary>
@@ -41,13 +50,22 @@ public static class PluginTrustService
     /// <returns>信任决策。</returns>
     public static PluginTrustDecision EvaluateInstall(PluginRepositoryEntry entry, PluginInstallSourceType sourceType)
     {
+        if (entry.SourceIsOfficial) return PluginTrustDecision.Allow;
+
         // Git 远程安装始终需要高风险确认
         if (sourceType is PluginInstallSourceType.Git)
             return PluginTrustDecision.RequireReconfirm;
 
-        var repoUrl = entry.SourceRepoUrl ?? string.Empty;
+        var repoUrl = GetRepositoryTrustUrl(entry);
 
-        // 官方源：允许（仍展示来源与能力说明，但不阻断）
+        // Topic market entries are discovered through GitHub API and use the repository owner as identity.
+        if (entry.SourceKind is "GitHub" or "Topics"
+            && !string.IsNullOrWhiteSpace(entry.GitHubLogin)
+            && Uri.TryCreate(entry.SourceRepoUrl, UriKind.Absolute, out var repoUri)
+            && string.Equals(repoUri.Host, "github.com", StringComparison.OrdinalIgnoreCase))
+            return PluginTrustDecision.Allow;
+
+        // 官方源：允许（仍展示来源说明，但不阻断）
         if (IsOfficialRepository(repoUrl))
             return PluginTrustDecision.Allow;
 
@@ -81,17 +99,17 @@ public static class PluginTrustService
         if (!string.Equals(installed.InstalledFrom, expectedSourceUrl, StringComparison.OrdinalIgnoreCase))
             return PluginTrustDecision.RequireReconfirm;
 
-        // 能力升级：新版本声明的能力比已安装版本更多
-        if (_HasCapabilityExpansion(installed.CapabilitiesSnapshot, incoming.Capabilities))
-            return PluginTrustDecision.RequireReconfirm;
-
         return PluginTrustDecision.Allow;
     }
 
     /// <summary>
     /// 添加仓库信任记录。
     /// </summary>
-    public static void AddTrust(string repoUrl, string repoName, PluginRepositorySourceType sourceType)
+    public static void AddTrust(
+        string repoUrl,
+        string repoName,
+        PluginRepositorySourceType sourceType,
+        PluginRepositorySourceKind sourceKind = PluginRepositorySourceKind.Json)
     {
         var records = _LoadRecords();
         var existing = records.FirstOrDefault(r => r.RepoUrl == repoUrl);
@@ -99,6 +117,9 @@ public static class PluginTrustService
         {
             existing.Enabled = true;
             existing.TrustedAt = DateTime.UtcNow;
+            existing.RepoName = repoName;
+            existing.SourceType = sourceType;
+            existing.SourceKind = sourceKind;
         }
         else
         {
@@ -108,7 +129,8 @@ public static class PluginTrustService
                 RepoName = repoName,
                 TrustedAt = DateTime.UtcNow,
                 Enabled = true,
-                SourceType = sourceType
+                SourceType = sourceType,
+                SourceKind = sourceKind
             });
         }
         _SaveRecords(records);
@@ -148,16 +170,6 @@ public static class PluginTrustService
     public static IReadOnlyList<PluginRepositoryTrustRecord> GetAllTrustRecords()
     {
         return _LoadRecords().AsReadOnly();
-    }
-
-    /// <summary>
-    /// 检测能力是否扩大。
-    /// </summary>
-    private static bool _HasCapabilityExpansion(PluginCapabilities[] current, PluginCapabilities[] incoming)
-    {
-        var currentSet = new HashSet<PluginCapabilities>(current);
-        var incomingSet = new HashSet<PluginCapabilities>(incoming);
-        return incomingSet.Any(c => c != PluginCapabilities.None && !currentSet.Contains(c));
     }
 
     private static string _TrustFilePath => Path.Combine(PCL.Core.App.Paths.PluginTrust, "repositories.json");
@@ -214,7 +226,7 @@ public enum PluginTrustDecision
     /// <summary>需要建立仓库信任（首次使用第三方仓库）。</summary>
     RequireRepositoryTrust,
 
-    /// <summary>需要二次确认（能力升级、来源变更等高风险变更）。</summary>
+    /// <summary>需要二次确认（来源变更等高风险变更）。</summary>
     RequireReconfirm,
 
     /// <summary>拒绝安装（技术校验失败）。</summary>

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using PCL.Core.App;
 using PCL.Core.IO.Net.Http;
 using PCL.Core.Logging;
+using PCL.Core.Utils;
 
 namespace PCL.Core.App.Plugins;
 
@@ -19,26 +20,24 @@ public sealed class PluginUpdateCandidate
 
     public required PluginMarketVersion ManifestVersion { get; init; }
 
-    public required Version LatestVersion { get; init; }
+    public required string LatestVersion { get; init; }
 }
 
 public static class PluginUpdateService
 {
     public static async Task<IReadOnlyList<PluginRepositoryIndex>> FetchEnabledIndexesAsync(CancellationToken ct = default)
     {
-        var indexes = new List<PluginRepositoryIndex>();
-
-        var officialIndex = await PluginRepositoryService.FetchIndexAsync(PluginRepositoryService.GetOfficialIndexUrl(), ct).ConfigureAwait(false);
-        if (officialIndex is not null) indexes.Add(officialIndex);
-
-        foreach (var repo in PluginTrustService.GetAllTrustRecords().Where(r => r.Enabled))
+        var market = await PluginMarketplaceService.LoadAsync(new PluginMarketQueryOptions
         {
-            if (PluginTrustService.IsOfficialRepository(repo.RepoUrl)) continue;
-            var index = await PluginRepositoryService.FetchIndexAsync(repo.RepoUrl, ct).ConfigureAwait(false);
-            if (index is not null) indexes.Add(index);
-        }
-
-        return indexes;
+            GitHubToken = Config.Plugin.GitHubToken,
+            IncludeArchived = Config.Plugin.ShowArchivedRepositories,
+            IncludeDisabled = Config.Plugin.ShowDisabledRepositories,
+            IncludeForks = Config.Plugin.ShowForkRepositories
+        }, ct: ct).ConfigureAwait(false);
+        return
+        [
+            new PluginRepositoryIndex { Name = "Configured Plugin Marketplace", Plugins = market.Entries.ToList() }
+        ];
     }
 
     public static IReadOnlyList<PluginUpdateCandidate> FindUpdates(
@@ -50,6 +49,7 @@ public static class PluginUpdateService
         foreach (var entry in entries)
         {
             if (!installed.TryGetValue(entry.Id, out var record)) continue;
+            if (!MatchesInstalledSource(record, entry)) continue;
             if (!TryGetDisplayVersion(entry, out var latestVersion)) continue;
             if (CompareVersion(latestVersion, record.InstalledVersion) <= 0) continue;
 
@@ -61,10 +61,12 @@ public static class PluginUpdateService
                 Installed = record,
                 Entry = entry,
                 Source = source,
-                ManifestVersion = new PluginMarketVersion
+                ManifestVersion = entry.SelectedVersion ?? new PluginMarketVersion
                 {
+                    PluginId = entry.Id,
                     Version = entry.Version,
-                    PackageUrl = source.Url
+                    ResolvedPackageUrl = source.Url,
+                    ResolvedSha256 = source.Sha256
                 },
                 LatestVersion = latestVersion
             };
@@ -98,10 +100,9 @@ public static class PluginUpdateService
     }
 
     /// <summary>
-    /// 从市场条目的 manifestUrl 获取实际最新兼容版本号。
-    /// plugins.json 里的 version 字段可能过时，真正的最新版本在每个插件的 manifest.json 中。
+    /// 从 Topic 市场条目或仓库根 manifest.json 获取实际最新版本号。
     /// </summary>
-    public static async Task<Version?> FetchLatestVersionAsync(PluginRepositoryEntry entry, CancellationToken ct = default)
+    public static async Task<string?> FetchLatestVersionAsync(PluginRepositoryEntry entry, CancellationToken ct = default)
     {
         var latest = await FetchLatestManifestVersionAsync(entry, ct).ConfigureAwait(false);
         return latest?.Version;
@@ -111,11 +112,14 @@ public static class PluginUpdateService
     {
         public required PluginMarketVersion ManifestVersion { get; init; }
 
-        public required Version Version { get; init; }
+        public required string Version { get; init; }
     }
 
     public static async Task<PluginLatestManifestVersion?> FetchLatestManifestVersionAsync(PluginRepositoryEntry entry, CancellationToken ct = default)
     {
+        if (entry.SelectedVersion is { } selectedVersion && TryParseVersion(selectedVersion.Version, out _))
+            return new PluginLatestManifestVersion { ManifestVersion = selectedVersion, Version = selectedVersion.Version! };
+
         if (string.IsNullOrWhiteSpace(entry.ManifestUrl)) return null;
         var manifest = await PluginRemoteInstallService.FetchManifestAsync(entry.ManifestUrl, ct).ConfigureAwait(false);
         if (manifest is null)
@@ -126,11 +130,11 @@ public static class PluginUpdateService
         try
         {
             var version = PluginRemoteInstallService.SelectCompatibleManifestVersion(manifest);
-            return TryParseVersion(version.Version, out var parsed)
+            return TryParseVersion(version.Version, out _)
                 ? new PluginLatestManifestVersion
                 {
                     ManifestVersion = version,
-                    Version = parsed
+                    Version = version.Version!
                 }
                 : null;
         }
@@ -152,6 +156,7 @@ public static class PluginUpdateService
         {
             ct.ThrowIfCancellationRequested();
             if (!installed.TryGetValue(entry.Id, out var record)) continue;
+            if (!MatchesInstalledSource(record, entry)) continue;
 
             var latest = await FetchLatestManifestVersionAsync(entry, ct).ConfigureAwait(false);
             if (latest is null) continue;
@@ -187,51 +192,55 @@ public static class PluginUpdateService
         return await FindUpdatesAsync(entries, installed, ct).ConfigureAwait(false);
     }
 
-    public static bool TryGetDisplayVersion(PluginRepositoryEntry entry, out Version version)
+    public static bool TryGetDisplayVersion(PluginRepositoryEntry entry, out string version)
         => TryParseVersion(entry.Version, out version);
 
-    public static bool TryParseVersion(string? value, out Version version)
+    public static bool TryParseVersion(string? value, out string version)
     {
-        version = new Version(0, 0, 0, 0);
+        version = string.Empty;
         if (string.IsNullOrWhiteSpace(value)) return false;
         var text = value.Trim();
-        if (text.StartsWith("v", StringComparison.OrdinalIgnoreCase)) text = text[1..];
-        return Version.TryParse(text, out version!);
+        if (text.StartsWith("v", StringComparison.OrdinalIgnoreCase)) return false;
+        if (!SemVer.TryParse(text, out _)) return false;
+        version = text;
+        return true;
     }
 
-    public static int CompareVersion(Version left, Version right)
+    public static int CompareVersion(string left, string right)
     {
-        var compare = left.Major.CompareTo(right.Major);
-        if (compare != 0) return compare;
-
-        compare = left.Minor.CompareTo(right.Minor);
-        if (compare != 0) return compare;
-
-        compare = NormalizeVersionPart(left.Build).CompareTo(NormalizeVersionPart(right.Build));
-        if (compare != 0) return compare;
-
-        return NormalizeVersionPart(left.Revision).CompareTo(NormalizeVersionPart(right.Revision));
+        if (!SemVer.TryParse(left, out var leftVersion) || !SemVer.TryParse(right, out var rightVersion))
+            throw new ArgumentException("Plugin versions must be valid SemVer values.");
+        return leftVersion!.CompareTo(rightVersion);
     }
 
-    public static string FormatVersion(Version version)
-    {
-        var build = NormalizeVersionPart(version.Build);
-        var revision = NormalizeVersionPart(version.Revision);
-        return revision > 0
-            ? $"{version.Major}.{version.Minor}.{build}.{revision}"
-            : $"{version.Major}.{version.Minor}.{build}";
-    }
-
-    private static int NormalizeVersionPart(int value) => value < 0 ? 0 : value;
+    public static string FormatVersion(string version)
+        => SemVer.TryParse(version, out var parsed) ? parsed!.ToString() : version;
 
     public static PluginTrustDecision EvaluateUpdate(PluginUpdateCandidate candidate)
     {
-        var expectedSourceUrl = candidate.Source.Url;
-        if (string.Equals(candidate.Installed.InstalledFrom, candidate.Entry.SourceRepoUrl, StringComparison.OrdinalIgnoreCase))
-            expectedSourceUrl = candidate.Entry.SourceRepoUrl;
-        else if (!string.Equals(candidate.Installed.InstalledFrom, candidate.Source.Url, StringComparison.OrdinalIgnoreCase))
+        var expectedSourceUrl = candidate.Installed.SourceType switch
+        {
+            PluginInstallSourceType.Git => candidate.Entry.SourceRepoUrl,
+            PluginInstallSourceType.Manifest => candidate.Entry.ManifestUrl,
+            _ => candidate.Source.Url
+        };
+        if (string.IsNullOrWhiteSpace(expectedSourceUrl)
+            || !string.Equals(candidate.Installed.InstalledFrom, expectedSourceUrl, StringComparison.OrdinalIgnoreCase))
             return PluginTrustDecision.RequireReconfirm;
 
         return PluginTrustService.EvaluateUpdate(candidate.Installed, candidate.Entry, expectedSourceUrl);
+    }
+
+    internal static bool MatchesInstalledSource(PluginInstallRecord installed, PluginRepositoryEntry entry)
+    {
+        return installed.SourceType switch
+        {
+            PluginInstallSourceType.Git =>
+                string.Equals(installed.InstalledFrom, entry.SourceRepoUrl, StringComparison.OrdinalIgnoreCase),
+            PluginInstallSourceType.Manifest =>
+                string.Equals(installed.InstalledFrom, entry.ManifestUrl, StringComparison.OrdinalIgnoreCase),
+            PluginInstallSourceType.Local => false,
+            _ => true // 兼容旧 Repository 安装记录。
+        };
     }
 }
