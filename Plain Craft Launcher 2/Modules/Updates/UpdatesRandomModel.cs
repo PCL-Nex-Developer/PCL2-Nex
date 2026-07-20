@@ -1,3 +1,4 @@
+using PCL.Core.App;
 using PCL.Core.Utils;
 
 namespace PCL;
@@ -36,9 +37,9 @@ public class UpdatesRandomModel : IUpdateSource // 社区自己的更新系统�
         return _sources.ElementAt(_randIndex).GetLatestVersion(channel, arch);
     }
 
-    public bool IsLatest(UpdateChannel channel, UpdateArch arch, SemVer currentVersion, int currentVersionCode)
+    public bool IsLatest(UpdateChannel channel, UpdateArch arch, LauncherBaseVersion currentVersion)
     {
-        return _sources.ElementAt(_randIndex).IsLatest(channel, arch, currentVersion, currentVersionCode);
+        return _sources.ElementAt(_randIndex).IsLatest(channel, arch, currentVersion);
     }
 
     public VersionAnnouncementDataModel GetAnnouncementList()

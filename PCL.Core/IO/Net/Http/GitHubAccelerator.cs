@@ -24,33 +24,92 @@ public static class GitHubAccelerator
 
     public static IReadOnlyList<string> Mirrors => MirrorPrefixes;
 
+    public static IReadOnlyList<string> SupportedDomains { get; } =
+    [
+        "github.com",
+        "api.github.com",
+        "raw.githubusercontent.com",
+        "objects.githubusercontent.com",
+        "release-assets.githubusercontent.com",
+        "gist.githubusercontent.com",
+        "avatars.githubusercontent.com"
+    ];
+
     public static string RewriteByConfig(string url)
     {
-        return Rewrite(url, Config.Download.PluginGitMirror);
+        return Rewrite(url, GetConfiguredMirror(), GetConfiguredDomains());
     }
 
     public static string Rewrite(string url, int mirror)
+        => Rewrite(url, mirror, SupportedDomains);
+
+    public static string Rewrite(string url, int mirror, IEnumerable<string>? enabledDomains)
     {
         if (mirror <= 0 || mirror > MirrorPrefixes.Length) return url;
         if (string.IsNullOrWhiteSpace(url)) return url;
 
         var mirrorPrefix = MirrorPrefixes[mirror - 1];
         if (IsAccelerated(url)) return url;
-        if (!ShouldRewrite(url)) return url;
+        if (!ShouldRewrite(url, enabledDomains)) return url;
 
         return mirrorPrefix + url;
     }
 
     public static bool ShouldRewrite(string url)
+        => ShouldRewrite(url, SupportedDomains);
+
+    public static bool ShouldRewrite(string url, IEnumerable<string>? enabledDomains)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return false;
         if (!string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)) return false;
+        var selected = new HashSet<string>(enabledDomains ?? [], StringComparer.OrdinalIgnoreCase);
+        return selected.Contains(uri.Host) && SupportedDomains.Contains(uri.Host, StringComparer.OrdinalIgnoreCase);
+    }
 
-        return uri.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase) ||
-             uri.Host.Equals("api.github.com", StringComparison.OrdinalIgnoreCase) ||
-               uri.Host.Equals("raw.githubusercontent.com", StringComparison.OrdinalIgnoreCase) ||
-               uri.Host.Equals("gist.githubusercontent.com", StringComparison.OrdinalIgnoreCase) ||
-               uri.Host.Equals("avatars.githubusercontent.com", StringComparison.OrdinalIgnoreCase);
+    public static IReadOnlyList<string> GetRequestCandidates(string url, int mirror)
+    {
+        var rewritten = Rewrite(url, mirror);
+        return string.Equals(rewritten, url, StringComparison.OrdinalIgnoreCase)
+            ? [url]
+            : [rewritten, url];
+    }
+
+    public static IReadOnlyList<string> GetRequestCandidatesByConfig(string url, int? mirror = null)
+    {
+        var rewritten = Rewrite(url, mirror ?? GetConfiguredMirror(), GetConfiguredDomains());
+        return string.Equals(rewritten, url, StringComparison.OrdinalIgnoreCase)
+            ? [url]
+            : [rewritten, url];
+    }
+
+    public static IReadOnlyList<string> GetConfiguredDomains()
+    {
+        try
+        {
+            var value = Config.Download.PluginGitAcceleratedDomains ?? string.Empty;
+            return value.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(domain => SupportedDomains.Contains(domain, StringComparer.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+        catch
+        {
+            // 配置系统尚未初始化的测试/早期启动阶段保持原有“全部支持域名”行为。
+            return SupportedDomains;
+        }
+    }
+
+    public static void SetConfiguredDomains(IEnumerable<string> domains)
+    {
+        Config.Download.PluginGitAcceleratedDomains = string.Join('|', domains
+            .Where(domain => SupportedDomains.Contains(domain, StringComparer.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase));
+    }
+
+    private static int GetConfiguredMirror()
+    {
+        try { return Config.Download.PluginGitMirror; }
+        catch { return 0; }
     }
 
     public static bool IsAccelerated(string url)
