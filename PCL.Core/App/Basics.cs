@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text.Json;
 using System.Threading;
@@ -21,23 +22,45 @@ public static class Basics
     /// <summary>
     /// 启动器元数据。
     /// </summary>
-    public static MetadataModel Metadata { get; } = JsonSerializer.Deserialize<MetadataModel>(
-        Assembly.GetEntryAssembly()!.GetManifestResourceStream("PCL.metadata.json")!, JsonCompat.SerializerOptions)!;
+    public static MetadataModel Metadata { get; } = _LoadMetadata();
 
     /// <summary>
     /// 版本名称。
     /// </summary>
-    public static string VersionName => Metadata.Version.BaseName;
+    public static string VersionName => BaseVersion.ToString();
 
     /// <summary>
-    /// 版本内部代号。
+    /// 当前严格解析后的 BaseVersion。
     /// </summary>
-    public static int VersionCode => Metadata.Version.Code;
+    public static LauncherBaseVersion BaseVersion => Metadata.Version.BaseVersion;
 
-    /// <summary>
-    /// 版本分支名。
-    /// </summary>
-    public static string VersionBranch => Metadata.Version.BranchName;
+    private static MetadataModel _LoadMetadata()
+    {
+        var entryAssembly = Assembly.GetEntryAssembly() ?? typeof(Basics).Assembly;
+        var coreAssembly = typeof(Basics).Assembly;
+        var stream = entryAssembly.GetManifestResourceStream("PCL.metadata.json");
+        MetadataModel? metadata = null;
+        if (stream is not null)
+        {
+            using (stream)
+                metadata = JsonSerializer.Deserialize<MetadataModel>(stream, JsonCompat.SerializerOptions);
+        }
+
+        var injectedBaseVersion = entryAssembly.GetCustomAttributes<AssemblyMetadataAttribute>()
+            .FirstOrDefault(attribute => string.Equals(attribute.Key, "BaseVersion", StringComparison.Ordinal))
+            ?.Value
+            ?? coreAssembly.GetCustomAttributes<AssemblyMetadataAttribute>()
+                .FirstOrDefault(attribute => string.Equals(attribute.Key, "BaseVersion", StringComparison.Ordinal))
+                ?.Value;
+
+        var baseVersion = !string.IsNullOrWhiteSpace(injectedBaseVersion)
+            ? LauncherBaseVersion.Parse(injectedBaseVersion)
+            : metadata?.Version.BaseVersion ?? LauncherBaseVersion.Parse("2026.07.1");
+        metadata = metadata is null
+            ? new MetadataModel("Plain Craft Launcher Nex", new LauncherVersionModel(baseVersion), [])
+            : metadata with { Version = new LauncherVersionModel(baseVersion) };
+        return metadata;
+    }
 
     /// <summary>
     /// 当前日期是否为愚人节。

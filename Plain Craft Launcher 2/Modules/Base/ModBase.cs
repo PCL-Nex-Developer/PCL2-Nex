@@ -42,24 +42,8 @@ public static class ModBase
 {
     #region 声明
 
-    // 下列版本信息由更新器自动修改
-    public static readonly string versionBaseName = Basics.VersionName;
-    public static readonly string versionStandardCode = Basics.Metadata.Version.StandardVersion;
-    public static readonly string upstreamVersion = Basics.Metadata.Version.UpstreamVersion;
-    public static readonly string commitHash = Basics.Metadata.Version.Commit;
-    public static readonly string commitHashShort = Basics.Metadata.Version.CommitDigest;
-    public static readonly int versionCode = Basics.VersionCode;
-
-#if DEBUG
-    public const string versionBranchName = "Debug";
-    public const string versionBranchCode = "100";
-#elif DEBUGCI
-    public const string versionBranchName = "CI";
-    public const string versionBranchCode = "50";
-#else
-    public const string versionBranchName = "Publish";
-    public const string versionBranchCode = "0";
-#endif
+    public static readonly string commitHash = EnvironmentInterop.GetSecret("GITHUB_SHA", false) ?? "native";
+    public static readonly string commitHashShort = commitHash.Length > 7 ? commitHash[..7] : commitHash;
     /// <summary>
     ///     主窗口句柄。
     /// </summary>
@@ -117,7 +101,11 @@ public static class ModBase
     ///     AppData 中的 PCLNex 配置文件夹路径，以 \ 结尾。
     /// </summary>
     public static string pathAppdataConfig = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) +
-                                             (versionBranchName == "Debug" ? @"\.PCLNexdebug\" : @"\.PCLNex\");
+#if DEBUG
+                                             @"\.PCLNexdebug\";
+#else
+                                             @"\.PCLNex\";
+#endif
 
 
     #endregion

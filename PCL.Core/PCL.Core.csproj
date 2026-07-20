@@ -7,8 +7,6 @@
         <Company>PCL Nex</Company>
         <Product>PCL.Core</Product>
         <Copyright>Copyright © PCL Nex</Copyright>
-        <AssemblyVersion>1.0.0.0</AssemblyVersion>
-        <FileVersion>1.0.0.0</FileVersion>
     </PropertyGroup>
     <PropertyGroup>
         <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
@@ -76,8 +74,8 @@
         <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.16.0" />
         <!-- 验证 -->
         <PackageReference Include="FluentValidation" Version="12.1.1" />
-        <!-- JavaScript 插件引擎 -->
-        <PackageReference Include="Jint" Version="4.4.0" />
+        <!-- PCL.Mixin 内部 IL Patch 实现；公共 API 不暴露 Harmony 类型。 -->
+        <PackageReference Include="Lib.Harmony" Version="2.4.2" />
     </ItemGroup>
     <!-- 信不过巨硬的智障代码，手动包含需要的文件 -->
     <PropertyGroup>
@@ -99,6 +97,5 @@
     <ItemGroup>
         <AdditionalFiles Include="App\IoC\LifecycleState.cs" />
         <ProjectReference Include="..\PCL.Core.SourceGenerators\PCL.Core.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-        <ProjectReference Include="..\PCL.Plugin.Abstractions\PCL.Plugin.Abstractions.csproj" />
     </ItemGroup>
 </Project>

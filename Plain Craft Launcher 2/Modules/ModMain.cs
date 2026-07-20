@@ -90,6 +90,7 @@ public static class ModMain
     public static PageInstanceSavesInfo? frmInstanceSavesInfo;
     public static PageInstanceSavesDatapack? frmInstanceSavesDatapack;
     public static PageDownloadCompDetail? frmDownloadCompDetail;
+    public static PageDownloadPluginDetail? frmDownloadPluginDetail;
     public static PageHomepageNewsView? frmHomepageNews;
 
     public static MySlider? dragControl = null;
@@ -895,10 +896,7 @@ public static class ModMain
     };
     
     // 基础
-    text = text.Replace("{pcl_version}", replacer(ModBase.versionBaseName));
-    text = text.Replace("{pcl_version_code}", replacer(ModBase.versionCode.ToString()));
-    text = text.Replace("{pcl_version_branch}", replacer(ModBase.versionBranchName));
-    text = text.Replace("{pcl_branch}", replacer(ModBase.versionBranchName));
+    text = text.Replace("{pcl_version}", replacer(Basics.VersionName));
     text = text.Replace("{identify}", replacer(Identify.LauncherId));
     text = text.Replace("{path}", replacer(Basics.ExecutableDirectory));
     text = text.Replace("{path_with_name}", replacer(Basics.ExecutableName));

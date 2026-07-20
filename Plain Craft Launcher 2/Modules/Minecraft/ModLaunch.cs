@@ -2827,7 +2827,7 @@ public static class ModLaunch
         gameArguments.Add("${library_directory}", ModBase.ShortenPath(ModFolder.mcFolderSelected + "libraries"));
         gameArguments.Add("${libraries_directory}", ModBase.ShortenPath(ModFolder.mcFolderSelected + "libraries"));
         gameArguments.Add("${launcher_name}", "PCLNex");
-        gameArguments.Add("${launcher_version}", ModBase.versionCode.ToString());
+        gameArguments.Add("${launcher_version}", Basics.VersionName);
         gameArguments.Add("${version_name}", instance.Name);
         var argumentInfo = Config.Instance.TypeInfo[ModInstanceList.McMcInstanceSelected?.PathInstance];
         gameArguments.Add("${version_type}",
@@ -3485,7 +3485,7 @@ public static class ModLaunch
         // 输出信息
         McLaunchLog("");
         McLaunchLog("~ 基础参数 ~");
-        McLaunchLog("PCL 版本：" + ModBase.versionBaseName + " (" + ModBase.versionCode + ")");
+        McLaunchLog("PCL 版本：" + Basics.VersionName);
         McLaunchLog(
             $"游戏版本：{ModInstanceList.McMcInstanceSelected.Info.VanillaName}（{ModInstanceList.McMcInstanceSelected.Info.vanilla}，Drop {ModInstanceList.McMcInstanceSelected.Info.Drop}{(ModInstanceList.McMcInstanceSelected.Info.Reliable ? "" : "，无法完全确定")}）");
         McLaunchLog("资源版本：" + ModAssets.McAssetsGetIndexName(ModInstanceList.McMcInstanceSelected));
@@ -3632,9 +3632,7 @@ public static class ModLaunch
 
         ;
         // 基础
-        text = text.Replace("{pcl_version}", replacer(ModBase.versionBaseName));
-        text = text.Replace("{pcl_version_code}", replacer(ModBase.versionCode.ToString()));
-        text = text.Replace("{pcl_version_branch}", replacer(ModBase.versionBranchName));
+        text = text.Replace("{pcl_version}", replacer(Basics.VersionName));
         text = text.Replace("{identify}", replacer(Identify.LauncherId));
         text = text.Replace("{path}", replacer(Basics.CurrentDirectory));
         text = text.Replace("{path_with_name}", replacer(Basics.ExecutablePath));
