@@ -155,7 +155,7 @@
     <!-- Main.Misc -->
 
     <sys:String x:Key="Main.UpdateLog.Empty">Welcome!</sys:String>
-    <sys:String x:Key="Main.UpdateLog.Title">PCL Nex has been updated to {0} {1}</sys:String>
+    <sys:String x:Key="Main.UpdateLog.Title">PCL Nex has been updated to {0}</sys:String>
     <sys:String x:Key="Main.UpdateLog.FullChangelog">Full changelog</sys:String>
     <sys:String x:Key="Main.DebugMode.Hint">[Debug mode] PCL is running in debug mode, which may cause performance degradation. Please do NOT enable it unless necessary!</sys:String>
     <sys:String x:Key="Main.SpecialVersion.DebugHint">The current PCL Nex build is a Debug build.&#x0a;This build is only intended for developer debugging and may have serious performance issues or various unexpected network problems.&#x0a;&#x0a;Problems caused by non-developer users running this build are not supported by the community, and related issues may be closed directly.&#x0a;Unless you are a developer, please delete this build immediately and use the latest stable version instead.</sys:String>
@@ -1907,7 +1907,7 @@
     <sys:String x:Key="Setup.About.Community.Info">The development team of Plain Craft Launcher Nex!</sys:String>
     <sys:String x:Key="Setup.About.OriginalAuthor.Name">LTCat (龙腾猫跃)</sys:String>
     <sys:String x:Key="Setup.About.Community.Name">PCL Nex</sys:String>
-    <sys:String x:Key="Setup.About.Version.Info">Current version: %VERSION% (%BRANCH%, %VERSIONCODE%, %COMMIT_HASH%)</sys:String>
+    <sys:String x:Key="Setup.About.Version.Info">Current version: %VERSION% (%COMMIT_HASH%)</sys:String>
     <sys:String x:Key="Setup.About.SponsorOriginalAuthor">Sponsor original author</sys:String>
     <sys:String x:Key="Setup.About.GitHubHome">GitHub page</sys:String>
     <sys:String x:Key="Setup.About.SourceCode">Source code</sys:String>
