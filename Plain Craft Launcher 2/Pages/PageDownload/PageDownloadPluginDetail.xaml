@@ -1,0 +1,77 @@
+<local:MyPageRight x:Class="PCL.PageDownloadPluginDetail"
+                   xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                   xmlns:local="clr-namespace:PCL"
+                   xmlns:markdig="clr-namespace:Markdig.Wpf;assembly=Markdig.Wpf"
+                   PanScroll="{Binding ElementName=PanBack}">
+    <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
+        <StackPanel Margin="25,25,25,10">
+            <local:MyCard Margin="0,0,0,15">
+                <Grid Margin="22,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="72" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <local:MyImage x:Name="ImgLogo" Width="72" Height="72" CornerRadius="8"
+                                   VerticalAlignment="Top"
+                                   FallbackSource="pack://application:,,,/images/Icons/NoIcon.png" />
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                        <TextBlock x:Name="LabName" FontSize="22" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource ColorBrush1}" TextWrapping="Wrap" />
+                        <TextBlock x:Name="LabDescription" FontSize="12" Margin="0,4,0,0"
+                                   Foreground="{DynamicResource ColorBrushGray3}" TextWrapping="Wrap" />
+                        <TextBlock x:Name="LabMetadata" FontSize="10.5" Margin="0,5,0,0"
+                                   Foreground="{DynamicResource ColorBrushGray4}" TextWrapping="Wrap" />
+                        <WrapPanel x:Name="PanBadges" Margin="0,7,0,0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="3" Margin="18,0,0,0" VerticalAlignment="Center">
+                        <local:MyIconTextButton x:Name="BtnRepository" Text="打开仓库" SvgIcon="lucide/external-link"
+                                                BorderBrush="{DynamicResource ColorBrush6}" BorderThickness="1"
+                                                Margin="0,0,0,8" HorizontalAlignment="Stretch" />
+                        <local:MyButton x:Name="BtnDeveloperTrust" Text="信任开发者" Height="30" MinWidth="112" />
+                    </StackPanel>
+                </Grid>
+            </local:MyCard>
+
+            <local:MyCard Title="安装与历史版本" Margin="0,0,0,15">
+                <Grid Margin="25,42,25,18">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="8" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="选择版本" VerticalAlignment="Center" Margin="0,0,14,0" />
+                    <local:MyComboBox x:Name="ComboVersion" Grid.Column="1" MinWidth="260" MaxDropDownHeight="360" />
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="15,0,0,0">
+                        <local:MyIconTextButton x:Name="BtnReleaseNotes" Text="发行说明" SvgIcon="lucide/external-link"
+                                                BorderBrush="{DynamicResource ColorBrush6}" BorderThickness="1"
+                                                Margin="0,0,8,0" />
+                         <local:MyButton x:Name="BtnInstall" Text="安装所选版本" Height="30" MinWidth="112"
+                                         ColorType="Highlight" />
+                         <local:MyButton x:Name="BtnUninstall" Text="卸载" Height="30" MinWidth="72"
+                                         Margin="8,0,0,0" ColorType="Red" Visibility="Collapsed" />
+                     </StackPanel>
+                    <TextBlock x:Name="LabVersionStatus" Grid.Row="2" Grid.ColumnSpan="3" FontSize="11"
+                               Foreground="{DynamicResource ColorBrushGray3}" TextWrapping="Wrap" />
+                </Grid>
+            </local:MyCard>
+
+            <local:MyCard Title="README" Margin="0,0,0,15">
+                <Grid Margin="25,42,25,20">
+                    <TextBlock x:Name="LabReadmeStatus" Text="正在加载 README..." FontSize="12"
+                               Foreground="{DynamicResource ColorBrushGray3}" />
+                    <markdig:MarkdownViewer x:Name="ReadmeViewer" Visibility="Collapsed"
+                                            Foreground="{DynamicResource ColorBrush1}"
+                                            FontWeight="Normal" />
+                </Grid>
+            </local:MyCard>
+        </StackPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>
