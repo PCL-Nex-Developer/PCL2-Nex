@@ -3447,9 +3447,6 @@
     <sys:String x:Key="Plugins.Loader.Error.LegacyPropertyRemoved">旧插件入口字段 {0} 已移除；插件必须声明 Mixin 配置</sys:String>
 
     <!-- PluginRemoteInstallService -->
-    <sys:String x:Key="Plugins.RemoteInstall.Error.SourceEmpty">安装来源不能为空。</sys:String>
-    <sys:String x:Key="Plugins.RemoteInstall.Error.ManifestUrlEmpty">插件 manifest 地址不能为空。</sys:String>
-    <sys:String x:Key="Plugins.RemoteInstall.Error.MissingPackageUrl">插件 manifest 缺少指向 .pclx 或 .zip 的 versions 条目。</sys:String>
     <sys:String x:Key="Plugins.RemoteInstall.Error.NoInstallableVersion">插件 manifest 中没有当前平台可安装且未过旧的版本。</sys:String>
     <sys:String x:Key="Plugins.RemoteInstall.Error.PackageIdMismatch">插件包 ID {0} 与市场 manifest 的 {1} 不一致。</sys:String>
     <sys:String x:Key="Plugins.RemoteInstall.Error.InvalidMarketVersion">市场 manifest 包含无效的插件版本。</sys:String>
@@ -3457,9 +3454,6 @@
     <sys:String x:Key="Plugins.RemoteInstall.Error.PackageVersionMismatch">插件包版本 {0} 与市场 manifest 的 {1} 不一致。</sys:String>
     <sys:String x:Key="Plugins.RemoteInstall.Error.DependencyMismatch">插件包 dependencies 与市场 manifest 声明不一致。</sys:String>
     <sys:String x:Key="Plugins.RemoteInstall.Error.GitUrlEmpty">Git 仓库地址不能为空。</sys:String>
-
-    <!-- PluginInstallService -->
-    <sys:String x:Key="Plugins.Install.Error.InvalidPluginId">插件 Id 无效。</sys:String>
 
     <!-- PluginDeveloperTrustService -->
     <sys:String x:Key="Plugins.Trust.Error.InvalidGitHubLogin">GitHub Login 无效。</sys:String>

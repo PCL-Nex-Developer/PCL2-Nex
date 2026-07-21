@@ -56,7 +56,7 @@
                         x:Name="ImgPCLLogo"
                         Grid.Row="2"
                         Margin="3" MouseLeftButtonDown="ImgPCLLogo_Click"
-                        Source="/Plain Craft Launcher 2;component/Images/Heads/PCL-Nex-Developer.png">
+                        Source="/Plain Craft Launcher 2;component/Images/icon.png">
                         <Image.Clip>
                             <EllipseGeometry
                                 Center="17 17"
@@ -79,7 +79,7 @@
                         x:Name="ImgPCLCommunity"
                         Grid.Row="1"  MouseLeftButtonDown="ImgPCLCommunity_Click"
                         Margin="3"
-                        Source="/Plain Craft Launcher 2;component/Images/Heads/PCL-Nex-Developer.png" />
+                        Source="/Plain Craft Launcher 2;component/Images/icon.png" />
                     <local:MyButton
                         Grid.Row="0"
                         Grid.Column="2"

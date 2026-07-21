@@ -16,8 +16,6 @@ using PCL.Core.UI;
 using PCL.Core.Utils;
 using PCL.Network;
 using PCL.Network.Loaders;
-using PCL.Core.IO.Net.Http;
-using PCL.Core.App.Localization;
 
 namespace PCL;
 

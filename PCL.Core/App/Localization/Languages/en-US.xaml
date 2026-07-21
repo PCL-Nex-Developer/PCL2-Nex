@@ -3448,9 +3448,6 @@
     <sys:String x:Key="Plugins.Loader.Error.LegacyPropertyRemoved">Legacy plugin entry field {0} has been removed; plugin must declare Mixin configuration</sys:String>
 
     <!-- PluginRemoteInstallService -->
-    <sys:String x:Key="Plugins.RemoteInstall.Error.SourceEmpty">Installation source cannot be empty.</sys:String>
-    <sys:String x:Key="Plugins.RemoteInstall.Error.ManifestUrlEmpty">Plugin manifest URL cannot be empty.</sys:String>
-    <sys:String x:Key="Plugins.RemoteInstall.Error.MissingPackageUrl">Plugin manifest version is missing a packageUrl pointing to .pclx or .zip.</sys:String>
     <sys:String x:Key="Plugins.RemoteInstall.Error.NoInstallableVersion">No installable and not outdated version for current platform in plugin manifest.</sys:String>
     <sys:String x:Key="Plugins.RemoteInstall.Error.PackageIdMismatch">Plugin package ID {0} does not match market manifest {1}.</sys:String>
     <sys:String x:Key="Plugins.RemoteInstall.Error.InvalidMarketVersion">Market manifest contains invalid plugin version.</sys:String>
@@ -3458,9 +3455,6 @@
     <sys:String x:Key="Plugins.RemoteInstall.Error.PackageVersionMismatch">Plugin package version {0} does not match market manifest {1}.</sys:String>
     <sys:String x:Key="Plugins.RemoteInstall.Error.DependencyMismatch">Plugin package dependencies do not match market manifest declaration.</sys:String>
     <sys:String x:Key="Plugins.RemoteInstall.Error.GitUrlEmpty">Git repository URL cannot be empty.</sys:String>
-
-    <!-- PluginInstallService -->
-    <sys:String x:Key="Plugins.Install.Error.InvalidPluginId">Invalid plugin ID.</sys:String>
 
     <!-- PluginDeveloperTrustService -->
     <sys:String x:Key="Plugins.Trust.Error.InvalidGitHubLogin">Invalid GitHub Login.</sys:String>
