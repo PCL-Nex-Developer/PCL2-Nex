@@ -72,6 +72,7 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
             RefreshCache();
         var loaders = new List<ModLoader.LoaderBase>();
         var patchUpdate = true;
+        var expectedSha256 = string.Empty;
         var tempPath = $@"{ModBase.pathTemp}Cache\Update\Download\";
         loaders.Add(new ModLoader.LoaderTask<int, List<DownloadFile>>(Lang.Text("Update.Task.GetVersionInfo"), load =>
         {
@@ -84,6 +85,7 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
                 throw new Exception("No assets can download!");
             var selfSha256 = ModBase.GetFileSHA256(Basics.ExecutablePath);
             var remoteUpdSha256 = deJsonData.Sha256;
+            expectedSha256 = remoteUpdSha256;
             var patchFileName = $"{selfSha256}_{remoteUpdSha256}.patch";
             if (deJsonData.Patches.Contains(patchFileName))
             {
@@ -113,30 +115,42 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
             }
             else
             {
-                using (var fs = new FileStream(tempPath, FileMode.Open, FileAccess.Read, FileShare.Read))
-                using (var zip = new ZipArchive(fs))
+                var actualSha256 = ModBase.GetFileSHA256(tempPath);
+                if (!string.Equals(expectedSha256, actualSha256, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException(Lang.Text("Update.Error.Sha256Mismatch", expectedSha256, actualSha256));
+
+                if (!IsZipArchive(tempPath))
                 {
-                    // 尝试找到目标条目
-                    var entry = zip.Entries
-                        .FirstOrDefault(x => x.Name.Contains("Plain Craft Launcher Nex.exe")) ?? zip
-                        .Entries
-                        .FirstOrDefault(x => x.Name.Contains("Plain Craft Launcher"));
-
-                    entry ??= zip.Entries
-                        .FirstOrDefault(x => x.Name.Contains("Launcher"));
-
-                    entry ??= zip.Entries
-                        .FirstOrDefault(x => x.Name.Contains(".exe"));
-
-                    if (entry is null)
-                        throw new Exception(Lang.Text("Update.Error.FileNotFound"));
-
-                    // 解压到指定文件（覆盖已存在文件）
-                    entry.ExtractToFile(output, true);
+                    File.Copy(tempPath, output, true);
+                    return;
                 }
+
+                using var fs = new FileStream(tempPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                using var zip = new ZipArchive(fs);
+                // 兼容历史上以 ZIP 承载完整程序的更新源。
+                var entry = zip.Entries
+                    .FirstOrDefault(x => x.Name.Contains("Plain Craft Launcher Nex.exe"))
+                    ?? zip.Entries.FirstOrDefault(x => x.Name.Contains("Plain Craft Launcher"))
+                    ?? zip.Entries.FirstOrDefault(x => x.Name.Contains("Launcher"))
+                    ?? zip.Entries.FirstOrDefault(x => x.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+
+                if (entry is null)
+                    throw new Exception(Lang.Text("Update.Error.FileNotFound"));
+                entry.ExtractToFile(output, true);
             }
         }));
         return loaders;
+    }
+
+    private static bool IsZipArchive(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        Span<byte> signature = stackalloc byte[4];
+        if (stream.Read(signature) < signature.Length) return false;
+        return signature[0] == 0x50 && signature[1] == 0x4B
+               && ((signature[2] == 0x03 && signature[3] == 0x04)
+                   || (signature[2] == 0x05 && signature[3] == 0x06)
+                   || (signature[2] == 0x07 && signature[3] == 0x08));
     }
 
     private VersionDataModel GetChannelInfo(UpdateChannel channel, UpdateArch arch)
