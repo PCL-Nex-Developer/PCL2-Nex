@@ -292,7 +292,7 @@ public partial class PageSetupLeft
 
             default:
             {
-                throw new Exception("未知的设置子页面种类：" + (int)targetID);
+                throw new Exception(Lang.Text("Setup.Left.Error.UnknownSubPage", (int)targetID));
             }
         }
     }

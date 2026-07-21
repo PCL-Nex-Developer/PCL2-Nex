@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using PCL.Core.App.IoC;
+using PCL.Core.App.Localization;
 using PCL.Core.Logging;
 using PCL.Mixin;
 
@@ -30,7 +32,7 @@ public sealed class PluginLoaderService : GeneralService
     public static bool SafeMode { get; set; } =
         string.Equals(Environment.GetEnvironmentVariable("PCL_NEX_SAFE_MODE"), "1", StringComparison.Ordinal);
 
-    public PluginLoaderService() : base("plugin-loader", "PCL.Mixin 插件引擎", asyncStart: false)
+    public PluginLoaderService() : base("plugin-loader", Lang.Text("Plugins.Loader.ServiceName"), asyncStart: false)
     {
         _context = ServiceContext;
     }
@@ -48,14 +50,25 @@ public sealed class PluginLoaderService : GeneralService
     public static void LoadAll() => LoadAllAsync().GetAwaiter().GetResult();
 
     public static async Task LoadAllAsync(CancellationToken cancellationToken = default)
+        => await LoadAllFromDirectoryAsync(Paths.PluginInstalled, warnAboutFlatPlugins: true, cancellationToken)
+            .ConfigureAwait(false);
+
+    internal static async Task LoadAllFromDirectoryAsync(
+        string installedDirectory,
+        bool warnAboutFlatPlugins = false,
+        CancellationToken cancellationToken = default,
+        Func<string, bool>? isEnabled = null,
+        IReadOnlyList<string>? enabledOrder = null,
+        bool disableFailedPlugins = true)
     {
-        var enabledOrder = PluginEnablementService.GetEnabledPluginOrder();
-        var installedPackages = EnumerateInstalledPluginPackages(Paths.PluginInstalled)
+        isEnabled ??= PluginEnablementService.IsEnabled;
+        enabledOrder ??= PluginEnablementService.GetEnabledPluginOrder();
+        var installedPackages = EnumerateInstalledPluginPackages(installedDirectory)
             .Select(item => new PluginPackageLocation(item.Manifest, item.PluginDir))
             .ToArray();
         var loadPlan = PluginDependencyService.CreateLoadPlan(
             installedPackages,
-            PluginEnablementService.IsEnabled,
+            isEnabled,
             enabledOrder);
         foreach (var (pluginId, error) in loadPlan.Errors)
             _context?.Warn($"插件 {pluginId} 前置依赖检查失败，已跳过：{error}", actionLevel: ActionLevel.NormalLog);
@@ -88,11 +101,25 @@ public sealed class PluginLoaderService : GeneralService
                 loadResults[manifest.Id] = false;
                 continue;
             }
-            loadResults[manifest.Id] = await LoadPackageAsync(manifest, pluginDirectory, cancellationToken)
+            loadResults[manifest.Id] = await LoadPackageAsync(
+                    manifest, pluginDirectory, cancellationToken, disableFailedPlugins)
                 .ConfigureAwait(false);
         }
 
-        WarnAboutUnsupportedFlatPlugins();
+        if (warnAboutFlatPlugins) WarnAboutUnsupportedFlatPlugins();
+    }
+
+    internal static void RollbackLoadedPluginForTesting(string pluginId)
+    {
+        PluginRecord? record;
+        lock (SyncRoot)
+        {
+            record = Records.FirstOrDefault(candidate =>
+                string.Equals(candidate.Id, pluginId, StringComparison.OrdinalIgnoreCase));
+            if (record is not null) Records.Remove(record);
+        }
+        if (record?.Assembly is not null) Runtime.RollbackAssembly(record.Assembly);
+        record?.LoadContext?.Unload();
     }
 
     public static IEnumerable<(PluginPackageManifest Manifest, string AssemblyPath, string PluginDir)>
@@ -140,7 +167,8 @@ public sealed class PluginLoaderService : GeneralService
     private static Task<bool> LoadPackageAsync(
         PluginPackageManifest manifest,
         string pluginDirectory,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool disableFailedPlugins)
     {
         if (ContainsRecord(manifest.Id))
         {
@@ -155,7 +183,7 @@ public sealed class PluginLoaderService : GeneralService
             cancellationToken.ThrowIfCancellationRequested();
             var assemblyPath = ResolvePackagePath(pluginDirectory, manifest.EntryAssembly);
             if (!File.Exists(assemblyPath))
-                throw new FileNotFoundException("插件主程序集不存在。", assemblyPath);
+                throw new FileNotFoundException(Text("Plugins.Loader.Error.EntryAssemblyNotFound", "插件主程序集不存在。"), assemblyPath);
 
             loadContext = new CollectiblePluginLoadContext(
                 assemblyPath,
@@ -163,7 +191,7 @@ public sealed class PluginLoaderService : GeneralService
             assembly = loadContext.LoadFromAssemblyPath(Path.GetFullPath(assemblyPath));
             var configPaths = manifest.GetMixinConfigurationPaths();
             if (configPaths.Count == 0)
-                throw new MixinApplyException("插件未声明 mixinConfig 或 mixinConfigs；旧 LoadAsync 插件不再受支持。");
+                throw new MixinApplyException(Text("Plugins.Loader.Error.MissingMixinConfig", "插件未声明 mixinConfig 或 mixinConfigs；旧 LoadAsync 插件不再受支持。"));
 
             var warnings = new List<string>();
             var appliedConfigs = new List<string>();
@@ -231,8 +259,19 @@ public sealed class PluginLoaderService : GeneralService
         {
             if (assembly is not null) Runtime.RollbackAssembly(assembly);
             loadContext?.Unload();
-            PluginEnablementService.MarkSelfProtectionDisabled(manifest.Id);
-            PluginEnablementService.SetEnabled(manifest.Id, false);
+            if (disableFailedPlugins)
+            {
+                try { PluginEnablementService.MarkSelfProtectionDisabled(manifest.Id); }
+                catch (Exception disableException)
+                {
+                    _context?.Warn($"写入插件自我保护禁用标记失败：{manifest.Id}", disableException);
+                }
+                try { PluginEnablementService.SetEnabled(manifest.Id, false); }
+                catch (Exception disableException)
+                {
+                    _context?.Warn($"保存插件禁用状态失败：{manifest.Id}", disableException);
+                }
+            }
             _context?.Error(
                 $"required Mixin 加载失败，插件已禁用：{manifest.Id}；" +
                 $"程序集={manifest.EntryAssembly}；原因={exception.Message}",
@@ -245,17 +284,17 @@ public sealed class PluginLoaderService : GeneralService
     private static MixinConfiguration ReadMixinConfiguration(string configPath)
     {
         if (!File.Exists(configPath))
-            throw new FileNotFoundException("Mixin 配置文件不存在。", configPath);
+            throw new FileNotFoundException(Text("Plugins.Loader.Error.MixinConfigNotFound", "Mixin 配置文件不存在。"), configPath);
         try
         {
             return JsonSerializer.Deserialize<MixinConfiguration>(
                        File.ReadAllText(configPath),
                        MixinJsonOptions)
-                   ?? throw new JsonException("Mixin 配置根对象为空。");
+                   ?? throw new JsonException(Text("Plugins.Loader.Error.MixinConfigRootEmpty", "Mixin 配置根对象为空。"));
         }
         catch (Exception exception) when (exception is IOException or JsonException)
         {
-            throw new MixinApplyException($"读取 Mixin 配置失败：{configPath}", exception);
+            throw new MixinApplyException(Text("Plugins.Loader.Error.MixinConfigReadFailed", "读取 Mixin 配置失败：{0}", configPath), exception);
         }
     }
 
@@ -281,14 +320,14 @@ public sealed class PluginLoaderService : GeneralService
             runtime.ValueKind == JsonValueKind.String &&
             runtime.GetString()?.Contains("javascript", StringComparison.OrdinalIgnoreCase) == true)
         {
-            reason = "JavaScript/Jint 插件运行时已移除";
+            reason = Text("Plugins.Loader.Error.JavaScriptRuntimeRemoved", "JavaScript/Jint 插件运行时已移除");
             return true;
         }
 
         foreach (var propertyName in new[] { "entryType", "loadMethod", "unloadMethod", "entryScript" })
         {
             if (!root.TryGetProperty(propertyName, out _)) continue;
-            reason = $"旧插件入口字段 {propertyName} 已移除；插件必须声明 Mixin 配置";
+            reason = Text("Plugins.Loader.Error.LegacyPropertyRemoved", "旧插件入口字段 {0} 已移除；插件必须声明 Mixin 配置", propertyName);
             return true;
         }
 
@@ -305,7 +344,7 @@ public sealed class PluginLoaderService : GeneralService
             pluginDirectory,
             relativePath.Replace('/', Path.DirectorySeparatorChar)));
         if (!fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException($"插件文件不能位于插件目录之外：{relativePath}");
+            throw new InvalidOperationException(Text("Plugins.Loader.Error.FileOutsidePluginDir", "插件文件不能位于插件目录之外：{0}", relativePath));
         return fullPath;
     }
 
@@ -340,6 +379,7 @@ public sealed class PluginLoaderService : GeneralService
         }
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     internal static bool ShouldSkipThirdPartyMixins(PluginPackageManifest manifest)
     {
         ArgumentNullException.ThrowIfNull(manifest);
@@ -378,7 +418,7 @@ public sealed class PluginLoaderService : GeneralService
         if (string.IsNullOrWhiteSpace(Paths.Plugins) || !Directory.Exists(Paths.Plugins)) return;
         foreach (var assemblyPath in Directory.GetFiles(Paths.Plugins, "*.dll", SearchOption.TopDirectoryOnly))
             _context?.Warn(
-                $"旧平铺 DLL 插件不再受支持，已跳过：{Path.GetFileName(assemblyPath)}。请改用包含 Mixin 配置的 PCLX 包。",
+                Text("Plugins.Loader.Error.LegacyDllNotSupported", "旧平铺 DLL 插件不再受支持，已跳过：{0}。请改用包含 Mixin 配置的 PCLX 包。", Path.GetFileName(assemblyPath)),
                 actionLevel: ActionLevel.NormalLog);
     }
 
@@ -394,6 +434,15 @@ public sealed class PluginLoaderService : GeneralService
         ReadCommentHandling = JsonCommentHandling.Skip,
         AllowTrailingCommas = true
     };
+
+    private static string Text(string key, string fallback, params object?[] args)
+    {
+        var template = Lang.Text(key);
+        if (string.Equals(template, key, StringComparison.Ordinal)
+            || string.Equals(template, $"!{key}!", StringComparison.Ordinal))
+            template = fallback;
+        return string.Format(Lang.Culture, template, args);
+    }
 }
 
 /// <summary>插件程序集隔离上下文；PCL.Core/PCL.Mixin 类型始终由默认上下文共享。</summary>

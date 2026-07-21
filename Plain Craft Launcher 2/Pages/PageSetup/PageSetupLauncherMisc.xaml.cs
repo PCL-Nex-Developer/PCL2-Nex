@@ -106,27 +106,27 @@ public partial class PageSetupLauncherMisc
     {
         BtnPluginGitMirrorSpeedTest.IsEnabled = false;
         var oldText = BtnPluginGitMirrorSpeedTest.Text;
-        BtnPluginGitMirrorSpeedTest.Text = "测速中";
-        HintService.Hint("正在测试 GitHub 加速站速度，请稍候……", HintType.Info);
+        BtnPluginGitMirrorSpeedTest.Text = Lang.Text("Common.Action.SpeedTesting");
+        HintService.Hint(Lang.Text("Setup.Misc.Network.SpeedTest.InProgress"), HintType.Info);
 
         try
         {
             var result = await GitHubAccelerator.FindFastestMirrorAsync(TimeSpan.FromSeconds(15));
             if (result is null)
             {
-                HintService.Hint("GitHub 加速测速失败，请稍后再试。", HintType.Error);
+                HintService.Hint(Lang.Text("Setup.Misc.Network.SpeedTest.Failed"), HintType.Error);
                 return;
             }
 
             Config.Download.PluginGitMirror = result.Mirror;
             ComboPluginGitMirror.SelectedIndex = CoerceSelectedIndex(result.Mirror, ComboPluginGitMirror.Items.Count);
             HintService.Hint(
-                $"已选择 {result.MirrorUrl}，测速约 {result.BytesPerSecond / 1024d / 1024d:F2} MB/s。",
+                Lang.Text("Setup.Misc.Network.SpeedTest.Success", result.MirrorUrl, (result.BytesPerSecond / 1024d / 1024d).ToString("F2")),
                 HintType.Success);
         }
         catch (Exception ex)
         {
-            ModBase.Log(ex, "GitHub 加速测速失败", ModBase.LogLevel.Hint);
+            ModBase.Log(ex, Lang.Text("Setup.Misc.Network.SpeedTest.Failed"), ModBase.LogLevel.Hint);
         }
         finally
         {
@@ -289,7 +289,7 @@ public partial class PageSetupLauncherMisc
     private void BtnSystemSettingExp_Click(object sender, MouseButtonEventArgs e)
     {
         var savePath =
-            SystemDialogs.SelectSaveFile(Lang.Text("Setup.Misc.Export.SaveTitle"), "PCL 全局配置.json", Lang.Text("Setup.Misc.Export.Filter"), ModBase.exePath);
+            SystemDialogs.SelectSaveFile(Lang.Text("Setup.Misc.Export.SaveTitle"), Lang.Text("Setup.Misc.ExportConfigFileName"), Lang.Text("Setup.Misc.Export.Filter"), ModBase.exePath);
         if (string.IsNullOrWhiteSpace(savePath))
             return;
         File.Copy(ConfigService.SharedConfigPath, savePath, true);

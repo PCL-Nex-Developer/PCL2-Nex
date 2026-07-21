@@ -263,8 +263,8 @@ public partial class FormMain
                 try
                 {
                     ModDownload.dlClientListMojangLoader.Start(1); // PCL 会同时根据这里的加载结果决定是否使用官方源进行下载
+                    UpdateManager.serverLoader.Start(1);
                     RunCountSub();
-                    ModBase.Log("[Update] 已临时禁用启动时自动检查更新");
                     ModBase.RunInNewThread(ModMain.TryClearTaskTemp, "TryClearTaskTemp", ThreadPriority.BelowNormal);
                 }
                 catch (Exception ex)
@@ -536,7 +536,7 @@ public partial class FormMain
             if (!isLogShown)
             {
                 ModBase.FeedbackInfo();
-                ModBase.Log("请在 https://github.com/PCL-Nex-Developer/PCL2-Nex/issues 提交错误报告，以便于社区解决此问题！（这也有可能是原版 PCL 的问题）");
+                ModBase.Log(Lang.Text("Main.Error.ReportUrl"));
                 isLogShown = true;
                 ModBase.ShellOnly(LogWrapper.CurrentLogger.CurrentLogFiles.Last());
             }
@@ -1440,7 +1440,7 @@ public partial class FormMain
             }
             case PageType.PluginDetail:
             {
-                return "插件详情 · " + (stack.pluginEntry?.Name ?? stack.pluginEntry?.Id ?? "未知插件");
+                return Lang.Text("Main.Title.PluginDetail", stack.pluginEntry?.Name ?? stack.pluginEntry?.Id ?? Lang.Text("Plugins.Common.UnknownPlugin"));
             }
             case PageType.VersionSaves:
             {

@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using PCL.Core.App.Localization;
 using PCL.Core.App.Plugins;
 
 namespace PCL;
@@ -45,15 +46,15 @@ public partial class PageDownloadPluginDetail
         _entry = ModMain.frmMain?.pageCurrent.pluginEntry;
         if (_entry is null)
         {
-            LabName.Text = "插件不存在";
-            LabDescription.Text = "无法读取插件市场条目。";
+            LabName.Text = Lang.Text("Plugins.Detail.Label.PluginNotFound");
+            LabDescription.Text = Lang.Text("Plugins.Detail.Label.CannotReadEntry");
             BtnInstall.IsEnabled = false;
             return;
         }
 
         PanBack.ScrollToHome();
         PopulateHeader();
-        LabReadmeStatus.Text = "正在加载 README...";
+        LabReadmeStatus.Text = Lang.Text("Plugins.Detail.Label.LoadingReadme");
         LabReadmeStatus.Visibility = Visibility.Visible;
         ReadmeViewer.Visibility = Visibility.Collapsed;
 
@@ -74,7 +75,7 @@ public partial class PageDownloadPluginDetail
             if (string.IsNullOrWhiteSpace(readme))
             {
                 readme = "# " + _entry.Name + "\n\n" +
-                         (string.IsNullOrWhiteSpace(_entry.Description) ? "该插件没有提供 README。" : _entry.Description);
+                         (string.IsNullOrWhiteSpace(_entry.Description) ? Lang.Text("Plugins.Detail.Label.ReadmeNotProvided") : _entry.Description);
             }
             ReadmeViewer.Markdown = readme;
             ReadmeViewer.Visibility = Visibility.Visible;
@@ -85,7 +86,7 @@ public partial class PageDownloadPluginDetail
         {
             ModBase.Log(ex, "[Plugins] 加载插件详情失败: " + _entry.Id, ModBase.LogLevel.Debug);
             PopulateVersions();
-            LabReadmeStatus.Text = "README 加载失败：" + ex.Message;
+            LabReadmeStatus.Text = Lang.Text("Plugins.Detail.Label.ReadmeLoadFailed", ex.Message);
             LabReadmeStatus.Visibility = Visibility.Visible;
         }
     }
@@ -96,8 +97,11 @@ public partial class PageDownloadPluginDetail
         const string noIcon = "pack://application:,,,/images/Icons/NoIcon.png";
         ImgLogo.Source = string.IsNullOrWhiteSpace(_entry.Logo) ? noIcon : _entry.Logo!;
         LabName.Text = _entry.Name;
-        LabDescription.Text = _entry.Description ?? "暂无简介";
-        LabMetadata.Text = $"ID: {_entry.Id}  ·  开发者: {_entry.GitHubLogin ?? _entry.Author ?? "未知"}  ·  来源: {_entry.SourceGroup}";
+        LabDescription.Text = _entry.Description ?? Lang.Text("Plugins.Detail.Label.NoDescription");
+        var developerLabel = Lang.Text("Plugins.Detail.Label.Developer");
+        var sourceLabel = Lang.Text("Plugins.Detail.Label.Source");
+        var unknownDev = _entry.GitHubLogin ?? _entry.Author ?? Lang.Text("Common.State.Unknown");
+        LabMetadata.Text = $"ID: {_entry.Id}  ·  {developerLabel}: {unknownDev}  ·  {sourceLabel}: {_entry.SourceGroup}";
         BtnRepository.Visibility = IsHttpUrl(_entry.SourceRepoUrl ?? _entry.HomepageUrl)
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -106,9 +110,9 @@ public partial class PageDownloadPluginDetail
         PanBadges.Children.Clear();
         PanBadges.Children.Add(CreateBadge(_entry.DeveloperTrustLevel switch
         {
-            PluginDeveloperTrustLevel.Official => "官方开发者",
-            PluginDeveloperTrustLevel.Local => "已信任开发者",
-            _ => "未信任开发者"
+            PluginDeveloperTrustLevel.Official => Lang.Text("Plugins.Detail.Developer.Official"),
+            PluginDeveloperTrustLevel.Local => Lang.Text("Plugins.Detail.Developer.Trusted"),
+            _ => Lang.Text("Plugins.Detail.Developer.Untrusted")
         }));
         PanBadges.Children.Add(CreateBadge(GetSourceTrustText(_entry)));
         if (_entry.Archived) PanBadges.Children.Add(CreateBadge("Archived"));
@@ -131,11 +135,11 @@ public partial class PageDownloadPluginDetail
             var download = PluginRepositoryService.SelectDownload(version, RuntimeInformation.OSArchitecture);
             var compatibility = PluginCompatibility.EvaluatePclCoreVersion(version.PclCoreVersion);
             var suffix = download is null
-                ? " · 平台不兼容"
-                : compatibility == PluginCoreCompatibilityStatus.TooOld ? " · Core 版本过旧" : string.Empty;
+                ? " · " + Lang.Text("Plugins.Detail.Label.PlatformIncompatible")
+                : compatibility == PluginCoreCompatibilityStatus.TooOld ? " · " + Lang.Text("Plugins.Compatibility.Status.TooOld") : string.Empty;
             ComboVersion.Items.Add(new MyComboBoxItem
             {
-                Content = $"{version.Version} · PCL.Core {version.PclCoreVersion ?? "未知"}{suffix}",
+                Content = $"{version.Version} · PCL.Core {version.PclCoreVersion ?? Lang.Text("Common.State.Unknown")}{suffix}",
                 Tag = version
             });
         }
@@ -164,7 +168,7 @@ public partial class PageDownloadPluginDetail
         {
             BtnInstall.IsEnabled = false;
             BtnReleaseNotes.Visibility = Visibility.Collapsed;
-            LabVersionStatus.Text = "没有可选择的历史版本。";
+            LabVersionStatus.Text = Lang.Text("Plugins.Detail.Label.NoHistoryVersion");
             return;
         }
 
@@ -175,28 +179,29 @@ public partial class PageDownloadPluginDetail
 
         var installed = PluginInstallService.GetRecord(_entry.Id);
         BtnUninstall.Visibility = installed is null ? Visibility.Collapsed : Visibility.Visible;
-        var action = "安装所选版本";
+        var action = Lang.Text("Plugins.Detail.Button.InstallSelected");
         if (installed is not null)
         {
             try
             {
                 action = PluginUpdateService.CompareVersion(_selectedVersion.Version ?? "0.0.0", installed.InstalledVersion) switch
                 {
-                    > 0 => "更新到此版本",
-                    < 0 => "降级到此版本",
-                    _ => "重新安装此版本"
+                    > 0 => Lang.Text("Plugins.Detail.Button.UpdateToThis"),
+                    < 0 => Lang.Text("Plugins.Detail.Button.DowngradeToThis"),
+                    _ => Lang.Text("Plugins.Detail.Button.ReinstallThisVersion")
                 };
             }
-            catch { action = "安装所选版本"; }
+            catch { action = Lang.Text("Plugins.Detail.Button.InstallSelected"); }
         }
         BtnInstall.Text = action;
 
-        var platformText = download is null ? "当前平台没有可用安装包" : "当前平台安装包可用";
+        var platformText = download is null ? Lang.Text("Plugins.Detail.Label.PackageNotAvailable") : Lang.Text("Plugins.Detail.Label.PackageAvailable");
         var installedText = installed is null
             ? string.Empty
-            : $" · 已安装 {PluginUpdateService.FormatVersion(installed.InstalledVersion)}"
-              + (string.IsNullOrWhiteSpace(installed.InstalledSha256) ? string.Empty : " · SHA-256 已记录");
-        LabVersionStatus.Text = $"版本 {_selectedVersion.Version ?? "未知"} · {platformText} · {PluginCompatibility.GetDisplayText(compatibility)}{installedText}";
+            : $" · {Lang.Text("Plugins.Detail.Label.Installed")} {PluginUpdateService.FormatVersion(installed.InstalledVersion)}"
+              + (string.IsNullOrWhiteSpace(installed.InstalledSha256) ? string.Empty : " · " + Lang.Text("Plugins.Detail.Label.Sha256Recorded"));
+        var versionStr = _selectedVersion.Version ?? Lang.Text("Common.State.Unknown");
+        LabVersionStatus.Text = $"{Lang.Text("Plugins.Detail.Label.VersionPrefix")} {versionStr} · {platformText} · {PluginCompatibility.GetDisplayText(compatibility)}{installedText}";
     }
 
     private async Task InstallSelectedVersionAsync()
@@ -205,7 +210,7 @@ public partial class PageDownloadPluginDetail
         var download = PluginRepositoryService.SelectDownload(_selectedVersion, RuntimeInformation.OSArchitecture);
         if (download is null)
         {
-            ModMain.MyMsgBox("该版本没有适用于当前平台的安装包。", "无法安装");
+            ModMain.MyMsgBox(Lang.Text("Plugins.Detail.Message.PackageNotAvailable"), Lang.Text("Plugins.Detail.Dialog.Title.CannotInstall"));
             return;
         }
         var source = new PluginInstallSourceEntry
@@ -235,11 +240,11 @@ public partial class PageDownloadPluginDetail
         if (PluginLoaderService.LoadedPlugins.Any(plugin =>
                 string.Equals(plugin.Id, _entry.Id, StringComparison.OrdinalIgnoreCase)))
         {
-            ModMain.MyMsgBox("插件正在运行。请先禁用并重启启动器，再进行卸载。", "无法卸载");
+            ModMain.MyMsgBox(Lang.Text("Plugins.Store.Uninstall.Running"), Lang.Text("Plugins.Common.Dialog.Title.CannotUninstall"));
             return;
         }
-        if (ModMain.MyMsgBox("确定卸载插件 " + _entry.Id + "？\n此操作会删除插件文件与数据。",
-                "确认卸载", button2: "取消", isWarn: true) != 1) return;
+        if (ModMain.MyMsgBox(Lang.Text("Plugins.Detail.Dialog.Message.ConfirmUninstall", _entry.Id),
+                Lang.Text("Plugins.Common.Dialog.Title.ConfirmUninstall"), button2: Lang.Text("Common.Action.Cancel"), isWarn: true) != 1) return;
 
         BtnUninstall.IsEnabled = false;
         try
@@ -247,12 +252,12 @@ public partial class PageDownloadPluginDetail
             PluginInstallService.SetEnabled(_entry.Id, false);
             await PluginInstallService.UninstallAsync(_entry.Id);
             ModMain.frmDownloadPluginStore?.RefreshStore();
-            HintService.Hint("插件 " + _entry.Id + " 已卸载。", HintType.Success);
+            HintService.Hint(Lang.Text("Plugins.Detail.Message.UninstallSuccess", _entry.Id), HintType.Success);
         }
         catch (Exception ex)
         {
             ModBase.Log(ex, "[Plugins] 卸载插件失败: " + _entry.Id, ModBase.LogLevel.Debug);
-            ModMain.MyMsgBox("卸载失败：" + ex.Message, "错误");
+            ModMain.MyMsgBox(Lang.Text("Plugins.Detail.Message.UninstallFailed", ex.Message), Lang.Text("Plugins.Common.Dialog.Title.Error"));
         }
         finally
         {
@@ -270,13 +275,13 @@ public partial class PageDownloadPluginDetail
         {
             PluginDeveloperTrustService.RemoveLocal(_entry.GitHubLogin);
             _entry.DeveloperTrustLevel = PluginDeveloperTrustLevel.Other;
-            HintService.Hint("已取消信任开发者 " + _entry.GitHubLogin);
+            HintService.Hint(Lang.Text("Plugins.Detail.Message.DeveloperUntrusted", _entry.GitHubLogin));
         }
         else
         {
             PluginDeveloperTrustService.AddLocal(_entry.GitHubLogin);
             _entry.DeveloperTrustLevel = PluginDeveloperTrustLevel.Local;
-            HintService.Hint("已信任开发者 " + _entry.GitHubLogin, HintType.Success);
+            HintService.Hint(Lang.Text("Plugins.Detail.Message.DeveloperTrusted", _entry.GitHubLogin), HintType.Success);
         }
         RefreshTrustButton();
         PopulateHeader();
@@ -294,9 +299,9 @@ public partial class PageDownloadPluginDetail
         BtnDeveloperTrust.IsEnabled = _entry.DeveloperTrustLevel != PluginDeveloperTrustLevel.Official;
         BtnDeveloperTrust.Text = _entry.DeveloperTrustLevel switch
         {
-            PluginDeveloperTrustLevel.Official => "官方开发者",
-            PluginDeveloperTrustLevel.Local => "取消信任",
-            _ => "信任开发者"
+            PluginDeveloperTrustLevel.Official => Lang.Text("Plugins.Detail.Developer.Official"),
+            PluginDeveloperTrustLevel.Local => Lang.Text("Plugins.Detail.Button.UntrustDeveloper"),
+            _ => Lang.Text("Plugins.Detail.Button.TrustDeveloper")
         };
         BtnDeveloperTrust.ColorType = _entry.DeveloperTrustLevel == PluginDeveloperTrustLevel.Local
             ? MyButton.ColorState.Red
@@ -322,9 +327,9 @@ public partial class PageDownloadPluginDetail
     private static string GetSourceTrustText(PluginRepositoryEntry entry)
     {
         var source = PluginTrustService.GetRepositoryTrustUrl(entry);
-        if (entry.SourceIsOfficial || PluginTrustService.IsOfficialRepository(source)) return "官方来源";
-        if (entry.SourceKind is "GitHub" or "Topics") return "GitHub Topic";
-        return PluginTrustService.IsRepositoryTrusted(source) ? "已信任来源" : "未信任来源";
+        if (entry.SourceIsOfficial || PluginTrustService.IsOfficialRepository(source)) return Lang.Text("Plugins.Detail.Label.SourceOfficial");
+        if (entry.SourceKind is "GitHub" or "Topics") return Lang.Text("Plugins.Detail.Label.SourceGitHubTopic");
+        return PluginTrustService.IsRepositoryTrusted(source) ? Lang.Text("Plugins.Detail.Label.SourceTrusted") : Lang.Text("Plugins.Detail.Label.SourceUntrusted");
     }
 
     private static Border CreateBadge(string text)

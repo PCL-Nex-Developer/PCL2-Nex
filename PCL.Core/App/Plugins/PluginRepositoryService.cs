@@ -11,6 +11,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using PCL.Core.App.Localization;
 using PCL.Core.IO.Net;
 using PCL.Core.IO.Net.Http;
 using PCL.Core.Utils;
@@ -42,7 +43,14 @@ public sealed record PluginMarketLoadResult(
     IReadOnlyList<PluginMarketError> Errors,
     bool UsedRepositoryCache,
     bool RateLimited,
-    DateTimeOffset? RateLimitReset);
+    DateTimeOffset? RateLimitReset)
+{
+    /// <summary>NexDeveloper 官方市场源声明的官方开发者。</summary>
+    public IReadOnlyList<PluginDeveloperRecord> OfficialDevelopers { get; init; } = [];
+
+    /// <summary>用户添加的第三方市场源声明的可信开发者 Login。</summary>
+    public IReadOnlyList<string> TrustedDeveloperLogins { get; init; } = [];
+}
 
 /// <summary>
 /// GitHub Topic based plugin market. Repositories are discovered through Search Repositories and
@@ -53,7 +61,7 @@ public static class PluginRepositoryService
     public const int DefaultReadmeSizeLimit = 512 * 1024;
     private const string GitHubApiVersion = "2022-11-28";
     public const string OfficialMarketSourceUrl =
-        "https://cdn.jsdelivr.net/gh/PCL-Nex-Developer/Nex_Server@main/apiv2/plugin-market.json";
+        "https://raw.githubusercontent.com/PCL-Nex-Developer/Nex_Server/refs/heads/main/apiv2/plugin-market.json";
 
     public static string BuildSearchUrl(int page, int perPage = 100, string topic = "pclnexplugin")
     {
@@ -499,8 +507,8 @@ public static class PluginRepositoryService
         {
             if (ParsePluginVersion(version.Version) is null)
                 throw new InvalidDataException($"Plugin version {version.Version ?? "?"} is not valid SemVer.");
-            if (!version.IsLegacyRepositoryVersion && !LauncherBaseVersion.TryParse(version.PclCoreVersion, out _))
-                throw new InvalidDataException($"Plugin version {version.Version ?? "?"} has an invalid pclCoreVersion.");
+            // Missing or malformed pclCoreVersion is a supported market state. Keep the entry so
+            // the UI can display Unknown and require confirmation at install/enable time.
             if (ContainsLegacyDownloadFields(version))
                 throw new InvalidDataException($"Plugin version {version.Version ?? "?"} must declare packages only under downloads.");
             var downloads = version.Downloads;
@@ -986,7 +994,7 @@ public static class PluginRepositoryService
         if (File.Exists(location))
         {
             var info = new FileInfo(location);
-            if (info.Length > maxBytes) throw new InvalidDataException("README 文件过大。");
+            if (info.Length > maxBytes) throw new InvalidDataException(Lang.Text("Plugins.Repository.Error.ReadmeTooLarge"));
             return await File.ReadAllTextAsync(location, ct).ConfigureAwait(false);
         }
 
@@ -1232,14 +1240,14 @@ public static class PluginRepositoryService
     private static async Task<string> ReadLimitedTextAsync(HttpResponseMessage response, int maxBytes, CancellationToken ct)
     {
         if (response.Content.Headers.ContentLength is > 0 and var length && length > maxBytes)
-            throw new InvalidDataException("README 超过大小限制。");
+            throw new InvalidDataException(Lang.Text("Plugins.Repository.Error.ReadmeSizeLimitExceeded"));
         await using var input = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
         using var output = new MemoryStream();
         var buffer = new byte[16 * 1024];
         int read;
         while ((read = await input.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
         {
-            if (output.Length + read > maxBytes) throw new InvalidDataException("README 超过大小限制。");
+            if (output.Length + read > maxBytes) throw new InvalidDataException(Lang.Text("Plugins.Repository.Error.ReadmeSizeLimitExceeded"));
             output.Write(buffer, 0, read);
         }
         return Encoding.UTF8.GetString(output.ToArray());

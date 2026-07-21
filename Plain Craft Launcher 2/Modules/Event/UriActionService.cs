@@ -5,6 +5,7 @@ using System.Linq;
 using PCL.Core.App;
 using PCL.Core.App.Cli;
 using PCL.Core.App.Essentials;
+using PCL.Core.App.Localization;
 using PCL.Core.App.Plugins;
 using PCL.Network;
 using PCL.Network.Loaders;
@@ -62,14 +63,14 @@ public static class UriActionService
                     AddPluginSource(request);
                     break;
                 default:
-                    HintService.Hint($"未知 URI 动作：{action}", HintType.Error);
+                    HintService.Hint(Lang.Text("UriAction.Error.UnknownAction", action), HintType.Error);
                     break;
             }
         }
         catch (Exception ex)
         {
             ModBase.Log(ex, "处理 URI 动作失败", ModBase.LogLevel.Feedback);
-            HintService.Hint("URI 动作执行失败：" + ex.Message, HintType.Error);
+            HintService.Hint(Lang.Text("UriAction.Error.ActionExecutionFailed", ex.Message), HintType.Error);
         }
     }
 
@@ -104,7 +105,7 @@ public static class UriActionService
 
         if (requireServer && string.IsNullOrWhiteSpace(server))
         {
-            HintService.Hint("URI 启动服务器缺少 server 参数。", HintType.Error);
+            HintService.Hint(Lang.Text("UriAction.Error.MissingServerParam"), HintType.Error);
             return;
         }
 
@@ -125,7 +126,7 @@ public static class UriActionService
         var version = GetFirstValue(request, "version", "id", "name") ?? request.PathArguments.FirstOrDefault();
         if (string.IsNullOrWhiteSpace(version))
         {
-            HintService.Hint("URI 下载原版缺少 version 参数。", HintType.Error);
+            HintService.Hint(Lang.Text("UriAction.Error.MissingVersionParam"), HintType.Error);
             return;
         }
 
@@ -156,14 +157,14 @@ public static class UriActionService
             return;
         }
 
-        HintService.Hint("URI 安装整合包缺少 file 或 url 参数。", HintType.Error);
+        HintService.Hint(Lang.Text("UriAction.Error.MissingModpackParam"), HintType.Error);
     }
 
     private static void DownloadAndInstallModpack(string url, string? instanceName, string? logo, string? resourceId)
     {
         if (!IsAbsoluteHttpUri(url))
         {
-            HintService.Hint("URI 整合包下载地址无效。", HintType.Error);
+            HintService.Hint(Lang.Text("UriAction.Error.InvalidModpackUrl"), HintType.Error);
             return;
         }
 
@@ -173,17 +174,17 @@ public static class UriActionService
         Directory.CreateDirectory(tempDir);
         var target = Path.Combine(tempDir, Guid.NewGuid().ToString("N") + extension);
 
-        var loader = new ModLoader.LoaderCombo<string>("URI 整合包安装", [
-            new LoaderDownload("下载整合包文件", [new DownloadFile([url], target)]) { ProgressWeight = 10d, block = true },
-            new ModLoader.LoaderTask<int, int>("安装整合包", _ => ModModpack.ModpackInstall(target, instanceName, logo, resourceId, true)) { ProgressWeight = 0.1d }
+        var loader = new ModLoader.LoaderCombo<string>(Lang.Text("UriAction.Title.ModpackInstall"), [
+            new LoaderDownload(Lang.Text("UriAction.Title.DownloadModpack"), [new DownloadFile([url], target)]) { ProgressWeight = 10d, block = true },
+            new ModLoader.LoaderTask<int, int>(Lang.Text("UriAction.Title.InstallingModpack"), _ => ModModpack.ModpackInstall(target, instanceName, logo, resourceId, true)) { ProgressWeight = 0.1d }
         ])
         {
             OnStateChanged = myLoader =>
             {
                 if (myLoader.State == ModBase.LoadState.Failed)
-                    HintService.Hint("URI 整合包安装失败：" + myLoader.Error.Message, HintType.Error);
+                    HintService.Hint(Lang.Text("UriAction.Error.ModpackInstallFailed", myLoader.Error.Message), HintType.Error);
                 else if (myLoader.State == ModBase.LoadState.Finished)
-                    HintService.Hint("URI 整合包安装已完成", HintType.Success);
+                    HintService.Hint(Lang.Text("UriAction.Success.ModpackInstallComplete"), HintType.Success);
             }
         };
         loader.Start(target);
@@ -194,81 +195,69 @@ public static class UriActionService
 
     private static void InstallPlugin(UriActionRequest request)
     {
-        var source = GetFirstValue(request, "source", "url", "git", "file", "path") ?? request.PathArguments.FirstOrDefault();
-        if (string.IsNullOrWhiteSpace(source))
+        if (!PluginUriSourceParser.TryParseInstallSource(request, out var source, out var error))
         {
-            HintService.Hint("URI 安装插件缺少 source 参数。", HintType.Error);
+            HintService.Hint(error ?? Lang.Text("UriAction.Error.InvalidPluginSource"), HintType.Error);
             return;
         }
 
-        _ = InstallPluginAsync(source);
+        _ = InstallPluginAsync(source!);
     }
 
-    private static async System.Threading.Tasks.Task InstallPluginAsync(string source)
+    private static async System.Threading.Tasks.Task InstallPluginAsync(PluginUriInstallSource source)
     {
         try
         {
-            PluginPreparedInstall prepared;
-            if (File.Exists(source) && IsPluginArchivePath(source)) prepared = await PluginLocalInstallService.PrepareZipAsync(source);
-            else if (source.StartsWith("https://", StringComparison.OrdinalIgnoreCase) || source.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
-                prepared = await PluginRemoteInstallService.PrepareAsync(source);
-            else
+            PluginPreparedInstall prepared = source.Kind switch
             {
-                HintService.Hint("URI 插件来源无效。仅支持 .pclx/.zip 文件或远程 manifest/package URL。", HintType.Error);
-                return;
-            }
+                PluginUriInstallSourceKind.LocalPackage => await PluginLocalInstallService.PrepareZipAsync(source.Value),
+                PluginUriInstallSourceKind.RemotePackage => await PluginRemoteInstallService.PreparePackageAsync(source.Value),
+                PluginUriInstallSourceKind.Manifest => await PluginRemoteInstallService.PrepareManifestAsync(source.Value),
+                PluginUriInstallSourceKind.Git => await PluginRemoteInstallService.PrepareGitRepositoryAsync(source.Value),
+                _ => throw new NotSupportedException(Lang.Text("UriAction.Error.UnsupportedPluginSourceType"))
+            };
 
             using (prepared)
             {
                 var manifest = prepared.Manifest;
                 var confirm = ModBase.RunInUiWait(() => ModMain.MyMsgBox(
-                    "即将安装插件（" + prepared.SourceLabel + "）：\n\n名称: " + manifest.Name + "\n来源: " + prepared.SourceUrl + "\n\n重大安全提醒：插件会在启动器内运行代码，可能读取或修改本地文件、访问网络、修改启动器界面，甚至执行恶意操作。\n请只安装你完全信任的来源。",
-                    "确认安装", button2: "取消", isWarn: true));
+                    Lang.Text("UriAction.Warning.PluginInstallSecurity", prepared.SourceLabel, manifest.Name, prepared.SourceUrl),
+                    Lang.Text("UriAction.Action.ConfirmInstall"), button2: "取消", isWarn: true));
                 if (confirm != 1) return;
 
                 await PluginInstallService.InstallFromDirectoryAsync(prepared.PluginRoot, manifest, prepared.SourceType,
                     prepared.SourceUrl, installedSha256: prepared.VerifiedSha256);
-                ModBase.RunInUi(() => ModMain.MyMsgBox("插件 " + manifest.Name + " 安装成功！", "安装完成"));
+                ModBase.RunInUi(() => ModMain.MyMsgBox(Lang.Text("UriAction.Success.PluginInstalled", manifest.Name), Lang.Text("UriAction.Title.InstallComplete")));
             }
         }
         catch (Exception ex)
         {
             ModBase.Log(ex, "URI 安装插件失败", ModBase.LogLevel.Feedback);
-            HintService.Hint("URI 安装插件失败：" + ex.Message, HintType.Error);
+            HintService.Hint(Lang.Text("UriAction.Error.PluginInstallFailedWithReason", ex.Message), HintType.Error);
         }
     }
 
     private static void AddPluginSource(UriActionRequest request)
     {
-        var url = GetFirstValue(request, "url", "source", "repo", "repository", "index", "registry") ?? request.PathArguments.FirstOrDefault();
-        if (string.IsNullOrWhiteSpace(url))
+        if (!PluginUriSourceParser.TryParseRepositorySource(request, out var source, out var error))
         {
-            HintService.Hint("URI 添加插件源缺少 url 参数。", HintType.Error);
+            HintService.Hint(error ?? Lang.Text("UriAction.Error.InvalidPluginSource2"), HintType.Error);
             return;
         }
 
-        url = url.Trim();
-        if (!IsAbsoluteHttpUri(url))
+        if (PluginTrustService.IsOfficialRepository(source!.Value))
         {
-            HintService.Hint("URI 插件源地址无效。仅支持 HTTP 或 HTTPS 地址。", HintType.Error);
+            HintService.Hint(Lang.Text("UriAction.Info.OfficialSourceBuiltIn"), HintType.Success);
             return;
         }
 
-        if (PluginTrustService.IsOfficialRepository(url))
-        {
-            HintService.Hint("官方插件源已内置，无需重复添加。", HintType.Success);
-            return;
-        }
-
-        var name = GetFirstValue(request, "name", "title", "repoName") ?? "自定义插件源";
-        name = string.IsNullOrWhiteSpace(name) ? "自定义插件源" : name.Trim();
         var confirm = ModBase.RunInUiWait(() => ModMain.MyMsgBox(
-            "即将添加第三方插件源：\n\n名称: " + name + "\n地址: " + url + "\n\n插件源会影响商店中可展示和可更新的插件。请只添加你信任的来源。",
-            "确认添加插件源", button2: "取消", isWarn: true));
+            Lang.Text("UriAction.Warning.AddPluginSource", source.Name, source.Kind, source.Value),
+            Lang.Text("UriAction.Action.ConfirmAddSource"), button2: "取消", isWarn: true));
         if (confirm != 1) return;
 
-        PluginTrustService.AddTrust(url, name, PluginRepositorySourceType.Custom);
-        HintService.Hint("插件源已添加：" + name, HintType.Success);
+        PluginTrustService.AddTrust(source.Value, source.Name, PluginRepositorySourceType.Custom, source.Kind);
+        HintService.Hint(Lang.Text("UriAction.Success.SourceAdded", source.Name), HintType.Success);
     }
 
     private static string? GetTextArgument(CommandLine model, string key)
@@ -300,7 +289,4 @@ public static class UriActionService
         => Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
            (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
 
-    private static bool IsPluginArchivePath(string path)
-        => path.EndsWith(".pclx", StringComparison.OrdinalIgnoreCase)
-           || path.EndsWith(".zip", StringComparison.OrdinalIgnoreCase);
 }

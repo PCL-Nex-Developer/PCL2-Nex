@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using PCL.Core.App.Localization;
 using PCL.Core.Utils;
 
 namespace PCL.Core.App.Plugins;
@@ -18,14 +19,14 @@ public static class PluginDependencyService
         foreach (var dependency in dependencies ?? [])
         {
             if (dependency is null || !PluginPackageService.IsValidPluginId(dependency.Id))
-                return PluginDependencyCheckResult.Failure("前置插件包含无效的插件 ID。");
+                return PluginDependencyCheckResult.Failure(Text("Plugins.Dependency.Error.InvalidDependencyId", "前置插件包含无效的插件 ID。"));
             if (string.Equals(ownerPluginId, dependency.Id, StringComparison.OrdinalIgnoreCase))
-                return PluginDependencyCheckResult.Failure($"插件 {ownerPluginId} 不能依赖自身。");
+                return PluginDependencyCheckResult.Failure(Text("Plugins.Dependency.Error.SelfDependency", "插件 {0} 不能依赖自身。", ownerPluginId));
             if (!seen.Add(dependency.Id.Trim()))
-                return PluginDependencyCheckResult.Failure($"前置插件 {dependency.Id} 被重复声明。");
+                return PluginDependencyCheckResult.Failure(Text("Plugins.Dependency.Error.DuplicateDependency", "前置插件 {0} 被重复声明。", dependency.Id));
             if (!TryValidateVersionExpression(dependency.Version, out var error))
                 return PluginDependencyCheckResult.Failure(
-                    $"前置插件 {dependency.Id} 的版本约束无效：{error}");
+                    Text("Plugins.Dependency.Error.InvalidVersionConstraint", "前置插件 {0} 的版本约束无效：{1}", dependency.Id, error));
         }
 
         return PluginDependencyCheckResult.Success;
@@ -58,12 +59,12 @@ public static class PluginDependencyService
         {
             var id = dependency.Id.Trim();
             if (!installed.TryGetValue(id, out var installedManifest))
-                return PluginDependencyCheckResult.Failure($"缺少前置插件 {id}。");
+                return PluginDependencyCheckResult.Failure(Text("Plugins.Dependency.Error.MissingDependency", "缺少前置插件 {0}。", id));
             if (isEnabled is not null && !isEnabled(id))
-                return PluginDependencyCheckResult.Failure($"前置插件 {id} 已安装但未启用。");
+                return PluginDependencyCheckResult.Failure(Text("Plugins.Dependency.Error.NotEnabled", "前置插件 {0} 已安装但未启用。", id));
             if (!IsVersionSatisfied(installedManifest.Version, dependency.Version, out var versionError))
                 return PluginDependencyCheckResult.Failure(
-                    versionError ?? $"前置插件 {id} 的版本不满足要求 {NormalizeExpression(dependency.Version)}。");
+                    versionError ?? Text("Plugins.Dependency.Error.VersionNotSatisfied", "前置插件 {0} 的版本不满足要求 {1}。", id, NormalizeExpression(dependency.Version)));
         }
 
         return PluginDependencyCheckResult.Success;
@@ -77,7 +78,7 @@ public static class PluginDependencyService
         error = null;
         if (!SemVer.TryParse(installedVersion ?? string.Empty, out var installed))
         {
-            error = $"已安装的前置插件版本 {installedVersion ?? "<空>"} 不是有效 SemVer。";
+            error = Text("Plugins.Dependency.Error.InvalidInstalledVersion", "已安装的前置插件版本 {0} 不是有效 SemVer。", installedVersion ?? "<空>");
             return false;
         }
 
@@ -103,7 +104,7 @@ public static class PluginDependencyService
             };
             if (!matches)
             {
-                error = $"前置插件版本 {installedVersion} 不满足约束 {normalized}。";
+                error = Text("Plugins.Dependency.Error.VersionConstraintNotSatisfied", "前置插件版本 {0} 不满足约束 {1}。", installedVersion, normalized);
                 return false;
             }
         }
@@ -123,7 +124,7 @@ public static class PluginDependencyService
             var id = package.Manifest.Id?.Trim() ?? string.Empty;
             if (!PluginPackageService.IsValidPluginId(id)) continue;
             if (!packages.TryAdd(id, package))
-                errors[id] = $"检测到重复安装的插件 ID：{id}。";
+                errors[id] = Text("Plugins.Dependency.Error.DuplicatePluginId", "检测到重复安装的插件 ID：{0}。", id);
         }
 
         var states = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -141,7 +142,7 @@ public static class PluginDependencyService
                 {
                     var start = stack.FindIndex(item => string.Equals(item, id, StringComparison.OrdinalIgnoreCase));
                     var cycle = (start < 0 ? stack : stack.Skip(start)).Append(id).ToArray();
-                    var message = "检测到插件循环依赖：" + string.Join(" -> ", cycle) + "。";
+                    var message = Text("Plugins.Dependency.Error.CircularDependency", "检测到插件循环依赖：{0}。", string.Join(" -> ", cycle));
                     foreach (var cycleId in cycle) errors[cycleId] = message;
                     return false;
                 }
@@ -162,21 +163,21 @@ public static class PluginDependencyService
                 var dependencyId = dependency.Id.Trim();
                 if (!packages.TryGetValue(dependencyId, out var dependencyPackage))
                 {
-                    errors[id] = $"缺少前置插件 {dependencyId}。";
+                    errors[id] = Text("Plugins.Dependency.Error.MissingDependency", "缺少前置插件 {0}。", dependencyId);
                     continue;
                 }
                 if (!isEnabled(dependencyId))
                 {
-                    errors[id] = $"前置插件 {dependencyId} 已安装但未启用。";
+                    errors[id] = Text("Plugins.Dependency.Error.NotEnabled", "前置插件 {0} 已安装但未启用。", dependencyId);
                     continue;
                 }
                 if (!IsVersionSatisfied(dependencyPackage.Manifest.Version, dependency.Version, out var versionError))
                 {
-                    errors[id] = versionError ?? $"前置插件 {dependencyId} 的版本不满足要求。";
+                    errors[id] = versionError ?? Text("Plugins.Dependency.Error.VersionNotSatisfiedGeneric", "前置插件 {0} 的版本不满足要求。", dependencyId);
                     continue;
                 }
                 if (!Visit(dependencyId) && !errors.ContainsKey(id))
-                    errors[id] = $"前置插件 {dependencyId} 无法加载。";
+                    errors[id] = Text("Plugins.Dependency.Error.DependencyLoadFailed", "前置插件 {0} 无法加载。", dependencyId);
             }
 
             stack.RemoveAt(stack.Count - 1);
@@ -241,10 +242,19 @@ public static class PluginDependencyService
 
         if (value.StartsWith('v') || !SemVer.TryParse(value, out version))
         {
-            error = $"无法解析版本约束 {token}。请使用完整 SemVer，例如 >=1.0.0 <2.0.0。";
+            error = Text("Plugins.Dependency.Error.InvalidVersionExpression", "无法解析版本约束 {0}。请使用完整 SemVer，例如 >=1.0.0 <2.0.0。", token);
             return false;
         }
         return true;
+    }
+
+    private static string Text(string key, string fallback, params object?[] args)
+    {
+        var template = Lang.Text(key);
+        if (string.Equals(template, key, StringComparison.Ordinal)
+            || string.Equals(template, $"!{key}!", StringComparison.Ordinal))
+            template = fallback;
+        return string.Format(Lang.Culture, template, args);
     }
 }
 

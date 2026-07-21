@@ -139,7 +139,7 @@
                         </Grid.ColumnDefinitions>
                         <local:MyHint Text="{DynamicResource Setup.Misc.Network.Proxy.UntrustedWarning}" Grid.Row="0" Grid.ColumnSpan="5" Theme="Yellow" />
                         <local:MyTextBox x:Name="TextSystemHttpProxy" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="5"
-                                         Tag="SystemHttpProxy" HintText="比如 http://127.0.0.1:1080/"
+                                         Tag="SystemHttpProxy" HintText="{StaticResource Setup.Misc.Network.ProxyHint}"
                                          ToolTip="{DynamicResource Setup.Misc.Network.Proxy.InvalidWarning}" />
                         <TextBlock Grid.Column="0" Grid.Row="4" Text="{DynamicResource Setup.Misc.Network.Proxy.Username}" VerticalAlignment="Center"
                                    HorizontalAlignment="Left" Margin="0,0,5,0" />
@@ -152,7 +152,7 @@
                         <local:MyButton Text="{DynamicResource Setup.Misc.Network.Proxy.Apply}" TextPadding="3" Grid.Row="4" Grid.Column="4"
                                         x:Name="BtnApplyHttpProxy" Click="ApplyHttpProxyBtn_OnClicked" />
                     </Grid>
-                    <TextBlock Text="GitHub 加速" Grid.Row="6" VerticalAlignment="Center" Margin="0,0,25,0" />
+                    <TextBlock Text="{DynamicResource Setup.Misc.Network.GitHubAcceleration}" Grid.Row="6" VerticalAlignment="Center" Margin="0,0,25,0" />
                     <Grid Grid.Row="6" Grid.Column="1">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="1*" />
@@ -160,16 +160,16 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <local:MyComboBox x:Name="ComboPluginGitMirror" Grid.Column="0" SelectionChanged="ComboPluginGitMirror_SelectionChanged">
-                            <local:MyComboBoxItem Content="关闭" />
-                            <local:MyComboBoxItem Content="gh-proxy.org" ToolTip="将 GitHub 文件链接改写为 https://gh-proxy.org/https://github.com/..." />
-                            <local:MyComboBoxItem Content="v4.gh-proxy.org" ToolTip="将 GitHub 文件链接改写为 https://v4.gh-proxy.org/https://github.com/..." />
-                            <local:MyComboBoxItem Content="v6.gh-proxy.org" ToolTip="将 GitHub 文件链接改写为 https://v6.gh-proxy.org/https://github.com/..." />
-                            <local:MyComboBoxItem Content="cdn.gh-proxy.org" ToolTip="将 GitHub 文件链接改写为 https://cdn.gh-proxy.org/https://github.com/..." />
+                            <local:MyComboBoxItem Content="{DynamicResource Common.Action.Close}" />
+                            <local:MyComboBoxItem Content="gh-proxy.org" ToolTip="{StaticResource Setup.Misc.Network.GitHubMirror.ToolTip1}" />
+                            <local:MyComboBoxItem Content="v4.gh-proxy.org" ToolTip="{StaticResource Setup.Misc.Network.GitHubMirror.ToolTip2}" />
+                            <local:MyComboBoxItem Content="v6.gh-proxy.org" ToolTip="{StaticResource Setup.Misc.Network.GitHubMirror.ToolTip3}" />
+                            <local:MyComboBoxItem Content="cdn.gh-proxy.org" ToolTip="{StaticResource Setup.Misc.Network.GitHubMirror.ToolTip4}" />
                         </local:MyComboBox>
-                        <local:MyButton x:Name="BtnPluginGitMirrorSpeedTest" Grid.Column="2" MinWidth="80" Text="测速" TextPadding="3"
+                        <local:MyButton x:Name="BtnPluginGitMirrorSpeedTest" Grid.Column="2" MinWidth="80" Text="{DynamicResource Common.Action.SpeedTest}" TextPadding="3"
                                         Click="BtnPluginGitMirrorSpeedTest_Click" />
                     </Grid>
-                    <TextBlock Text="加速域名" Grid.Row="8" VerticalAlignment="Center" Margin="0,0,25,0" />
+                    <TextBlock Text="{DynamicResource Setup.Misc.Network.AcceleratedDomains}" Grid.Row="8" VerticalAlignment="Center" Margin="0,0,25,0" />
                     <WrapPanel Grid.Row="8" Grid.Column="1" VerticalAlignment="Center">
                         <local:MyCheckBox x:Name="CheckGitDomainGithub" Text="github.com" Tag="github.com" Margin="0,0,12,6" Change="PluginGitDomain_Change" />
                         <local:MyCheckBox x:Name="CheckGitDomainApi" Text="API" Tag="api.github.com" Margin="0,0,12,6" ToolTip="api.github.com" Change="PluginGitDomain_Change" />
@@ -181,28 +181,28 @@
                     </WrapPanel>
                 </Grid>
             </local:MyCard>
-            <local:MyCard Margin="0,0,0,15" Title="插件源管理">
+            <local:MyCard Margin="0,0,0,15" Title="{DynamicResource Plugins.Repository.ManagementTitle}">
                 <StackPanel Margin="25,40,25,15">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="管理 Topic、Manifest 与第三方 JSON 来源" FontSize="13" VerticalAlignment="Center" TextWrapping="Wrap" />
-                        <local:MyButton Grid.Column="1" Text="添加源" x:Name="BtnPluginRepoAdd" Click="BtnPluginRepoAdd_Click" Margin="10,0,0,0" Height="30" MinWidth="80" />
+                        <TextBlock Text="{DynamicResource Plugins.Repository.ManagementDescription}" FontSize="13" VerticalAlignment="Center" TextWrapping="Wrap" />
+                        <local:MyButton Grid.Column="1" Text="{DynamicResource Plugins.Repository.AddSource}" x:Name="BtnPluginRepoAdd" Click="BtnPluginRepoAdd_Click" Margin="10,0,0,0" Height="30" MinWidth="80" />
                     </Grid>
                     <Grid Margin="0,12,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="GitHub Token（可选）" VerticalAlignment="Center" Margin="0,0,18,0" />
+                        <TextBlock Text="{DynamicResource Plugins.Repository.GitHubTokenLabel}" VerticalAlignment="Center" Margin="0,0,18,0" />
                         <local:MyTextBox x:Name="TextPluginGitHubToken" Grid.Column="1"
-                                         HintText="用于私有仓库和提高 API Rate Limit；留空则匿名访问"
-                                         ToolTip="Token 会加密保存，并且只发送给受支持的 GitHub 原始域或其已选镜像。"
+                                         HintText="{DynamicResource Plugins.Repository.GitHubTokenHint}"
+                                         ToolTip="{DynamicResource Plugins.Repository.GitHubTokenToolTip}"
                                          ValidatedTextChanged="TextPluginGitHubToken_ValidatedTextChanged" />
                     </Grid>
-                    <TextBlock Text="Token 不会发送给第三方 JSON、README 或下载域名。"
+                    <TextBlock Text="{DynamicResource Plugins.Repository.GitHubTokenPrivacyNote}"
                                Margin="0,5,0,0" FontSize="10.5" TextWrapping="Wrap"
                                Foreground="{DynamicResource ColorBrushGray4}" />
                     <StackPanel x:Name="PanPluginRepoList" Margin="0,12,0,0" />

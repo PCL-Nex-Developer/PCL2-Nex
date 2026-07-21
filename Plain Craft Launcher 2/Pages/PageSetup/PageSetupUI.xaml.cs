@@ -310,13 +310,9 @@ public partial class PageSetupUI
 
                     if (videoEx.Message.Contains("0xC00D109B"))
                         ModBase.Log(
-                            $"""
-                             刷新背景内容失败，该视频文件可能并非 H.264（AVC） 格式。
-                             你可以尝试使用视频转码工具打开视频文件并设定目标格式为 H.264（AVC） ，然后转码该视频。
-                             文件：{videoAddress}
-                             """, ModBase.LogLevel.Msgbox);
+                            Lang.Text("Setup.Ui.Background.VideoFormatError", videoAddress), ModBase.LogLevel.Msgbox);
                     else
-                        ModBase.Log(videoEx, $"刷新背景内容失败（{videoAddress}）", ModBase.LogLevel.Msgbox);
+                        ModBase.Log(videoEx, Lang.Text("Setup.Ui.Background.LoadFailed", videoAddress), ModBase.LogLevel.Msgbox);
                 }
             };
             ModMain.frmMain.VideoBack.MediaFailed -= videoHandler;
@@ -415,13 +411,10 @@ public partial class PageSetupUI
         catch (Exception ex)
         {
             if (ex.Message.Contains("参数无效"))
-                ModBase.Log("""
-                            改变标题栏图片失败，该图片文件可能并非标准格式。
-                            你可以尝试使用画图打开该文件并重新保存，这会让图片变为标准格式。
-                            """,
+                ModBase.Log(Lang.Text("Setup.Ui.Error.ImageFormatInvalid"),
                     ModBase.LogLevel.Msgbox);
             else
-                ModBase.Log(ex, "设置标题栏图片失败", ModBase.LogLevel.Msgbox);
+                ModBase.Log(ex, Lang.Text("Setup.Ui.Logo.SetImageFailed"), ModBase.LogLevel.Msgbox);
             ModMain.frmMain.ImageTitleLogo.Source = null;
         }
     }
@@ -443,13 +436,10 @@ public partial class PageSetupUI
             catch (Exception ex)
             {
                 if (ex.Message.Contains("参数无效"))
-                    ModBase.Log("""
-                                调整标题栏图片失败，该图片文件可能并非标准格式。
-                                你可以尝试使用画图打开该文件并重新保存，这会让图片变为标准格式。
-                                """,
+                    ModBase.Log(Lang.Text("Setup.Ui.Error.ImageFormatInvalid"),
                         ModBase.LogLevel.Msgbox);
                 else
-                    ModBase.Log(ex, "调整标题栏图片失败", ModBase.LogLevel.Msgbox);
+                    ModBase.Log(ex, Lang.Text("Setup.Ui.Logo.AdjustImageFailed"), ModBase.LogLevel.Msgbox);
                 ModMain.frmMain.ImageTitleLogo.Source = null;
                 e.handled = true;
                 try
@@ -458,7 +448,7 @@ public partial class PageSetupUI
                 }
                 catch (Exception exx)
                 {
-                    ModBase.Log(exx, "清理错误的标题栏图片失败", ModBase.LogLevel.Msgbox);
+                    ModBase.Log(exx, Lang.Text("Setup.Ui.Logo.CleanupFailed"), ModBase.LogLevel.Msgbox);
                 }
             }
 
@@ -483,7 +473,7 @@ public partial class PageSetupUI
             }
             catch (Exception ex)
             {
-                ModBase.Log(ex, "复制标题栏图片失败", ModBase.LogLevel.Msgbox);
+                ModBase.Log(ex, Lang.Text("Setup.Ui.Logo.CopyImageFailed"), ModBase.LogLevel.Msgbox);
             }
         }
     }
@@ -498,7 +488,7 @@ public partial class PageSetupUI
         }
         catch (Exception ex)
         {
-            ModBase.Log(ex, "清空标题栏图片失败", ModBase.LogLevel.Msgbox);
+            ModBase.Log(ex, Lang.Text("Setup.Ui.Logo.ClearImageFailed"), ModBase.LogLevel.Msgbox);
         }
     }
 
