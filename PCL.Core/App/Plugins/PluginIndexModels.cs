@@ -532,7 +532,7 @@ public sealed class PluginPackageManifest
 }
 
 /// <summary>
-/// 插件市场来源文档。一个 JSON 可同时声明 GitHub Topics、额外 manifest 地址和内联插件。
+/// 插件市场来源文档。一个 JSON 可同时声明开发者、额外 manifest 地址和内联插件。
 /// </summary>
 public sealed class PluginMarketSourceDocument
 {
@@ -551,8 +551,12 @@ public sealed class PluginMarketSourceDocument
     [JsonPropertyName("tags")]
     public List<string> Tags { get; set; } = [];
 
-    [JsonPropertyName("topics")]
-    public List<string> Topics { get; set; } = [];
+    /// <summary>
+    /// 此商店源声明的开发者集合。官方内置源中的 official 条目授予官方身份；
+    /// 用户添加的第三方源中的条目只授予用户信任身份。
+    /// </summary>
+    [JsonPropertyName("developers")]
+    public List<PluginDeveloperRecord> Developers { get; set; } = [];
 
     [JsonPropertyName("manifests")]
     public List<string> Manifests { get; set; } = [];
