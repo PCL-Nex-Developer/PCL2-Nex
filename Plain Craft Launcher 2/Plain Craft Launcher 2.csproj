@@ -32,7 +32,10 @@
         <Copyright>Copyright © 龙腾猫跃 2016. All Rights Reserved.</Copyright>
         <NoWarn>
             41999;42016;42017;42018;42019;42020;42021;42022;42032;42036;42314;
-            VSTHRD002;VSTHRD003;VSTHRD110;VSTHRD200
+            VSTHRD002;VSTHRD003;VSTHRD110;VSTHRD200;
+            CS8600;CS8601;CS8602;CS8603;CS8604;CS8605;CS8618;CS8619;CS8620;CS8622;CS8625;CS8629;CS8714;CS8765;CS8767;CS9264;
+            CS0168;CS0162;CS0109;CS0659;CS0661;CS0675;CS1717;
+            IL3000
         </NoWarn>
         <DefaultItemExcludes>$(DefaultItemExcludes);$(ProjectDir)**\*.vb</DefaultItemExcludes>
     </PropertyGroup>

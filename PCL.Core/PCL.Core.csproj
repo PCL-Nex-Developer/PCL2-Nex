@@ -25,7 +25,7 @@
         <WarningLevel>4</WarningLevel>
         <OutputPath>bin\$(Configuration)-$(Platform)\</OutputPath>
         <PlatformTarget>$(Platform)</PlatformTarget>
-        <NoWarn>$(NoWarn);CS9113</NoWarn>
+        <NoWarn>$(NoWarn);CS9113;CS8600;CS8601;CS8602;CS8603;CS8604;CS8605;CS8618;CS8619;CS8620;CS8622;CS8625;CS8629;CS8714;CS8765;CS8767;CS9264</NoWarn>
     </PropertyGroup>
     <!-- 构建配置 -->
     <PropertyGroup Condition="'$(Configuration)' == 'Debug' Or '$(Configuration)' == 'CI' Or '$(Configuration)' == 'DebugCI'">
