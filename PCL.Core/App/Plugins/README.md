@@ -53,7 +53,9 @@ is used only when a required Mixin fails; third-party Mixins are not hot-unloade
 
 ## Marketplace sources
 
-The official Nex_Server `plugin-market.json` and custom JSON sources may combine all three forms:
+The launcher keeps the official `pclnexplugin` GitHub Topic as a built-in client source. The official
+Nex_Server `plugin-market.json` and user-added JSON sources only combine developer trust with
+manifest and inline-plugin discovery:
 
 ```json
 {
@@ -61,7 +63,9 @@ The official Nex_Server `plugin-market.json` and custom JSON sources may combine
   "name": "Example source",
   "group": "Utilities",
   "tags": ["featured"],
-  "topics": ["pclnexplugin"],
+  "developers": [
+    { "githubLogin": "example", "displayName": "Example", "level": "trusted" }
+  ],
   "manifests": ["https://example.com/plugin/manifest.json"],
   "plugins": []
 }
@@ -71,3 +75,11 @@ A plugin market manifest may declare `logo`, `group`, and `tags`. Relative logos
 against the manifest location. GitHub Topic plugins without a logo use the repository owner avatar.
 Git installations persist their repository URL; non-Git installations persist and subscribe to
 their manifest/source JSON URL in the local launcher configuration so updates keep using the same source.
+
+The built-in NexDeveloper registry uses the GitHub Raw `plugin-market.json` URL. A user can add
+multiple third-party registries through the existing source-management UI or `add-plugin-source` URI Scheme;
+market documents must not declare `topics`, because Topic discovery is controlled by the launcher.
+no separate developer-source action exists. Developers declared by the built-in registry with
+`level: official` receive `Official` identity. Developers declared by a user-added registry receive
+`Local` trust only, so a third-party registry cannot grant NexDeveloper official identity. The
+existing per-login local trust controls remain available independently.

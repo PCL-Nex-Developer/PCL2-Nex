@@ -30,6 +30,10 @@ public class MixinRuntimeTest
         using var runtime = ApplyAll();
 
         Assert.AreEqual(15, OverwriteTarget.Compute(5));
+        var conflict = runtime.Conflicts.Single(item => item.TargetMethod.Name == nameof(OverwriteTarget.Compute)
+                                                     && item.TargetMethod.DeclaringType == typeof(OverwriteTarget));
+        Assert.AreEqual(typeof(OverwriteMixin), conflict.ApplicationOrder[0].MixinType);
+        Assert.AreEqual(typeof(LowPriorityOverwriteMixin), conflict.ApplicationOrder[1].MixinType);
     }
 
     [TestMethod]
@@ -238,6 +242,34 @@ public class MixinRuntimeTest
     }
 
     [TestMethod]
+    public void FailedConfiguration_ShouldNotRemoveShadowMethodsFromEarlierConfiguration()
+    {
+        using var runtime = new MixinRuntime();
+        runtime.ApplyConfiguration(typeof(MixinRuntimeTest).Assembly, new MixinConfiguration
+        {
+            Required = true,
+            Mixins = [typeof(ShadowMixin).FullName!]
+        }, "shadow.success.json");
+
+        Assert.AreEqual(5, new ShadowTarget().Apply(2));
+        Assert.Throws<InvalidOperationException>(() => runtime.ApplyConfiguration(
+            typeof(MixinRuntimeTest).Assembly,
+            new MixinConfiguration
+            {
+                Required = true,
+                Mixins = [typeof(ConfigurationMixin).FullName!],
+                Plugin = typeof(FailingPostApplyProcessor).FullName
+            },
+            "shadow.failure.json"));
+
+        ShadowMixin.SeenFinal = 0;
+        ShadowMixin.SeenMethod = 0;
+        Assert.AreEqual(5, new ShadowTarget().Apply(2));
+        Assert.AreEqual(1, ShadowMixin.SeenFinal);
+        Assert.AreEqual(3, ShadowMixin.SeenMethod);
+    }
+
+    [TestMethod]
     public void PriorityAndConflictDiagnostics_ShouldShowApplicationOrder()
     {
         ConflictTarget.Order.Clear();
@@ -304,12 +336,28 @@ public class MixinRuntimeTest
     {
         ShadowMixin.SeenFinal = 0;
         ShadowMixin.SeenMethod = 0;
+        ShadowMixin.SeenUnique = 0;
         using var runtime = ApplyAll();
         var target = new ShadowTarget();
 
         Assert.AreEqual(5, target.Apply(2));
         Assert.AreEqual(1, ShadowMixin.SeenFinal);
         Assert.AreEqual(3, ShadowMixin.SeenMethod);
+        Assert.AreEqual(2, ShadowMixin.SeenUnique);
+    }
+
+    [TestMethod]
+    public void UniqueInstanceState_ShouldBeIsolatedPerTargetObject()
+    {
+        using var runtime = ApplyAll();
+        var first = new UniqueStateTarget();
+        var second = new UniqueStateTarget();
+
+        Assert.AreEqual(1, first.Next());
+        Assert.AreEqual(2, first.Next());
+        Assert.AreEqual(1, second.Next());
+        Assert.AreEqual(3, first.Next());
+        Assert.AreEqual(2, second.Next());
     }
 
     [TestMethod]
@@ -373,6 +421,10 @@ public class MixinRuntimeTest
         Assert.IsTrue(result.Warnings.Any(warning => warning.Contains("Require=2", StringComparison.Ordinal)));
         Assert.IsTrue(result.Warnings.Any(warning => warning.Contains("Allow=0", StringComparison.Ordinal)));
         Assert.IsTrue(result.Warnings.Any(warning => warning.Contains("Expect=2", StringComparison.Ordinal)));
+        Assert.IsTrue(result.Warnings.Any(warning =>
+            warning.Contains(nameof(OptionalIlRequireFailureMixin), StringComparison.Ordinal)
+            && warning.Contains("Require=1", StringComparison.Ordinal)),
+            string.Join(Environment.NewLine, result.Warnings));
     }
 
     [TestMethod]
@@ -618,11 +670,18 @@ public class MixinRuntimeTest
         public static int Compute(int value) => value - 100;
     }
 
-    [Mixin(typeof(OverwriteTarget))]
+    [Mixin(typeof(OverwriteTarget), Priority = 2000)]
     private static class OverwriteMixin
     {
         [Overwrite(nameof(OverwriteTarget.Compute))]
         private static int Compute(int value) => value * 3;
+    }
+
+    [Mixin(typeof(OverwriteTarget), Priority = 1000)]
+    private static class LowPriorityOverwriteMixin
+    {
+        [Overwrite(nameof(OverwriteTarget.Compute))]
+        private static int Compute(int value) => 999;
     }
 
     public static class RedirectTarget
@@ -866,6 +925,13 @@ public class MixinRuntimeTest
         public void PostApply(MixinApplyContext context) => PostApplyCount++;
     }
 
+    private sealed class FailingPostApplyProcessor : IMixinConfigPlugin
+    {
+        public bool ShouldApplyMixin(string targetClassName, string mixinClassName) => true;
+        public void PreApply(MixinApplyContext context) { }
+        public void PostApply(MixinApplyContext context) => throw new InvalidOperationException("post apply failed");
+    }
+
     public static class ConflictTarget
     {
         public static List<string> Order { get; } = [];
@@ -909,6 +975,7 @@ public class MixinRuntimeTest
     {
         public static int SeenFinal;
         public static int SeenMethod;
+        public static int SeenUnique;
 
 #pragma warning disable CS0169
         [Shadow("_fixed"), Final]
@@ -926,11 +993,28 @@ public class MixinRuntimeTest
         {
             SeenFinal = Fixed;
             SeenMethod = Helper(3);
+            SeenUnique = IsolatedHelper();
             Value += increment;
         }
 
         [Unique]
         private static int IsolatedHelper() => 2;
+    }
+
+    public sealed class UniqueStateTarget
+    {
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public int Next() => 0;
+    }
+
+    [Mixin(typeof(UniqueStateTarget))]
+    private sealed class UniqueStateMixin
+    {
+        [Unique]
+        private int _calls;
+
+        [Inject(nameof(UniqueStateTarget.Next), At = MixinAt.Head, Cancellable = true)]
+        private void Next(CallbackInfo<int> callback) => callback.SetReturnValue(++_calls);
     }
 
     public sealed class FinalShadowTarget
@@ -1060,6 +1144,20 @@ public class MixinRuntimeTest
     {
         [Inject(nameof(ConstraintTarget.Run)), Expect(2)]
         private static void Head() { }
+    }
+
+    public static class OptionalIlConstraintTarget
+    {
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static int Run(int value) => Math.Abs(value);
+    }
+
+    [Mixin(typeof(OptionalIlConstraintTarget), Optional = true)]
+    private static class OptionalIlRequireFailureMixin
+    {
+        [Inject(nameof(OptionalIlConstraintTarget.Run), At = MixinAt.Invoke,
+            Target = "System.String::IsNullOrEmpty(System.String)", Require = 1)]
+        private static void MissingInvoke() { }
     }
 
     public sealed class AccessorTarget
