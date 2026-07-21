@@ -12,7 +12,7 @@ internal sealed class MixinRuntime : IMixinRuntime, IDisposable
 {
     private readonly object _lock = new();
     private readonly Dictionary<MethodBase, TargetPlan> _plans = [];
-    private readonly Dictionary<MethodInfo, MethodInfo> _shadowMethods = [];
+    private readonly Dictionary<MethodInfo, ShadowMethodRegistration> _shadowMethods = [];
     private readonly HashSet<ApplicationKey> _appliedApplications = [];
     private readonly Harmony _harmony;
     private long _sequence;
@@ -154,7 +154,7 @@ internal sealed class MixinRuntime : IMixinRuntime, IDisposable
             _appliedApplications.RemoveWhere(application => application.Assembly == assembly);
             var affected = new HashSet<MethodBase>();
             RemoveAssemblyHandlers(assembly, affected);
-            RemoveShadowMethods(shadow => shadow.DeclaringType?.Assembly == assembly);
+            RemoveShadowMethods((_, registration) => registration.SourceAssembly == assembly);
             foreach (var target in affected) RefreshPatch(target);
         }
     }
@@ -238,18 +238,24 @@ internal sealed class MixinRuntime : IMixinRuntime, IDisposable
                             warnings,
                             shadows.Fields);
                             processor?.PostApply(context);
-                            RegisterShadowMethods(shadows.Methods);
+                            RegisterShadowMethods(shadows.Methods, applicationId, assembly, mixinType);
+                            // Harmony evaluates transpilers while Patch is applied. Refresh each
+                            // mixin inside its own try/catch so an optional INVOKE/FIELD/etc.
+                            // matcher or signature failure can be rolled back without aborting the
+                            // rest of the configuration.
+                            foreach (var target in mixinAffected) RefreshPatch(target);
                             affected.UnionWith(mixinAffected);
                         }
                         catch (Exception exception) when (mixin.Optional)
                         {
                             if (counted) mixinCount--;
                             RemoveHandlersAfterSequence(sequenceBefore, assembly, mixinAffected);
-                            RemoveShadowMethods(shadow => shadow.DeclaringType == mixinType);
+                            RemoveShadowMethods((_, registration) =>
+                                registration.ApplicationId == applicationId && registration.MixinType == mixinType);
                             foreach (var target in mixinAffected) RefreshPatch(target);
                             warnings.Add(
                                 $"可选 Mixin 失败：{mixinType.FullName} -> " +
-                                $"{mixin.TargetName ?? mixin.Target?.FullName ?? "<null>"}：{exception.Message}");
+                                $"{mixin.TargetName ?? mixin.Target?.FullName ?? "<null>"}：{DescribeFailure(exception)}");
                         }
                     }
                 }
@@ -262,7 +268,8 @@ internal sealed class MixinRuntime : IMixinRuntime, IDisposable
             {
                 _appliedApplications.Remove(key);
                 RemoveApplicationHandlers(applicationId, assembly, affected);
-                RemoveShadowMethods(shadow => shadow.DeclaringType?.Assembly == assembly);
+                RemoveShadowMethods((_, registration) =>
+                    registration.SourceAssembly == assembly && registration.ApplicationId == applicationId);
                 foreach (var target in affected) RefreshPatch(target);
                 throw;
             }
@@ -272,6 +279,12 @@ internal sealed class MixinRuntime : IMixinRuntime, IDisposable
     }
 
     private sealed record ApplicationKey(Assembly Assembly, string Id);
+
+    private static string DescribeFailure(Exception exception)
+    {
+        var root = exception.GetBaseException();
+        return string.IsNullOrWhiteSpace(root.Message) ? exception.Message : root.Message;
+    }
 
     private void RegisterMixin(
         string applicationId,
@@ -285,7 +298,7 @@ internal sealed class MixinRuntime : IMixinRuntime, IDisposable
         List<string> warnings,
         IReadOnlyList<ShadowFieldBinding> shadowFields)
     {
-        object? mixinInstance = null;
+        MixinInstanceScope? mixinInstances = null;
         var methods = mixinType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static |
                                            BindingFlags.Instance | BindingFlags.DeclaredOnly);
 
@@ -293,11 +306,7 @@ internal sealed class MixinRuntime : IMixinRuntime, IDisposable
         {
             var operations = handler.GetCustomAttributes<MixinOperationAttribute>(false).ToArray();
             if (operations.Length == 0) continue;
-            if (!handler.IsStatic && mixinInstance is null)
-            {
-                mixinInstance = Activator.CreateInstance(mixinType, nonPublic: true)
-                    ?? throw new MixinApplyException($"无法创建 Mixin 类型实例：{mixinType.FullName}");
-            }
+            if (!handler.IsStatic) mixinInstances ??= new MixinInstanceScope(mixinType);
 
             foreach (var operation in operations)
             {
@@ -337,7 +346,7 @@ internal sealed class MixinRuntime : IMixinRuntime, IDisposable
                     operation,
                     priority,
                     ++_sequence,
-                    handler.IsStatic ? null : mixinInstance,
+                    handler.IsStatic ? null : mixinInstances,
                     shadowFields);
                 AddHandler(plan, handlerPlan);
                 plan.Sort();
@@ -480,14 +489,10 @@ internal sealed class MixinRuntime : IMixinRuntime, IDisposable
                 break;
             case OverwriteAttribute:
                 ValidateBoundaryCount(handler, handler.Operation);
-                if (plan.Overwrite is not null)
-                    throw new MixinApplyException(
-                        $"目标 {plan.Target.DeclaringType?.FullName}.{plan.Target.Name} 已有 Overwrite：" +
-                        $"{plan.Overwrite.MixinType.FullName}.{plan.Overwrite.Handler.Name}");
                 var expected = MixinInvocation.GetReturnType(plan.Target);
                 if (handler.Handler.ReturnType != expected)
                     throw new MixinApplyException($"Overwrite {handler.MixinType.FullName}.{handler.Handler.Name} 必须返回 {expected.FullName}。");
-                plan.Overwrite = handler;
+                plan.Overwrites.Add(handler);
                 break;
             default:
                 if (!handler.Handler.IsStatic)
@@ -546,13 +551,17 @@ internal sealed class MixinRuntime : IMixinRuntime, IDisposable
         _harmony.Patch(target, prefix, postfix, transpiler);
     }
 
-    private void RegisterShadowMethods(IReadOnlyList<(MethodInfo Shadow, MethodInfo Target)> methods)
+    private void RegisterShadowMethods(
+        IReadOnlyList<(MethodInfo Shadow, MethodInfo Target)> methods,
+        string applicationId,
+        Assembly sourceAssembly,
+        Type mixinType)
     {
         foreach (var (shadow, target) in methods)
         {
             if (_shadowMethods.TryGetValue(shadow, out var existing))
             {
-                if (existing != target)
+                if (existing.Target != target)
                     throw new MixinApplyException(
                         $"Shadow 方法重复绑定到不同目标：{shadow.DeclaringType?.FullName}.{shadow.Name}");
                 continue;
@@ -562,19 +571,28 @@ internal sealed class MixinRuntime : IMixinRuntime, IDisposable
             var prefix = new HarmonyMethod(typeof(MixinShadowWrapperFactory).GetMethod(
                 nameof(MixinShadowWrapperFactory.PrefixFactory), BindingFlags.Static | BindingFlags.Public)!);
             _harmony.Patch(shadow, prefix: prefix);
-            _shadowMethods.Add(shadow, target);
+            _shadowMethods.Add(shadow, new ShadowMethodRegistration(target, applicationId, sourceAssembly, mixinType));
         }
     }
 
-    private void RemoveShadowMethods(Func<MethodInfo, bool> predicate)
+    private void RemoveShadowMethods(Func<MethodInfo, ShadowMethodRegistration, bool> predicate)
     {
-        foreach (var shadow in _shadowMethods.Keys.Where(predicate).ToArray())
+        foreach (var shadow in _shadowMethods
+                     .Where(pair => predicate(pair.Key, pair.Value))
+                     .Select(pair => pair.Key)
+                     .ToArray())
         {
             _harmony.Unpatch(shadow, HarmonyPatchType.All, OwnerId);
             MixinShadowDispatch.Unregister(shadow);
             _shadowMethods.Remove(shadow);
         }
     }
+
+    private sealed record ShadowMethodRegistration(
+        MethodInfo Target,
+        string ApplicationId,
+        Assembly SourceAssembly,
+        Type MixinType);
 
     private void RemoveAssemblyHandlers(Assembly assembly, HashSet<MethodBase> affected)
     {
@@ -585,7 +603,7 @@ internal sealed class MixinRuntime : IMixinRuntime, IDisposable
             plan.Head.RemoveAll(handler => handler.SourceAssembly == assembly);
             plan.Return.RemoveAll(handler => handler.SourceAssembly == assembly);
             plan.Transpilers.RemoveAll(handler => handler.SourceAssembly == assembly);
-            if (plan.Overwrite?.SourceAssembly == assembly) plan.Overwrite = null;
+            plan.Overwrites.RemoveAll(handler => handler.SourceAssembly == assembly);
             if (before != plan.AllHandlers().Count()) affected.Add(pair.Key);
         }
     }
@@ -600,7 +618,7 @@ internal sealed class MixinRuntime : IMixinRuntime, IDisposable
             plan.Head.RemoveAll(handler => Match(handler));
             plan.Return.RemoveAll(handler => Match(handler));
             plan.Transpilers.RemoveAll(handler => Match(handler));
-            if (plan.Overwrite is not null && Match(plan.Overwrite)) plan.Overwrite = null;
+            plan.Overwrites.RemoveAll(handler => Match(handler));
             if (before != plan.AllHandlers().Count()) affected.Add(pair.Key);
         }
     }
@@ -615,7 +633,7 @@ internal sealed class MixinRuntime : IMixinRuntime, IDisposable
             plan.Head.RemoveAll(handler => Match(handler));
             plan.Return.RemoveAll(handler => Match(handler));
             plan.Transpilers.RemoveAll(handler => Match(handler));
-            if (plan.Overwrite is not null && Match(plan.Overwrite)) plan.Overwrite = null;
+            plan.Overwrites.RemoveAll(handler => Match(handler));
             if (before != plan.AllHandlers().Count()) affected.Add(pair.Key);
         }
     }

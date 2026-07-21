@@ -86,19 +86,20 @@ internal static class MixinInvocation
 
         object? InvokeHandler()
         {
+            var mixinInstance = plan.GetMixinInstance(targetInstance);
             var shadowStates = new List<(ShadowFieldBinding Binding, object? Previous, object? Initial)>();
             foreach (var binding in plan.ShadowFields)
             {
-                var previous = binding.GetShadowValue(plan.MixinInstance);
+                var previous = binding.GetShadowValue(mixinInstance);
                 var initial = binding.GetTargetValue(targetInstance);
-                binding.SetShadowValue(plan.MixinInstance, initial);
+                binding.SetShadowValue(mixinInstance, initial);
                 shadowStates.Add((binding, previous, initial));
             }
 
             try
             {
                 using var shadowScope = MixinShadowDispatch.Enter(targetInstance);
-                return plan.Handler.Invoke(plan.MixinInstance, arguments);
+                return plan.Handler.Invoke(mixinInstance, arguments);
             }
             catch (TargetInvocationException exception) when (exception.InnerException is not null)
             {
@@ -109,7 +110,7 @@ internal static class MixinInvocation
             {
                 foreach (var (binding, previous, initial) in shadowStates)
                 {
-                    var current = binding.GetShadowValue(plan.MixinInstance);
+                    var current = binding.GetShadowValue(mixinInstance);
                     try
                     {
                         if (!Equals(current, initial))
@@ -123,14 +124,15 @@ internal static class MixinInvocation
                     }
                     finally
                     {
-                        binding.SetShadowValue(plan.MixinInstance, previous);
+                        binding.SetShadowValue(mixinInstance, previous);
                     }
                 }
             }
         }
 
         object? result;
-        var shadowLock = plan.ShadowFields.Count == 0 ? null : plan.MixinInstance ?? plan.MixinType;
+        var invocationInstance = plan.GetMixinInstance(targetInstance);
+        var shadowLock = plan.ShadowFields.Count == 0 ? null : invocationInstance ?? plan.MixinType;
         if (shadowLock is null)
         {
             result = InvokeHandler();
