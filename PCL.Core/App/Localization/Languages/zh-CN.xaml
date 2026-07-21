@@ -2457,11 +2457,6 @@
     <sys:String x:Key="Instance.Server.Card.CopyAddress">复制地址</sys:String>
     <sys:String x:Key="Instance.Server.Card.Edit">编辑</sys:String>
     <sys:String x:Key="Instance.Server.Card.Remove">移除</sys:String>
-    <sys:String x:Key="Instance.Server.Card.Connecting">正在连接</sys:String>
-    <sys:String x:Key="Instance.Server.Card.ConnectingDots">正在连接...</sys:String>
-    <sys:String x:Key="Instance.Server.Card.Offline">离线</sys:String>
-    <sys:String x:Key="Instance.Server.Card.ServerOffline">服务器离线</sys:String>
-    <sys:String x:Key="Instance.Server.Card.RefreshingStatus">正在刷新服务器 {0} 的状态...</sys:String>
     <sys:String x:Key="Instance.Server.Card.ConnectingTo">正在连接到服务器 {0}...</sys:String>
     <sys:String x:Key="Instance.Server.Card.LaunchFailed">启动服务器失败</sys:String>
     <sys:String x:Key="Instance.Server.Card.LaunchFailedMsg">启动服务器失败：{0}</sys:String>
@@ -2646,10 +2641,6 @@
     <sys:String x:Key="Tools.Test.Skin.TooFrequent">获取皮肤太过频繁，请 5 分钟之后再试！</sys:String>
     <sys:String x:Key="Tools.Test.Skin.Saved">玩家 {0} 的皮肤已保存！</sys:String>
     <sys:String x:Key="Tools.Test.Skin.FileFilter">皮肤图片文件(*.png)|*.png</sys:String>
-
-    <!-- Tools.Test.ServerQuery -->
-
-    <sys:String x:Key="Tools.Test.ServerQuery.Title">瞅眼服务器</sys:String>
 
     <!-- Tools.Test.Achievement -->
 
@@ -2847,23 +2838,6 @@
     <sys:String x:Key="Speed.Progress.RemainingThreads">剩余线程</sys:String>
     <sys:String x:Key="Speed.Error.ClickToCopy">单击复制错误详情</sys:String>
     <sys:String x:Key="Speed.Error.Copied">已复制错误详情！</sys:String>
-
-    <!-- Tools.ServerQuery -->
-
-    <sys:String x:Key="Tools.ServerQuery.Address.Hint">输入服务器地址</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.Action.Query">查询</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.State.Querying">查询中...</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.State.NoInfo">未返回服务器信息</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.Title.MinecraftServer">Minecraft 服务器</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.Error.UnableToConnect">无法连接: {0}</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.Error.Timeout.Connect">连接超时</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.Error.Timeout.ReadWrite">数据读写超时</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.Error.InvalidResponse">服务器返回了错误的信息</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.Error.AddressTooLong">服务器地址过长</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.Error.EmptyPacket">服务器返回了空数据包</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.Error.StaleConnection">服务器在返回状态后提前断开连接，未返回 pong 数据包，无法计算延迟。</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.Error.IncompleteConnection">服务器在返回完整状态数据包前提前断开连接。</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.Error.PongDataLength">Pong 数据长度必须为 8 字节</sys:String>
 
     <!-- Update -->
 
