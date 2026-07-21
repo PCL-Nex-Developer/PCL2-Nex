@@ -6,12 +6,25 @@ namespace PCL.Core.Utils.Codecs;
 
 public static class EncodingDetector
 {
+    private const int MaxDetectionBytes = 64 * 1024;
+
+    private static readonly Encoding _StrictUtf8 = new UTF8Encoding(false, true);
+    private static readonly Encoding _StrictGb2312 = Encoding.GetEncoding(
+        Encodings.GB2312.CodePage,
+        EncoderFallback.ExceptionFallback,
+        DecoderFallback.ExceptionFallback);
+    private static readonly Encoding _StrictGb18030 = Encoding.GetEncoding(
+        Encodings.GB18030.CodePage,
+        EncoderFallback.ExceptionFallback,
+        DecoderFallback.ExceptionFallback);
+    private static readonly Encoding _Utf32BigEndian = new UTF32Encoding(true, true);
+
     /// <summary>
     /// 检测流中的文本编码方式（支持 Seek 的流）
     /// </summary>
     /// <param name="stream">输入流，必须支持 Seek</param>
     /// <param name="readFromBegin">是否将流重置到起始点</param>
-    /// <returns>检测到的编码，未识别时返回 UTF-8 或系统默认</returns>
+    /// <returns>检测到的 Unicode 或中文代码页编码；未识别时返回系统默认编码。</returns>
     public static Encoding DetectEncoding(Stream stream, bool readFromBegin = false)
     {
         if (!stream.CanRead)
@@ -51,28 +64,21 @@ public static class EncodingDetector
         if (actualRead != sampleLength) throw new Exception("无法获取样本长度");
 
         // 对样本进行分析
-        if (sampleLength >= 3 && buffer is [0xef, 0xbb, 0xbf])
-            return Encoding.UTF8; // UTF-8
-
-        if (sampleLength >= 2)
-        {
-            if (buffer is [0xfe, 0xff])
-                return Encoding.BigEndianUnicode; // UTF-16 BE
-            if (buffer is [0xff, 0xfe])
-            {
-                if (sampleLength >= 4 && buffer is [_, _, 0x00, 0x00])
-                    return Encoding.UTF32; // UTF-32 LE
-                return Encoding.Unicode;   // UTF-16 LE
-            }
-        }
-
         if (sampleLength >= 4)
         {
-            if (buffer is [0x00, 0x00, 0xfe, 0xff])
-                return Encoding.GetEncoding("utf-32BE"); // UTF-32 BE
-            if (buffer is [0xff, 0xfe, 0x00, 0x00])
-                return Encoding.UTF32; // UTF-32 LE
+            if (buffer[0] == 0x00 && buffer[1] == 0x00 && buffer[2] == 0xfe && buffer[3] == 0xff)
+                return _Utf32BigEndian;
+            if (buffer[0] == 0xff && buffer[1] == 0xfe && buffer[2] == 0x00 && buffer[3] == 0x00)
+                return Encoding.UTF32;
         }
+
+        if (sampleLength >= 3 && buffer[0] == 0xef && buffer[1] == 0xbb && buffer[2] == 0xbf)
+            return Encoding.UTF8;
+
+        if (sampleLength >= 2 && buffer[0] == 0xfe && buffer[1] == 0xff)
+            return Encoding.BigEndianUnicode;
+        if (sampleLength >= 2 && buffer[0] == 0xff && buffer[1] == 0xfe)
+            return Encoding.Unicode;
 
         return null;
     }
@@ -82,26 +88,37 @@ public static class EncodingDetector
     /// </summary>
     private static Encoding? _DetectWithoutBOM(Stream stream, long originalPosition)
     {
-        // 尝试验证是否为有效 UTF-8
-        return _IsValidUtf8(stream, originalPosition) ? Encoding.UTF8 : null;
+        if (_CanDecode(stream, originalPosition, _StrictUtf8)) return Encoding.UTF8;
+        if (_CanDecode(stream, originalPosition, _StrictGb2312)) return Encodings.GB2312;
+        if (_CanDecode(stream, originalPosition, _StrictGb18030)) return Encodings.GB18030;
+        return null;
     }
 
     /// <summary>
-    /// 验证流内容是否为合法 UTF-8（通过 round-trip 验证）
+    /// 使用严格解码器验证流开头是否符合指定编码。
     /// </summary>
-    private static bool _IsValidUtf8(Stream stream, long originalPosition)
+    private static bool _CanDecode(Stream stream, long originalPosition, Encoding encoding)
     {
-        const int sampleSize = 1024;
-        var buffer = new byte[sampleSize];
         stream.Position = originalPosition;
+        var buffer = new byte[4096];
+        var decoder = encoding.GetDecoder();
+        var remaining = Math.Min(MaxDetectionBytes, stream.Length - originalPosition);
 
         try
         {
-            var decoded = Encoding.UTF8.GetString(buffer);
-            var roundTrip = Encoding.UTF8.GetBytes(decoded);
-            return roundTrip.SequenceEqual(buffer);
+            while (remaining > 0)
+            {
+                var read = stream.Read(buffer, 0, (int)Math.Min(buffer.Length, remaining));
+                if (read == 0) break;
+
+                remaining -= read;
+                var reachedEnd = stream.Position >= stream.Length;
+                _ = decoder.GetCharCount(buffer, 0, read, reachedEnd);
+            }
+
+            return true;
         }
-        catch
+        catch (DecoderFallbackException)
         {
             return false;
         }

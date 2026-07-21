@@ -9,6 +9,8 @@
         <StartupObject>PCL.Program</StartupObject>
         <PublishUrl>publish\</PublishUrl>
         <PublishSingleFile>true</PublishSingleFile>
+        <!-- The SDK only supports bundle compression for self-contained releases. -->
+        <EnableCompressionInSingleFile Condition="'$(SelfContained)' == 'true'">true</EnableCompressionInSingleFile>
         <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
         <RuntimeIdentifier Condition="'$(Platform)' == 'x64'">win-x64</RuntimeIdentifier>
         <RuntimeIdentifier Condition="'$(Platform)' == 'ARM64'">win-arm64</RuntimeIdentifier>

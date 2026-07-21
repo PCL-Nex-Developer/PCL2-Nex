@@ -16,20 +16,40 @@ public class LocalizationTest
         .Select(language => language.Code)
         .ToArray();
 
-    [TestMethod]
-    public void AllLanguageDictionariesShouldContainBaseKeys()
-    {
-        var baseKeys = LoadKeys("zh-CN");
+    private static readonly string[] CompleteLanguageFiles =
+    [
+        LocalizationService.DefaultLanguageCode,
+        "en-US"
+    ];
 
-        foreach (var language in LanguageFiles.Where(language => language != "zh-CN"))
+    [TestMethod]
+    public void CompleteLanguageDictionariesShouldMatchBaseKeys()
+    {
+        var baseKeys = LoadKeys(LocalizationService.DefaultLanguageCode);
+
+        foreach (var language in CompleteLanguageFiles)
         {
             var keys = LoadKeys(language);
             var missing = baseKeys.Except(keys).ToArray();
+            var unexpected = keys.Except(baseKeys).ToArray();
 
             Assert.IsEmpty(missing, $"{language} 缺少语言键：{string.Join(", ", missing)}");
+            Assert.IsEmpty(unexpected, $"{language} 存在基线语言中没有的键：{string.Join(", ", unexpected)}");
         }
     }
 
+    [TestMethod]
+    public void PartialLanguageDictionariesShouldOnlyOverrideBaseKeys()
+    {
+        var baseKeys = LoadKeys(LocalizationService.DefaultLanguageCode);
+
+        foreach (var language in LanguageFiles.Except(CompleteLanguageFiles, StringComparer.OrdinalIgnoreCase))
+        {
+            var unexpected = LoadKeys(language).Except(baseKeys).ToArray();
+
+            Assert.IsEmpty(unexpected, $"{language} 存在无法回退的未知语言键：{string.Join(", ", unexpected)}");
+        }
+    }
 
     [TestMethod]
     public void LanguageDictionariesShouldNotContainDuplicateKeys()
@@ -101,6 +121,15 @@ public class LocalizationTest
             LocalizationFontService.ResolveProfileFromCultureName("es-ES"));
         Assert.AreEqual(LocalizationFontProfile.Other,
             LocalizationFontService.ResolveProfileFromCultureName("pt-BR"));
+    }
+
+    [TestMethod]
+    public void FontFamiliesShouldBuildWithoutPackUriErrors()
+    {
+        var fontFamily = LocalizationFontService.BuildRepresentativeFontFamily(LocalizationFontProfile.English);
+
+        StringAssert.Contains(fontFamily.Source, "PCL English");
+        StringAssert.Contains(fontFamily.Source, "Segoe UI");
     }
 
     [TestMethod]
