@@ -37,7 +37,7 @@ jobs:
             echo "Release tag must use vyyyy.MM.patch format." >&2
             exit 1
           fi
-          if [[ ! "$base_version" =~ ^[0-9]{4}\.(0[1-9]|1[0-2])\.(0|[1-9][0-9]*)$ ]]; then
+          if [[ ! "$base_version" =~ ^[1-9][0-9]{3}\.(0[1-9]|1[0-2])\.(0|[1-9][0-9]*)$ ]]; then
             echo "Invalid BaseVersion parsed from release tag: $base_version" >&2
             exit 1
           fi
@@ -59,6 +59,20 @@ jobs:
           -p:Configuration=${{ inputs.configuration }} -p:Platform=${{ inputs.architecture }} \
           -p:BaseVersion="$base_version" \
           -p:DeleteExistingFiles=true -o ./artifact --no-self-contained
+
+      - name: Verify removed plugin runtimes are absent
+        shell: bash
+        run: |
+          mapfile -t forbidden < <(find ./artifact -type f \( \
+            -iname 'Jint.dll' -o \
+            -iname 'Acornima.dll' -o \
+            -iname 'PCL.Plugin.Abstractions.dll' -o \
+            -iname 'PCL.Mixin.dll' \
+          \))
+          if (( ${#forbidden[@]} > 0 )); then
+            printf 'Forbidden legacy/plugin runtime artifact: %s\n' "${forbidden[@]}" >&2
+            exit 1
+          fi
 
       - name: Upload the Build Artifact
         uses: actions/upload-artifact@v7
