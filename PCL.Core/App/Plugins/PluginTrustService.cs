@@ -29,7 +29,11 @@ public static class PluginTrustService
     /// </summary>
     public static bool IsOfficialRepository(string repoUrl)
     {
-        return string.Equals(repoUrl, PluginRepositoryService.GetOfficialIndexUrl(), StringComparison.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(repoUrl)) return false;
+        return string.Equals(
+            PluginRepositoryService.GetOfficialIndexUrl(),
+            repoUrl.Trim(),
+            StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>返回需要建立信任的实际市场来源，而不是插件自身的代码仓库。</summary>
@@ -111,8 +115,12 @@ public static class PluginTrustService
         PluginRepositorySourceType sourceType,
         PluginRepositorySourceKind sourceKind = PluginRepositorySourceKind.Json)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(repoUrl);
+        repoUrl = repoUrl.Trim();
+        repoName = string.IsNullOrWhiteSpace(repoName) ? repoUrl : repoName.Trim();
         var records = _LoadRecords();
-        var existing = records.FirstOrDefault(r => r.RepoUrl == repoUrl);
+        var existing = records.FirstOrDefault(r =>
+            string.Equals(r.RepoUrl, repoUrl, StringComparison.OrdinalIgnoreCase));
         if (existing is not null)
         {
             existing.Enabled = true;
@@ -144,7 +152,8 @@ public static class PluginTrustService
         if (IsOfficialRepository(repoUrl)) return;
 
         var records = _LoadRecords();
-        var record = records.FirstOrDefault(r => r.RepoUrl == repoUrl);
+        var record = records.FirstOrDefault(r =>
+            string.Equals(r.RepoUrl, repoUrl, StringComparison.OrdinalIgnoreCase));
         if (record is not null)
         {
             record.Enabled = enabled;
@@ -160,7 +169,7 @@ public static class PluginTrustService
         if (IsOfficialRepository(repoUrl)) return;
 
         var records = _LoadRecords();
-        records.RemoveAll(r => r.RepoUrl == repoUrl);
+        records.RemoveAll(r => string.Equals(r.RepoUrl, repoUrl, StringComparison.OrdinalIgnoreCase));
         _SaveRecords(records);
     }
 

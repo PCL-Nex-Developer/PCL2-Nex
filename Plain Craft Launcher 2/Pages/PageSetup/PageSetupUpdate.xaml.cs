@@ -25,7 +25,7 @@ public partial class PageSetupUpdate
         ComboSystemUpdateChannel.SelectedIndex = (int)Config.Update.UpdateChannel;
         ComboSystemUpdateMode.SelectedIndex = (int)Config.Update.UpdateMode;
 
-        TextCurrentVersion.Text = "PCL Nex " + Basics.BaseVersion;
+        TextCurrentVersion.Text = Lang.Text("Update.VersionPrefix", Basics.BaseVersion);
         ModAnimation.AniControlEnabled -= 1;
         CheckUpdate();
     }
@@ -69,7 +69,7 @@ public partial class PageSetupUpdate
                 {
                     updateInfo = UpdateManager.remoteServer.GetLatestVersion(
                         UpdateManager.SelectedUpdateChannel, UpdateManager.CurrentUpdateArchitecture);
-                    TextUpdateName.Text = "PCL Nex " + updateInfo.BaseVersion;
+                    TextUpdateName.Text = Lang.Text("Update.VersionPrefix", updateInfo.BaseVersion);
                     var summary = updateInfo.Changelog.Between("<summary>", "</summary>");
                     if (!updateInfo.Changelog.Contains("<summary>") || string.IsNullOrWhiteSpace(summary.Trim()))
                         TextChangelog.Text = Lang.Text("Setup.Update.Changelog.Empty");

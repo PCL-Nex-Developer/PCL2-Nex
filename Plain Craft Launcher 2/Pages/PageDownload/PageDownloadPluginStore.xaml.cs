@@ -20,7 +20,7 @@ public partial class PageDownloadPluginStore
     private bool _suppressFilterEvents;
     private int _loadGeneration;
     private IReadOnlyList<PluginRepositoryEntry>? _allEntries;
-    private PluginDeveloperAllowlist _officialAllowlist = new();
+    private IReadOnlyList<PluginDeveloperRecord> _officialDevelopers = [];
     private readonly Dictionary<string, PluginUpdateService.PluginLatestManifestVersion> _latestVersionCache = new(StringComparer.OrdinalIgnoreCase);
 
     public PageDownloadPluginStore()
@@ -84,8 +84,8 @@ public partial class PageDownloadPluginStore
 
         CardPlugins.Visibility = Visibility.Collapsed;
         PanLoad.Visibility = Visibility.Visible;
-        Load.Text = "正在获取插件商店列表";
-        Load.TextError = "插件商店列表获取失败";
+        Load.Text = Lang.Text("Plugins.Store.Loading");
+        Load.TextError = Lang.Text("Plugins.Store.LoadFailed");
         Load.State.LoadingState = MyLoading.MyLoadingState.Run;
         PanPlugins.Children.Clear();
 
@@ -98,16 +98,18 @@ public partial class PageDownloadPluginStore
                 IncludeDisabled = true,
                 IncludeForks = true
             }, ct: ct);
-            var allowlistTask = PluginDeveloperTrustService.FetchOfficialAsync(ct: ct);
-            await Task.WhenAll(marketTask, allowlistTask);
+            await marketTask;
 
             var market = await marketTask;
-            _officialAllowlist = await allowlistTask;
-            var localAllowlist = PluginDeveloperTrustService.GetLocalAllowlist();
+            _officialDevelopers = market.OfficialDevelopers;
+            var localAllowlist = PluginDeveloperTrustService.GetLocalAllowlist()
+                .Concat(market.TrustedDeveloperLogins)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
             foreach (var entry in market.Entries)
                 entry.DeveloperTrustLevel = entry.SourceIsOfficial && string.IsNullOrWhiteSpace(entry.GitHubLogin)
                     ? PluginDeveloperTrustLevel.Official
-                    : PluginDeveloperTrustService.GetTrustLevel(entry.GitHubLogin, _officialAllowlist, localAllowlist);
+                    : PluginDeveloperTrustService.GetTrustLevel(entry.GitHubLogin, _officialDevelopers, localAllowlist);
 
             _allEntries = market.Entries;
             if (ct.IsCancellationRequested) return;
@@ -131,7 +133,7 @@ public partial class PageDownloadPluginStore
         }
         catch (Exception ex)
         {
-            Load.TextError = "加载失败: " + ex.Message;
+            Load.TextError = Lang.Text("Plugins.Store.LoadError", ex.Message);
             Load.State.LoadingState = MyLoading.MyLoadingState.Error;
             PanLoad.Visibility = Visibility.Visible;
             CardPlugins.Visibility = Visibility.Collapsed;
@@ -199,7 +201,7 @@ public partial class PageDownloadPluginStore
 
         if (entries.Count == 0)
         {
-            var empty = new TextBlock { Text = "暂无可用插件。", FontSize = 13, TextWrapping = TextWrapping.Wrap };
+            var empty = new TextBlock { Text = Lang.Text("Plugins.Store.Empty"), FontSize = 13, TextWrapping = TextWrapping.Wrap };
             empty.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
             PanPlugins.Children.Add(empty);
             return;
@@ -234,7 +236,7 @@ public partial class PageDownloadPluginStore
             {
                 Tag = entry,
                 Title = entry.Name,
-                Description = (entry.Description ?? "暂无简介").Replace("\r", "").Replace("\n", " "),
+                Description = (entry.Description ?? Lang.Text("Plugins.Store.NoDescription")).Replace("\r", "").Replace("\n", " "),
                 Logo = string.IsNullOrWhiteSpace(entry.Logo)
                     ? "pack://application:,,,/images/Icons/NoIcon.png"
                     : entry.Logo!,
@@ -263,7 +265,7 @@ public partial class PageDownloadPluginStore
                 item.ColumnTime1.Width = item.ColumnTime2.Width = item.ColumnTime3.Width = new GridLength(0);
             }
 
-            item.LabSource.Text = string.IsNullOrWhiteSpace(entry.SourceGroup) ? "未知" : entry.SourceGroup;
+            item.LabSource.Text = string.IsNullOrWhiteSpace(entry.SourceGroup) ? Lang.Text("Common.State.Unknown") : entry.SourceGroup;
             item.LabSource.ToolTip = entry.SourceRepoUrl ?? entry.ManifestUrl;
             item.Click += (_, e) =>
             {
@@ -274,7 +276,7 @@ public partial class PageDownloadPluginStore
             if (installedRecord is not null)
             {
                 item.BtnDelete.SvgIcon = "lucide/trash-2";
-                item.BtnDelete.ToolTip = "卸载插件";
+                item.BtnDelete.ToolTip = Lang.Text("Plugins.Store.Tooltip.Uninstall");
                 item.BtnDelete.Click += (_, _) => UninstallPlugin(entry.Id);
             }
 
@@ -298,17 +300,17 @@ public partial class PageDownloadPluginStore
         {
             var hasUpdate = TryGetKnownLatestVersion(entry, out var latestVersion)
                             && PluginUpdateService.CompareVersion(latestVersion, installed.InstalledVersion) > 0;
-            tags.Add(hasUpdate ? "可更新" : "已安装");
+            tags.Add(hasUpdate ? Lang.Text("Plugins.Store.Tag.UpdateAvailable") : Lang.Text("Plugins.Store.Tag.Installed"));
         }
         tags.Add(PluginCompatibility.GetDisplayText(entry.CompatibilityStatus));
         tags.Add(entry.DeveloperTrustLevel switch
         {
-            PluginDeveloperTrustLevel.Official => "官方开发者",
-            PluginDeveloperTrustLevel.Local => "用户信任开发者",
-            _ => "其他开发者"
+            PluginDeveloperTrustLevel.Official => Lang.Text("Plugins.Store.Developer.Official"),
+            PluginDeveloperTrustLevel.Local => Lang.Text("Plugins.Store.Developer.Trusted"),
+            _ => Lang.Text("Plugins.Store.Developer.Other")
         });
         if (entry.SelectedVersion is not null && entry.SelectedDownload is null)
-            tags.Insert(0, "平台不兼容");
+            tags.Insert(0, Lang.Text("Plugins.Store.Tag.PlatformIncompatible"));
         if (entry.Archived) tags.Insert(0, "Archived");
         if (entry.Disabled) tags.Insert(0, "Disabled");
         if (entry.Fork) tags.Insert(0, "Fork");
@@ -351,7 +353,7 @@ public partial class PageDownloadPluginStore
         if (hasMin && hasMax) return minVersion + " - " + maxVersion;
         if (hasMin) return ">= " + minVersion;
         if (hasMax) return "<= " + maxVersion;
-        return "任意";
+        return Lang.Text("Plugins.Store.VersionRange.Any");
     }
 
     internal async Task<bool> InstallPluginAsync(
@@ -363,14 +365,14 @@ public partial class PageDownloadPluginStore
         {
             var trustDecision = PluginTrustService.EvaluateInstall(entry, PluginInstallSourceType.Repository);
             var repoSource = PluginTrustService.GetRepositoryTrustUrl(entry);
-            if (string.IsNullOrWhiteSpace(repoSource)) repoSource = "未知来源";
-            var confirmMsg = "即将安装插件：\n\n名称: " + entry.Name + "\n更新来源: " + repoSource + "\n下载源: " + sourceEntry.Url + "\n\n重大安全提醒：插件会在启动器内运行代码，可能读取或修改本地文件、访问网络、修改启动器行为，甚至执行恶意操作。\n请只安装你完全信任的来源。";
+            if (string.IsNullOrWhiteSpace(repoSource)) repoSource = Lang.Text("Plugins.Store.Source.Unknown");
+            var confirmMsg = Lang.Text("Plugins.Store.Install.ConfirmMessage", entry.Name, repoSource, sourceEntry.Url);
             if (entry.DeveloperTrustLevel == PluginDeveloperTrustLevel.Other)
-                confirmMsg += "\n\n来源提醒：该 GitHub 开发者不在官方或本地白名单中。";
+                confirmMsg += Lang.Text("Plugins.Store.Install.DeveloperWarning");
             if (trustDecision == PluginTrustDecision.RequireRepositoryTrust)
             {
-                confirmMsg += "\n\n该插件来自未信任的第三方仓库。继续将信任该仓库并安装。";
-                if (ModMain.MyMsgBox(confirmMsg, "信任确认", button2: "取消", isWarn: true) != 1) return false;
+                confirmMsg += Lang.Text("Plugins.Store.Install.TrustWarning");
+                if (ModMain.MyMsgBox(confirmMsg, Lang.Text("Plugins.Store.Install.Dialog.TrustConfirm"), button2: Lang.Text("Common.Action.Cancel"), isWarn: true) != 1) return false;
                 var sourceKind = entry.SourceKind switch
                 {
                     "GitHub" or "Topics" => PluginRepositorySourceKind.Topic,
@@ -385,10 +387,10 @@ public partial class PageDownloadPluginStore
             }
             else
             {
-                if (ModMain.MyMsgBox(confirmMsg, "确认安装", button2: "取消", isWarn: true) != 1) return false;
+                if (ModMain.MyMsgBox(confirmMsg, Lang.Text("Plugins.Store.Install.Dialog.ConfirmInstall"), button2: Lang.Text("Common.Action.Cancel"), isWarn: true) != 1) return false;
             }
 
-            ModMain.MyMsgBox("正在获取插件包，请稍候...", "安装中");
+            ModMain.MyMsgBox(Lang.Text("Plugins.Store.Install.Downloading"), Lang.Text("Plugins.Store.Install.Dialog.Installing"));
             using var prepared = await PrepareInstallAsync(entry, sourceEntry, selectedVersion);
             var persistentSource = PluginRepositoryService.GetPersistentInstallSource(
                 entry, sourceEntry, prepared.SourceType, prepared.SourceUrl);
@@ -400,14 +402,14 @@ public partial class PageDownloadPluginStore
                 installedSha256: prepared.VerifiedSha256);
             ModMain.frmMain?.RefreshRestartButton(true);
 
-            ModMain.MyMsgBox("插件 " + prepared.Manifest.Name + " 安装成功！\n重启启动器后生效。", "安装完成");
+            ModMain.MyMsgBox(Lang.Text("Plugins.Store.Install.Success", prepared.Manifest.Name), Lang.Text("Plugins.Store.Install.Dialog.InstallComplete"));
             _ = LoadStoreAsync();
             return true;
         }
         catch (Exception ex)
         {
             ModBase.Log(ex, "[Plugins] Store install failed: " + entry.Id, ModBase.LogLevel.Debug);
-            ModMain.MyMsgBox("安装失败: " + ex.Message, "错误");
+            ModMain.MyMsgBox(Lang.Text("Plugins.Store.Install.Error", ex.Message), Lang.Text("Plugins.Common.Dialog.Title.Error"));
             return false;
         }
     }
@@ -421,7 +423,7 @@ public partial class PageDownloadPluginStore
         if (manifestVersion is not null)
         {
             var download = PluginRepositoryService.SelectDownload(manifestVersion, System.Runtime.InteropServices.RuntimeInformation.OSArchitecture)
-                ?? throw new InvalidDataException("该插件版本没有适用于当前平台的安装包。");
+                ?? throw new InvalidDataException(Lang.Text("Plugins.Detail.Message.PackageNotAvailable"));
             manifestVersion.ResolvedPackageUrl = download.PackageUrl;
             manifestVersion.ResolvedSha256 = download.Sha256;
             if (entry.ManifestUrlIsDirect && !string.IsNullOrWhiteSpace(entry.ManifestUrl))
@@ -452,10 +454,10 @@ public partial class PageDownloadPluginStore
     {
         if (PluginLoaderService.LoadedPlugins.Any(plugin => string.Equals(plugin.Id, pluginId, StringComparison.OrdinalIgnoreCase)))
         {
-            ModMain.MyMsgBox("插件正在运行。请先禁用并重启启动器，再进行卸载。", "无法卸载");
+            ModMain.MyMsgBox(Lang.Text("Plugins.Store.Uninstall.Running"), Lang.Text("Plugins.Common.Dialog.Title.CannotUninstall"));
             return;
         }
-        if (ModMain.MyMsgBox("确定卸载插件 " + pluginId + "？", "确认卸载", button2: "取消", isWarn: true) != 1) return;
+        if (ModMain.MyMsgBox(Lang.Text("Plugins.Store.Uninstall.Dialog.Confirm", pluginId), Lang.Text("Plugins.Common.Dialog.Title.ConfirmUninstall"), button2: Lang.Text("Common.Action.Cancel"), isWarn: true) != 1) return;
 
         try
         {
@@ -465,7 +467,7 @@ public partial class PageDownloadPluginStore
         }
         catch (Exception ex)
         {
-            ModMain.MyMsgBox("卸载失败: " + ex.Message, "错误");
+            ModMain.MyMsgBox(Lang.Text("Plugins.Store.Uninstall.Error", ex.Message), Lang.Text("Plugins.Common.Dialog.Title.Error"));
         }
     }
 
@@ -520,7 +522,7 @@ public partial class PageDownloadPluginStore
         var selectedSource = GetSelectedFilter(ComboSourceGroup);
         var selectedTag = GetSelectedFilter(ComboTag);
         ComboSourceGroup.Items.Clear();
-        ComboSourceGroup.Items.Add(new MyComboBoxItem { Content = "全部", Tag = string.Empty });
+        ComboSourceGroup.Items.Add(new MyComboBoxItem { Content = Lang.Text("Plugins.Store.Filter.All"), Tag = string.Empty });
         foreach (var group in entries.Select(entry => entry.SourceGroup)
                      .Where(value => !string.IsNullOrWhiteSpace(value))
                      .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -528,7 +530,7 @@ public partial class PageDownloadPluginStore
             ComboSourceGroup.Items.Add(new MyComboBoxItem { Content = group, Tag = group });
 
         ComboTag.Items.Clear();
-        ComboTag.Items.Add(new MyComboBoxItem { Content = "全部", Tag = string.Empty });
+        ComboTag.Items.Add(new MyComboBoxItem { Content = Lang.Text("Plugins.Store.Filter.All"), Tag = string.Empty });
         foreach (var tag in entries.SelectMany(entry => entry.Tags ?? [])
                      .Where(value => !string.IsNullOrWhiteSpace(value))
                      .Distinct(StringComparer.OrdinalIgnoreCase)

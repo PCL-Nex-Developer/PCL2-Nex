@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using PCL.Core.App.Localization;
 
 namespace PCL.Core.App.Plugins;
 
@@ -53,18 +54,18 @@ public static class PluginInstallService
         ArgumentNullException.ThrowIfNull(manifest);
         var validation = PluginPackageService.ValidatePackageManifest(manifest);
         if (!validation.IsValid)
-            throw new InvalidDataException(validation.ErrorMessage ?? "插件清单校验失败。");
+            throw new InvalidDataException(validation.ErrorMessage ?? Lang.Text("Plugins.Install.Error.ManifestValidationFailed"));
 
         var compatibility = validation.CompatibilityStatus;
         if (compatibility == PluginCoreCompatibilityStatus.TooOld)
             throw new InvalidDataException(PluginCompatibility.GetBlockingMessage(compatibility, manifest.PclCoreVersion));
         if (compatibility is PluginCoreCompatibilityStatus.Future or PluginCoreCompatibilityStatus.Unknown
             && !await PluginCompatibility.ConfirmIfRequiredAsync(manifest, PluginCompatibilityAction.Install, ct).ConfigureAwait(false))
-            throw new OperationCanceledException("用户取消了插件兼容性确认。", ct);
+            throw new OperationCanceledException(Lang.Text("Plugins.Install.Error.UserCancelledCompatibility"), ct);
 
         var dependencyCheck = PluginDependencyService.CheckInstalledDependencies(manifest);
         if (!dependencyCheck.IsValid)
-            throw new InvalidDataException(dependencyCheck.ErrorMessage ?? "插件前置依赖检查失败。");
+            throw new InvalidDataException(dependencyCheck.ErrorMessage ?? Lang.Text("Plugins.Install.Error.DependencyCheckFailed"));
 
         var pluginId = manifest.Id;
         var safePluginId = _SafeFolderName(pluginId);
@@ -94,12 +95,12 @@ public static class PluginInstallService
             var entryPath = manifest.EntryAssembly;
             var entryFullPath = PluginLoaderService.ResolvePackagePath(tempDir, entryPath);
             if (!File.Exists(entryFullPath))
-                throw new FileNotFoundException($"插件入口文件不存在: {entryPath}");
+                throw new FileNotFoundException(Lang.Text("Plugins.Install.Error.EntryAssemblyNotFound", entryPath));
             foreach (var mixinConfig in manifest.GetMixinConfigurationPaths())
             {
                 var configFullPath = PluginLoaderService.ResolvePackagePath(tempDir, mixinConfig);
                 if (!File.Exists(configFullPath))
-                    throw new FileNotFoundException($"Mixin 配置文件不存在: {mixinConfig}");
+                    throw new FileNotFoundException(Lang.Text("Plugins.Install.Error.MixinConfigNotFound", mixinConfig));
             }
 
             Directory.CreateDirectory(Path.GetDirectoryName(installDir)!);
@@ -189,7 +190,7 @@ public static class PluginInstallService
         lock (_lock)
         {
             if (!PluginPackageService.IsValidPluginId(pluginId))
-                throw new ArgumentException("插件 Id 无效。", nameof(pluginId));
+                throw new ArgumentException(Lang.Text("Plugins.Install.Error.InvalidPluginId"), nameof(pluginId));
 
             // 删除安装目录
             var installDir = Path.Combine(PCL.Core.App.Paths.PluginInstalled, _SafeFolderName(pluginId));
@@ -218,9 +219,9 @@ public static class PluginInstallService
     public static void SetEnabled(string pluginId, bool enabled)
     {
         if (!PluginPackageService.IsValidPluginId(pluginId))
-            throw new ArgumentException("插件 Id 无效。", nameof(pluginId));
+            throw new ArgumentException(Lang.Text("Plugins.Install.Error.InvalidPluginId"), nameof(pluginId));
         if (enabled)
-            throw new InvalidOperationException("启用插件必须通过 SetEnabledAsync 执行 Core 兼容性确认。");
+            throw new InvalidOperationException(Lang.Text("Plugins.Install.Error.EnableThroughAsyncRequired"));
 
         SetEnabledState(pluginId, false);
     }
@@ -247,7 +248,7 @@ public static class PluginInstallService
         {
             var pluginRoot = Path.Combine(PCL.Core.App.Paths.PluginInstalled, _SafeFolderName(pluginId));
             var manifest = await PluginPackageService.ReadManifestFromDirectoryAsync(pluginRoot, ct).ConfigureAwait(false);
-            if (manifest is null) throw new InvalidDataException("无法读取插件清单。");
+            if (manifest is null) throw new InvalidDataException(Lang.Text("Plugins.Install.Error.CannotReadManifest"));
 
             var compatibility = PluginCompatibility.EvaluatePclCoreVersion(manifest.PclCoreVersion);
             if (compatibility == PluginCoreCompatibilityStatus.TooOld)
@@ -258,7 +259,7 @@ public static class PluginInstallService
 
             var dependencyCheck = PluginDependencyService.CheckInstalledDependencies(manifest);
             if (!dependencyCheck.IsValid)
-                throw new InvalidOperationException(dependencyCheck.ErrorMessage ?? "插件前置依赖检查失败。");
+                throw new InvalidOperationException(dependencyCheck.ErrorMessage ?? Lang.Text("Plugins.Install.Error.DependencyCheckFailed"));
         }
 
         SetEnabledState(pluginId, enabled);
@@ -381,7 +382,7 @@ public static class PluginInstallService
     private static string _SafeFolderName(string id)
     {
         if (!PluginPackageService.IsValidPluginId(id))
-            throw new ArgumentException("插件 Id 无效。", nameof(id));
+            throw new ArgumentException(Text("Plugins.Install.Error.InvalidPluginId", "插件 Id 无效。"), nameof(id));
         return id;
     }
 
@@ -401,5 +402,14 @@ public static class PluginInstallService
             Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
             File.Copy(file, targetPath, overwrite: true);
         }
+    }
+
+    private static string Text(string key, string fallback, params object?[] args)
+    {
+        var template = Lang.Text(key);
+        if (string.Equals(template, key, StringComparison.Ordinal)
+            || string.Equals(template, $"!{key}!", StringComparison.Ordinal))
+            template = fallback;
+        return string.Format(Lang.Culture, template, args);
     }
 }

@@ -8,13 +8,14 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using PCL.Core.App.Localization;
 using PCL.Core.IO.Net;
 using PCL.Core.IO.Net.Http;
 
 namespace PCL.Core.App.Plugins;
 
 /// <summary>
-/// 汇总内置 GitHub Topic、NexDeveloper 第三方 JSON、额外 manifest、内联 plugins 与用户来源。
+/// 汇总客户端内置 GitHub Topic、NexDeveloper market、额外 manifest、内联 plugins 与用户来源。
 /// </summary>
 public static class PluginMarketplaceService
 {
@@ -30,23 +31,7 @@ public static class PluginMarketplaceService
         await LoadTopicAsync("pclnexplugin", "GitHub", [], options, httpClient, state, ct)
             .ConfigureAwait(false);
 
-        try
-        {
-            await LoadJsonSourceAsync(
-                PluginRepositoryService.OfficialMarketSourceUrl,
-                "NexDeveloper",
-                options,
-                httpClient,
-                state,
-                ct,
-                includeTopics: false,
-                sourceIsOfficial: true).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-        catch (Exception ex)
-        {
-            state.Errors.Add(new PluginMarketError("NexDeveloper", ex.Message));
-        }
+        await LoadOfficialSourceAsync(options, httpClient, state, ct).ConfigureAwait(false);
 
         foreach (var record in PluginTrustService.GetAllTrustRecords().Where(record => record.Enabled))
         {
@@ -56,9 +41,8 @@ public static class PluginMarketplaceService
                 switch (record.SourceKind)
                 {
                     case PluginRepositorySourceKind.Topic:
-                        await LoadTopicAsync(record.RepoUrl, record.RepoUrl, [], options, httpClient, state, ct)
-                            .ConfigureAwait(false);
-                        break;
+                        // Topic discovery is owned by the client and is not a user-configurable source.
+                        continue;
                     case PluginRepositorySourceKind.Manifest:
                         await LoadManifestAsync(record.RepoUrl, record.RepoName, [], options, state, ct)
                             .ConfigureAwait(false);
@@ -97,7 +81,43 @@ public static class PluginMarketplaceService
             .GroupBy(entry => $"{entry.Id}|{entry.SourceRepoUrl}|{entry.ManifestUrl}", StringComparer.OrdinalIgnoreCase)
             .Select(group => group.First())
             .ToList();
-        return new PluginMarketLoadResult(entries, state.Errors, state.UsedCache, state.RateLimited, state.RateLimitReset);
+        return CreateResult(entries, state);
+    }
+
+    internal static async Task<PluginMarketLoadResult> LoadOfficialSourceForTestingAsync(
+        PluginMarketQueryOptions? options = null,
+        HttpClient? httpClient = null,
+        CancellationToken ct = default)
+    {
+        options ??= new PluginMarketQueryOptions();
+        httpClient ??= NetworkService.GetClient();
+        var state = new LoadState();
+        await LoadOfficialSourceAsync(options, httpClient, state, ct).ConfigureAwait(false);
+        return CreateResult(state.Entries, state);
+    }
+
+    private static async Task LoadOfficialSourceAsync(
+        PluginMarketQueryOptions options,
+        HttpClient httpClient,
+        LoadState state,
+        CancellationToken ct)
+    {
+        try
+        {
+            await LoadJsonSourceAsync(
+                PluginRepositoryService.OfficialMarketSourceUrl,
+                "NexDeveloper",
+                options,
+                httpClient,
+                state,
+                ct,
+                sourceIsOfficial: true).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            state.Errors.Add(new PluginMarketError("NexDeveloper", ex.Message));
+        }
     }
 
     internal static async Task<PluginMarketLoadResult> LoadSourceAsync(
@@ -110,7 +130,7 @@ public static class PluginMarketplaceService
         httpClient ??= NetworkService.GetClient();
         var state = new LoadState();
         await LoadJsonSourceAsync(source, string.Empty, options, httpClient, state, ct).ConfigureAwait(false);
-        return new PluginMarketLoadResult(state.Entries, state.Errors, state.UsedCache, state.RateLimited, state.RateLimitReset);
+        return CreateResult(state.Entries, state);
     }
 
     private static async Task LoadJsonSourceAsync(
@@ -120,7 +140,6 @@ public static class PluginMarketplaceService
         HttpClient httpClient,
         LoadState state,
         CancellationToken ct,
-        bool includeTopics = true,
         bool sourceIsOfficial = false)
     {
         var (json, usedCache) = await ReadSourceTextAsync(location, options, httpClient, ct).ConfigureAwait(false);
@@ -135,7 +154,7 @@ public static class PluginMarketplaceService
         if (root.TryGetProperty("id", out _) && root.TryGetProperty("versions", out _))
         {
             var manifest = JsonSerializer.Deserialize<PluginMarketManifest>(json, PluginJson.SerializerOptions)
-                ?? throw new InvalidDataException("插件 manifest 为空。");
+                ?? throw new InvalidDataException(Text("Plugins.Marketplace.Error.ManifestEmpty", "插件 manifest 为空。"));
             var displayName = FirstNonEmpty(sourceName, manifest.Name, GetSourceLabel(location)) ?? manifest.Name;
             var entry = PluginRepositoryService.CreateManifestEntry(
                 manifest, location, options.Architecture, "Manifest", displayName);
@@ -144,22 +163,34 @@ public static class PluginMarketplaceService
             return;
         }
 
-        var isSourceDocument = root.TryGetProperty("topics", out _)
-                               || root.TryGetProperty("manifests", out _)
+        if (root.TryGetProperty("topics", out _))
+            throw new InvalidDataException(Text(
+                "Plugins.Marketplace.Error.TopicsNotSupported",
+                "plugin-market.json 不能声明 topics；GitHub Topic 由启动器内置维护。"));
+
+        var isSourceDocument = root.TryGetProperty("manifests", out _)
+                               || root.TryGetProperty("developers", out _)
                                || LooksLikeInlinePluginDocument(root);
         if (isSourceDocument)
         {
             var source = JsonSerializer.Deserialize<PluginMarketSourceDocument>(json, PluginJson.SerializerOptions)
-                ?? throw new InvalidDataException("插件来源 JSON 为空。");
-            if (source.Version != 1) throw new InvalidDataException("不支持的插件来源 JSON 版本。");
+                ?? throw new InvalidDataException(Text("Plugins.Marketplace.Error.SourceJsonEmpty", "插件来源 JSON 为空。"));
+            if (source.Version != 1) throw new InvalidDataException(Text("Plugins.Marketplace.Error.UnsupportedSourceVersion", "不支持的插件来源 JSON 版本。"));
             var displayName = FirstNonEmpty(sourceName, source.Name, source.Group, GetSourceLabel(location))
-                              ?? "自定义来源";
+                              ?? Text("Plugins.Marketplace.Label.CustomSource", "自定义来源");
             var inheritedTags = NormalizeTags(source.Tags);
-
-            if (includeTopics)
-                foreach (var topic in source.Topics.Where(value => !string.IsNullOrWhiteSpace(value)))
-                    await LoadTopicAsync(topic.Trim(), displayName, inheritedTags, options, httpClient, state, ct)
-                        .ConfigureAwait(false);
+            var developers = PluginDeveloperTrustService.NormalizeSourceDevelopers(
+                source.Developers, sourceIsOfficial);
+            if (sourceIsOfficial)
+            {
+                foreach (var developer in developers)
+                    state.OfficialDevelopers.TryAdd(developer.GitHubLogin, developer);
+            }
+            else
+            {
+                foreach (var developer in developers)
+                    state.TrustedDeveloperLogins.Add(developer.GitHubLogin);
+            }
 
             foreach (var manifestLocation in source.Manifests.Where(value => !string.IsNullOrWhiteSpace(value)))
                 await LoadManifestAsync(
@@ -187,12 +218,12 @@ public static class PluginMarketplaceService
         }
 
         var legacy = JsonSerializer.Deserialize<PluginRepositoryIndex>(json, PluginJson.SerializerOptions)
-            ?? throw new InvalidDataException("插件 JSON 不是 topics/manifests/plugins 来源文档、manifest 或旧索引。");
+            ?? throw new InvalidDataException(Text("Plugins.Marketplace.Error.UnrecognizedJson", "插件 JSON 不是 developers/manifests/plugins 来源文档、manifest 或旧索引。"));
         PluginRepositoryService.NormalizeIndex(legacy, location);
         foreach (var entry in legacy.Plugins)
         {
             entry.SourceKind = "Json";
-            entry.SourceGroup = FirstNonEmpty(sourceName, legacy.Name, GetSourceLabel(location)) ?? "自定义来源";
+            entry.SourceGroup = FirstNonEmpty(sourceName, legacy.Name, GetSourceLabel(location)) ?? Text("Plugins.Marketplace.Label.CustomSource", "自定义来源");
             entry.Tags = NormalizeTags(entry.Tags);
             entry.Logo = PluginRepositoryService.ResolveLogoUrl(entry.Logo ?? entry.IconUrl, location, null);
             entry.SourceIsOfficial = sourceIsOfficial;
@@ -236,7 +267,7 @@ public static class PluginMarketplaceService
         if (File.Exists(manifestUrl))
         {
             var info = new FileInfo(manifestUrl);
-            if (info.Length > options.MaxManifestBytes) throw new InvalidDataException("插件 manifest 文件过大。");
+            if (info.Length > options.MaxManifestBytes) throw new InvalidDataException(Text("Plugins.Marketplace.Error.ManifestTooLarge", "插件 manifest 文件过大。"));
             manifest = JsonSerializer.Deserialize<PluginMarketManifest>(
                 await File.ReadAllTextAsync(manifestUrl, ct).ConfigureAwait(false),
                 PluginJson.SerializerOptions);
@@ -246,7 +277,7 @@ public static class PluginMarketplaceService
         {
             manifest = await PluginRemoteInstallService.FetchManifestAsync(manifestUrl, ct).ConfigureAwait(false);
         }
-        if (manifest is null) throw new InvalidDataException("插件 manifest 获取或解析失败。");
+        if (manifest is null) throw new InvalidDataException(Text("Plugins.Marketplace.Error.ManifestLoadFailed", "插件 manifest 获取或解析失败。"));
         state.Entries.Add(PluginRepositoryService.CreateManifestEntry(
             manifest, manifestUrl, options.Architecture, "Manifest", group, inheritedTags));
     }
@@ -260,13 +291,13 @@ public static class PluginMarketplaceService
         if (File.Exists(location))
         {
             var info = new FileInfo(location);
-            if (info.Length > options.MaxManifestBytes) throw new InvalidDataException("插件来源 JSON 文件过大。");
+            if (info.Length > options.MaxManifestBytes) throw new InvalidDataException(Text("Plugins.Marketplace.Error.SourceJsonTooLarge", "插件来源 JSON 文件过大。"));
             return (await File.ReadAllTextAsync(location, ct).ConfigureAwait(false), false);
         }
 
         if (!Uri.TryCreate(location, UriKind.Absolute, out var uri)
             || uri.Scheme is not ("http" or "https"))
-            throw new InvalidDataException("插件来源必须是 Topic、HTTP/HTTPS JSON 地址或本地 JSON 文件。");
+            throw new InvalidDataException(Text("Plugins.Marketplace.Error.InvalidSource", "插件来源必须是 HTTP/HTTPS JSON 地址或本地 JSON 文件。"));
 
         var cacheDirectory = options.CacheDirectory ?? Path.Combine(Paths.PluginTrust, "market-cache");
         var sourceCache = Path.Combine(cacheDirectory, "sources");
@@ -302,20 +333,20 @@ public static class PluginMarketplaceService
         }
 
         if (File.Exists(cachePath)) return (File.ReadAllText(cachePath), true);
-        throw lastError ?? new HttpRequestException("插件来源 JSON 获取失败。");
+        throw lastError ?? new HttpRequestException(Text("Plugins.Marketplace.Error.SourceJsonFetchFailed", "插件来源 JSON 获取失败。"));
     }
 
     private static async Task<string> ReadLimitedAsync(HttpResponseMessage response, int maxBytes, CancellationToken ct)
     {
         if (response.Content.Headers.ContentLength is > 0 and var length && length > maxBytes)
-            throw new InvalidDataException("插件来源 JSON 超过大小限制。");
+            throw new InvalidDataException(Text("Plugins.Marketplace.Error.SourceJsonSizeLimitExceeded", "插件来源 JSON 超过大小限制。"));
         await using var input = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
         using var output = new MemoryStream();
         var buffer = new byte[16 * 1024];
         int read;
         while ((read = await input.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
         {
-            if (output.Length + read > maxBytes) throw new InvalidDataException("插件来源 JSON 超过大小限制。");
+            if (output.Length + read > maxBytes) throw new InvalidDataException(Text("Plugins.Marketplace.Error.SourceJsonSizeLimitExceeded", "插件来源 JSON 超过大小限制。"));
             output.Write(buffer, 0, read);
         }
         return Encoding.UTF8.GetString(output.ToArray());
@@ -374,16 +405,37 @@ public static class PluginMarketplaceService
     {
         if (Uri.TryCreate(source, UriKind.Absolute, out var uri)) return uri.Host;
         try { return Path.GetFileName(source); }
-        catch { return "自定义来源"; }
+        catch { return Text("Plugins.Marketplace.Label.CustomSource", "自定义来源"); }
     }
 
     private static string? FirstNonEmpty(params string?[] values)
         => values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim();
 
+    private static string Text(string key, string fallback, params object?[] args)
+    {
+        var template = Lang.Text(key);
+        if (string.Equals(template, key, StringComparison.Ordinal)
+            || string.Equals(template, $"!{key}!", StringComparison.Ordinal))
+            template = fallback;
+        return string.Format(Lang.Culture, template, args);
+    }
+
+    private static PluginMarketLoadResult CreateResult(
+        IReadOnlyList<PluginRepositoryEntry> entries,
+        LoadState state)
+        => new(entries, state.Errors, state.UsedCache, state.RateLimited, state.RateLimitReset)
+        {
+            OfficialDevelopers = state.OfficialDevelopers.Values.ToArray(),
+            TrustedDeveloperLogins = state.TrustedDeveloperLogins.ToArray()
+        };
+
     private sealed class LoadState
     {
         public List<PluginRepositoryEntry> Entries { get; } = [];
         public List<PluginMarketError> Errors { get; } = [];
+        public Dictionary<string, PluginDeveloperRecord> OfficialDevelopers { get; } =
+            new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> TrustedDeveloperLogins { get; } = new(StringComparer.OrdinalIgnoreCase);
         public bool UsedCache { get; set; }
         public bool RateLimited { get; set; }
         public DateTimeOffset? RateLimitReset { get; set; }

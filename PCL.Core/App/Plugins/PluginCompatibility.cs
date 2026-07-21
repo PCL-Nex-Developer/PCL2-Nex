@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using PCL.Core.App.Localization;
 
 namespace PCL.Core.App.Plugins;
 
@@ -71,17 +72,17 @@ public static class PluginCompatibility
 
     public static string GetDisplayText(PluginCoreCompatibilityStatus status) => status switch
     {
-        PluginCoreCompatibilityStatus.Compatible => "兼容",
-        PluginCoreCompatibilityStatus.TooOld => "Core 版本过旧",
-        PluginCoreCompatibilityStatus.Future => "插件使用未来 Core 版本",
-        _ => "未知"
+        PluginCoreCompatibilityStatus.Compatible => Lang.Text("Plugins.Compatibility.Status.Compatible"),
+        PluginCoreCompatibilityStatus.TooOld => Lang.Text("Plugins.Compatibility.Status.TooOld"),
+        PluginCoreCompatibilityStatus.Future => Lang.Text("Plugins.Compatibility.Status.Future"),
+        _ => Lang.Text("Plugins.Compatibility.Status.Unknown")
     };
 
     public static string GetBlockingMessage(PluginCoreCompatibilityStatus status, string? pclCoreVersion) => status switch
     {
-        PluginCoreCompatibilityStatus.TooOld => $"插件引用的 PCL.Core 版本 {pclCoreVersion ?? "未知"} 已低于当前启动器支持范围。",
-        PluginCoreCompatibilityStatus.Future => "该插件使用了比当前启动器更新的 PCL.Core 版本，可能无法正常使用或导致崩溃。",
-        PluginCoreCompatibilityStatus.Unknown => "插件的 pclCoreVersion 缺失或格式错误，无法确认兼容性。",
+        PluginCoreCompatibilityStatus.TooOld => Lang.Text("Plugins.Compatibility.Blocking.TooOld", pclCoreVersion ?? Lang.Text("Common.State.Unknown")),
+        PluginCoreCompatibilityStatus.Future => Lang.Text("Plugins.Compatibility.Blocking.Future"),
+        PluginCoreCompatibilityStatus.Unknown => Lang.Text("Plugins.Compatibility.Blocking.Unknown"),
         _ => string.Empty
     };
 }

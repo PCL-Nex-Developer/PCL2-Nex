@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using PCL.Core.App;
+using PCL.Core.App.Localization;
 using PCL.Core.App.Plugins;
 using PCL.Core.UI;
 
@@ -69,7 +70,7 @@ public partial class PagePluginsInstalled
 
         if (allIds.Count == 0)
         {
-            var empty = new TextBlock { Text = "暂无已安装插件。可从商店安装，或通过下方远程安装。", FontSize = 13, TextWrapping = TextWrapping.Wrap };
+            var empty = new TextBlock { Text = Lang.Text("Plugins.Installed.Empty"), FontSize = 13, TextWrapping = TextWrapping.Wrap };
             empty.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
             PanInstalled.Children.Add(empty);
             return;
@@ -110,10 +111,10 @@ public partial class PagePluginsInstalled
 
             var isEnabled = PluginEnablementService.IsEnabled(pluginId);
             var orderIndex = IndexOfPlugin(enabledOrder, pluginId);
-            var orderText = orderIndex >= 0 ? "  |  加载顺序: " + (orderIndex + 1) : string.Empty;
-            var source = record?.InstalledFrom ?? (manifest is not null ? "本地插件目录" : loadedRecord != null ? "旧布局（根目录 DLL）" : "未知");
-            var state = loadedRecord != null ? loadedRecord.State.ToString() : (isEnabled ? "未加载" : "已禁用");
-            var src = new TextBlock { Text = "来源: " + source + "  |  状态: " + state + orderText, FontSize = 11, Margin = new Thickness(0, 2, 0, 0) };
+            var orderText = orderIndex >= 0 ? "  |  " + Lang.Text("Plugins.Installed.Label.LoadOrder") + (orderIndex + 1) : string.Empty;
+            var source = record?.InstalledFrom ?? (manifest is not null ? Lang.Text("Plugins.Installed.Label.SourceLocal") : loadedRecord != null ? Lang.Text("Plugins.Installed.Label.SourceLegacy") : Lang.Text("Common.State.Unknown"));
+            var state = loadedRecord != null ? loadedRecord.State.ToString() : (isEnabled ? Lang.Text("Plugins.Installed.Label.StateNotLoaded") : Lang.Text("Plugins.Installed.Label.StateDisabled"));
+            var src = new TextBlock { Text = Lang.Text("Plugins.Installed.Label.SourcePrefix") + source + "  |  " + Lang.Text("Plugins.Installed.Label.StatePrefix") + state + orderText, FontSize = 11, Margin = new Thickness(0, 2, 0, 0) };
             src.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
             info.Children.Add(src);
 
@@ -123,12 +124,12 @@ public partial class PagePluginsInstalled
             var orderButtons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(8, 0, 0, 0) };
             orderButtons.SetValue(Grid.ColumnProperty, 3);
 
-            var moveUpBtn = new MyButton { Text = "上移", Height = 28, MinWidth = 50, IsEnabled = orderIndex > 0 };
+            var moveUpBtn = new MyButton { Text = Lang.Text("Select.Folder.MoveUp"), Height = 28, MinWidth = 50, IsEnabled = orderIndex > 0 };
             var idMoveUp = pluginId;
             moveUpBtn.Click += (_, _) => MovePlugin(idMoveUp, -1);
             orderButtons.Children.Add(moveUpBtn);
 
-            var moveDownBtn = new MyButton { Text = "下移", Height = 28, MinWidth = 50, Margin = new Thickness(4, 0, 0, 0), IsEnabled = orderIndex >= 0 && orderIndex < enabledOrder.Count - 1 };
+            var moveDownBtn = new MyButton { Text = Lang.Text("Select.Folder.MoveDown"), Height = 28, MinWidth = 50, Margin = new Thickness(4, 0, 0, 0), IsEnabled = orderIndex >= 0 && orderIndex < enabledOrder.Count - 1 };
             var idMoveDown = pluginId;
             moveDownBtn.Click += (_, _) => MovePlugin(idMoveDown, 1);
             orderButtons.Children.Add(moveDownBtn);
@@ -137,7 +138,7 @@ public partial class PagePluginsInstalled
 
             var toggleBtn = new MyButton
             {
-                Text = isEnabled ? "禁用" : "启用",
+                Text = isEnabled ? Lang.Text("Common.Action.Disable") : Lang.Text("Common.Action.Enable"),
                 Height = 28,
                 MinWidth = 60,
                 Margin = new Thickness(8, 0, 0, 0),
@@ -148,7 +149,7 @@ public partial class PagePluginsInstalled
             toggleBtn.Click += (_, _) => TogglePlugin(id1, !en);
             row.Children.Add(toggleBtn);
 
-            var uninstallBtn = new MyButton { Text = "卸载", Height = 28, MinWidth = 60, Margin = new Thickness(4, 0, 0, 0), ColorType = MyButton.ColorState.Red, IsEnabled = true };
+            var uninstallBtn = new MyButton { Text = Lang.Text("Plugins.Installed.Button.Uninstall"), Height = 28, MinWidth = 60, Margin = new Thickness(4, 0, 0, 0), ColorType = MyButton.ColorState.Red, IsEnabled = true };
             uninstallBtn.SetValue(Grid.ColumnProperty, 5);
             var id2 = pluginId;
             uninstallBtn.Click += (_, _) => _Uninstall(id2);
@@ -184,10 +185,10 @@ public partial class PagePluginsInstalled
         {
             if (!await PluginInstallService.SetEnabledAsync(pluginId, enabled)) return;
             ModMain.frmMain?.RefreshRestartButton(true);
-            ModMain.MyMsgBox("插件 " + pluginId + (enabled ? " 已启用。" : " 已禁用。") + "\n请重启启动器后生效。", "插件状态");
+            ModMain.MyMsgBox(Lang.Text(enabled ? "Plugins.Installed.Message.PluginEnabled" : "Plugins.Installed.Message.PluginDisabled", pluginId), Lang.Text("Plugins.Installed.Dialog.Title.PluginStatus"));
             BuildInstalledList();
         }
-        catch (Exception ex) { ModMain.MyMsgBox("操作失败: " + ex.Message, "错误"); }
+        catch (Exception ex) { ModMain.MyMsgBox(Lang.Text("Plugins.Installed.Message.OperationFailed", ex.Message), Lang.Text("Plugins.Common.Dialog.Title.Error")); }
     }
 
     private void MovePlugin(string pluginId, int offset)
@@ -198,7 +199,7 @@ public partial class PagePluginsInstalled
             ModMain.frmMain?.RefreshRestartButton(true);
             BuildInstalledList();
         }
-        catch (Exception ex) { ModMain.MyMsgBox("调整顺序失败: " + ex.Message, "错误"); }
+        catch (Exception ex) { ModMain.MyMsgBox(Lang.Text("Plugins.Installed.Message.MoveFailed", ex.Message), Lang.Text("Plugins.Common.Dialog.Title.Error")); }
     }
 
     private static int IndexOfPlugin(IReadOnlyList<string> pluginOrder, string pluginId)
@@ -214,65 +215,65 @@ public partial class PagePluginsInstalled
     {
         if (PluginLoaderService.LoadedPlugins.Any(record => string.Equals(record.Id, pluginId, StringComparison.OrdinalIgnoreCase)))
         {
-            ModMain.MyMsgBox("插件 " + pluginId + " 正在运行。\n请先禁用插件并重启启动器，再进行卸载。", "无法卸载");
+            ModMain.MyMsgBox(Lang.Text("Plugins.Installed.Message.PluginRunning", pluginId), Lang.Text("Plugins.Common.Dialog.Title.CannotUninstall"));
             return;
         }
 
-        if (ModMain.MyMsgBox("确定卸载插件 " + pluginId + "？\n此操作将删除插件文件和数据，需要重启启动器。", "确认卸载", button2: "取消", isWarn: true) != 1) return;
+        if (ModMain.MyMsgBox(Lang.Text("Plugins.Installed.Dialog.Message.ConfirmUninstall", pluginId), Lang.Text("Plugins.Common.Dialog.Title.ConfirmUninstall"), button2: Lang.Text("Common.Action.Cancel"), isWarn: true) != 1) return;
         try
         {
             PluginInstallService.SetEnabled(pluginId, false);
             await PluginInstallService.UninstallAsync(pluginId);
-            ModMain.MyMsgBox("插件 " + pluginId + " 已卸载。", "卸载完成");
+            ModMain.MyMsgBox(Lang.Text("Plugins.Installed.Message.UninstallSuccess", pluginId), Lang.Text("Plugins.Installed.Dialog.Title.UninstallComplete"));
             BuildInstalledList();
         }
-        catch (Exception ex) { ModMain.MyMsgBox("卸载失败: " + ex.Message, "错误"); }
+        catch (Exception ex) { ModMain.MyMsgBox(Lang.Text("Plugins.Store.Uninstall.Error", ex.Message), Lang.Text("Plugins.Common.Dialog.Title.Error")); }
     }
 
     private async void BtnInstallUrl_Click(object sender, MouseButtonEventArgs e)
     {
         try
         {
-            var source = ModMain.MyMsgBoxInput("远程安装", "请输入插件 manifest URL，或直接输入 .pclx / .zip 插件包 URL：");
+            var source = ModMain.MyMsgBoxInput(Lang.Text("Plugins.Installed.Dialog.Title.RemoteInstall"), Lang.Text("Plugins.Installed.Dialog.Message.RemoteInstallUrl"));
             if (string.IsNullOrWhiteSpace(source)) return;
             if (!source.StartsWith("https://", StringComparison.OrdinalIgnoreCase) && !source.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
             {
-                ModMain.MyMsgBox("远程安装仅支持 HTTP 或 HTTPS 地址。", "安装失败");
+                ModMain.MyMsgBox(Lang.Text("Plugins.Installed.Message.RemoteInstallProtocolError"), Lang.Text("Plugins.Installed.Dialog.Title.RemoteInstallFailed"));
                 return;
             }
-            ModMain.MyMsgBox("正在解析插件来源，请稍候...", "安装准备");
+            ModMain.MyMsgBox(Lang.Text("Plugins.Installed.Message.ParsingSource"), Lang.Text("Plugins.Installed.Dialog.Title.InstallPreparing"));
             using var prepared = await PluginRemoteInstallService.PrepareAsync(source);
             var manifest = prepared.Manifest;
-            if (ModMain.MyMsgBox("即将安装插件（" + prepared.SourceLabel + "）：\n\n名称: " + manifest.Name + "\n来源: " + prepared.SourceUrl + "\n\n未经仓库信任验证。\n\n重大安全提醒：插件会在启动器内运行代码，可能读取或修改本地文件、访问网络、修改启动器界面，甚至执行恶意操作。\n请只安装你完全信任的来源。", "确认安装", button2: "取消", isWarn: true) != 1) return;
+            if (ModMain.MyMsgBox(Lang.Text("Plugins.Installed.Message.InstallSecurityWarning", prepared.SourceLabel, manifest.Name, prepared.SourceUrl), Lang.Text("Plugins.Installed.Dialog.Title.ConfirmInstall"), button2: Lang.Text("Common.Action.Cancel"), isWarn: true) != 1) return;
             await PluginInstallService.InstallFromDirectoryAsync(prepared.PluginRoot, manifest, prepared.SourceType,
                 prepared.SourceUrl, installedSha256: prepared.VerifiedSha256);
             ModMain.frmMain?.RefreshRestartButton(true);
-            ModMain.MyMsgBox("插件 " + manifest.Name + " 安装成功！\n请重启启动器后生效。", "安装完成");
+            ModMain.MyMsgBox(Lang.Text("Plugins.Installed.Message.InstallSuccess", manifest.Name), Lang.Text("Plugins.Installed.Dialog.Title.InstallComplete"));
             BuildInstalledList();
         }
-        catch (Exception ex) { ModMain.MyMsgBox("安装失败: " + ex.Message, "错误"); }
+        catch (Exception ex) { ModMain.MyMsgBox(Lang.Text("Plugins.Store.Install.Error", ex.Message), Lang.Text("Plugins.Common.Dialog.Title.Error")); }
     }
 
     private async void BtnInstallZip_Click(object sender, MouseButtonEventArgs e)
     {
         try
         {
-            var files = SystemDialogs.SelectFiles("PCL 插件包(*.pclx;*.zip)|*.pclx;*.zip", "选择插件包", allowMultiSelect: false);
+            var files = SystemDialogs.SelectFiles(Lang.Text("Plugins.Installed.Dialog.FileFilter"), Lang.Text("Plugins.Installed.Dialog.Title.SelectPackage"), allowMultiSelect: false);
             if (files.Length == 0 || string.IsNullOrWhiteSpace(files[0])) return;
             using var prepared = await PluginLocalInstallService.PrepareZipAsync(files[0]);
             await ConfirmAndInstallPreparedAsync(prepared);
         }
-        catch (Exception ex) { ModMain.MyMsgBox("导入失败: " + ex.Message, "错误"); }
+        catch (Exception ex) { ModMain.MyMsgBox(Lang.Text("Plugins.Installed.Message.ImportFailed", ex.Message), Lang.Text("Plugins.Common.Dialog.Title.Error")); }
     }
 
     private async System.Threading.Tasks.Task ConfirmAndInstallPreparedAsync(PluginPreparedInstall prepared)
     {
         var manifest = prepared.Manifest;
-        if (ModMain.MyMsgBox("即将导入插件（" + prepared.SourceLabel + "）：\n\n名称: " + manifest.Name + "\n来源: " + prepared.SourceUrl + "\n\n重大安全提醒：插件会在启动器内运行代码，可能读取或修改本地文件、访问网络、修改启动器界面，甚至执行恶意操作。\n请只导入你完全信任的插件。", "确认导入", button2: "取消", isWarn: true) != 1) return;
+        if (ModMain.MyMsgBox(Lang.Text("Plugins.Installed.Message.ImportSecurityWarning", prepared.SourceLabel, manifest.Name, prepared.SourceUrl), Lang.Text("Plugins.Installed.Dialog.Title.ConfirmImport"), button2: Lang.Text("Common.Action.Cancel"), isWarn: true) != 1) return;
         await PluginInstallService.InstallFromDirectoryAsync(prepared.PluginRoot, manifest, prepared.SourceType,
             prepared.SourceUrl, installedSha256: prepared.VerifiedSha256);
         ModMain.frmMain?.RefreshRestartButton(true);
-        ModMain.MyMsgBox("插件 " + manifest.Name + " 导入成功！\n请重启启动器后生效。", "导入完成");
+        ModMain.MyMsgBox(Lang.Text("Plugins.Installed.Message.ImportSuccess", manifest.Name), Lang.Text("Plugins.Installed.Dialog.Title.ImportComplete"));
         BuildInstalledList();
     }
 
@@ -291,7 +292,7 @@ public partial class PagePluginsInstalled
     {
         BtnCheckPluginUpdates.IsEnabled = false;
         PanPluginUpdates.Children.Clear();
-        var loading = new TextBlock { Text = "正在检查插件更新...", FontSize = 13, TextWrapping = TextWrapping.Wrap };
+        var loading = new TextBlock { Text = Lang.Text("Plugins.Installed.Message.CheckingUpdates"), FontSize = 13, TextWrapping = TextWrapping.Wrap };
         loading.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
         PanPluginUpdates.Children.Add(loading);
 
@@ -300,15 +301,15 @@ public partial class PagePluginsInstalled
             _updates = await PluginUpdateService.CheckForUpdatesAsync();
             RenderPluginUpdates();
             if (showHint)
-                ModMain.MyMsgBox(_updates.Count == 0 ? "所有市场插件都是最新版本。" : "发现 " + _updates.Count + " 个可更新插件。", "插件更新");
+                ModMain.MyMsgBox(_updates.Count == 0 ? Lang.Text("Plugins.Installed.Message.AllUpToDate") : Lang.Text("Plugins.Installed.Message.UpdatesAvailable", _updates.Count), Lang.Text("Plugins.Installed.Dialog.Title.PluginUpdates"));
         }
         catch (Exception ex)
         {
             PanPluginUpdates.Children.Clear();
-            var error = new TextBlock { Text = "检查失败: " + ex.Message, FontSize = 13, TextWrapping = TextWrapping.Wrap };
+            var error = new TextBlock { Text = Lang.Text("Plugins.Installed.Message.CheckFailed", ex.Message), FontSize = 13, TextWrapping = TextWrapping.Wrap };
             error.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
             PanPluginUpdates.Children.Add(error);
-            if (showHint) ModMain.MyMsgBox("检查更新失败: " + ex.Message, "插件更新");
+            if (showHint) ModMain.MyMsgBox(Lang.Text("Plugins.Installed.Message.CheckUpdateFailed", ex.Message), Lang.Text("Plugins.Installed.Dialog.Title.PluginUpdates"));
         }
         finally
         {
@@ -321,7 +322,7 @@ public partial class PagePluginsInstalled
         PanPluginUpdates.Children.Clear();
         if (_updates.Count == 0)
         {
-            var empty = new TextBlock { Text = "暂无可用更新。", FontSize = 13, TextWrapping = TextWrapping.Wrap };
+            var empty = new TextBlock { Text = Lang.Text("Plugins.Installed.Message.NoUpdatesAvailable"), FontSize = 13, TextWrapping = TextWrapping.Wrap };
             empty.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
             PanPluginUpdates.Children.Add(empty);
             return;
@@ -343,7 +344,7 @@ public partial class PagePluginsInstalled
             info.Children.Add(src);
             row.Children.Add(info);
 
-            var updateBtn = new MyButton { Text = "更新", Height = 28, MinWidth = 60, Margin = new Thickness(8, 0, 0, 0), ColorType = MyButton.ColorState.Highlight };
+            var updateBtn = new MyButton { Text = Lang.Text("Plugins.Installed.Button.Update"), Height = 28, MinWidth = 60, Margin = new Thickness(8, 0, 0, 0), ColorType = MyButton.ColorState.Highlight };
             updateBtn.SetValue(Grid.ColumnProperty, 1);
             updateBtn.Click += (_, _) => UpdatePlugin(candidate, refreshAfter: true);
             row.Children.Add(updateBtn);
@@ -357,11 +358,11 @@ public partial class PagePluginsInstalled
         try
         {
             var trustDecision = PluginUpdateService.EvaluateUpdate(candidate);
-            var confirmMsg = "即将更新插件：\n\n名称: " + candidate.Entry.Name + "\n当前版本: v" + PluginUpdateService.FormatVersion(candidate.Installed.InstalledVersion) + "\n最新版本: v" + PluginUpdateService.FormatVersion(candidate.LatestVersion) + "\n下载源: " + candidate.Source.Url;
+            var confirmMsg = Lang.Text("Plugins.Installed.Message.UpdateConfirm", candidate.Entry.Name, PluginUpdateService.FormatVersion(candidate.Installed.InstalledVersion), PluginUpdateService.FormatVersion(candidate.LatestVersion), candidate.Source.Url);
             if (trustDecision == PluginTrustDecision.RequireReconfirm)
-                confirmMsg += "\n\n该更新涉及来源变化或能力变化，请确认你信任此版本。";
+                confirmMsg += Lang.Text("Plugins.Installed.Message.UpdateReconfirm");
 
-            if (ModMain.MyMsgBox(confirmMsg, "确认更新", button2: "取消", isWarn: trustDecision != PluginTrustDecision.Allow) != 1) return;
+            if (ModMain.MyMsgBox(confirmMsg, Lang.Text("Plugins.Installed.Dialog.Title.ConfirmUpdate"), button2: Lang.Text("Common.Action.Cancel"), isWarn: trustDecision != PluginTrustDecision.Allow) != 1) return;
 
             using var prepared = await PluginRemoteInstallService.PrepareManifestVersionAsync(candidate.Source.Url, candidate.ManifestVersion);
             await PluginInstallService.InstallFromDirectoryAsync(
@@ -371,13 +372,13 @@ public partial class PagePluginsInstalled
                 candidate.Installed.InstalledFrom,
                 installedSha256: prepared.VerifiedSha256);
             ModMain.frmMain?.RefreshRestartButton(true);
-            ModMain.MyMsgBox("插件 " + prepared.Manifest.Name + " 已更新到 v" + PluginUpdateService.FormatVersion(prepared.Manifest.Version) + "！\n请重启启动器后生效。", "更新完成");
+            ModMain.MyMsgBox(Lang.Text("Plugins.Installed.Message.UpdateSuccess", prepared.Manifest.Name, PluginUpdateService.FormatVersion(prepared.Manifest.Version)), Lang.Text("Plugins.Installed.Dialog.Title.UpdateComplete"));
             BuildInstalledList();
             if (refreshAfter) await CheckPluginUpdatesAsync(showHint: false);
         }
         catch (Exception ex)
         {
-            ModMain.MyMsgBox("更新失败: " + ex.Message, "错误");
+            ModMain.MyMsgBox(Lang.Text("Plugins.Installed.Message.UpdateFailed", ex.Message), Lang.Text("Plugins.Common.Dialog.Title.Error"));
         }
     }
 }

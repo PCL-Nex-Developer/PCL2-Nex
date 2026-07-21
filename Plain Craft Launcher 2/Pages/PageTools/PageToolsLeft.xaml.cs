@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using PCL.Core.App;
+using PCL.Core.App.Localization;
 
 namespace PCL;
 
@@ -56,7 +57,7 @@ public partial class PageToolsLeft
     {
         var targetID = id ?? pageID;
         if (targetID != FormMain.PageSubType.ToolsTest)
-            throw new Exception("未知的工具子页面种类：" + (int)targetID);
+            throw new Exception(Lang.Text("Tools.Left.Error.UnknownSubPage", (int)targetID));
 
         ModMain.frmToolsTest ??= new PageToolsTest();
         return ModMain.frmToolsTest;

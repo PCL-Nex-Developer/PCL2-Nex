@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using PCL.Core.App.Localization;
 
 namespace PCL.Core.App.Plugins;
 
@@ -29,7 +30,7 @@ public static class PluginEnablementService
 
     internal static void SetEnabled(string pluginId, bool enabled)
     {
-        if (!PluginPackageService.IsValidPluginId(pluginId)) throw new ArgumentException("插件 Id 无效。", nameof(pluginId));
+        if (!PluginPackageService.IsValidPluginId(pluginId)) throw new ArgumentException(Text("Plugins.Install.Error.InvalidPluginId", "插件 Id 无效。"), nameof(pluginId));
         if (enabled) ClearSelfProtectionDisabled(pluginId);
 
         var states = NormalizeEnabledStates(ReadEnabledStates()).ToList();
@@ -47,7 +48,7 @@ public static class PluginEnablementService
 
     public static void MarkSelfProtectionDisabled(string pluginId)
     {
-        if (!PluginPackageService.IsValidPluginId(pluginId)) throw new ArgumentException("插件 Id 无效。", nameof(pluginId));
+        if (!PluginPackageService.IsValidPluginId(pluginId)) throw new ArgumentException(Text("Plugins.Install.Error.InvalidPluginId", "插件 Id 无效。"), nameof(pluginId));
         Directory.CreateDirectory(_GetSelfProtectionDirectory());
         File.WriteAllText(_GetSelfProtectionMarkerPath(pluginId), DateTimeOffset.UtcNow.ToString("O"));
     }
@@ -81,7 +82,7 @@ public static class PluginEnablementService
 
     public static bool MoveEnabledPlugin(string pluginId, int offset)
     {
-        if (!PluginPackageService.IsValidPluginId(pluginId)) throw new ArgumentException("插件 Id 无效。", nameof(pluginId));
+        if (!PluginPackageService.IsValidPluginId(pluginId)) throw new ArgumentException(Text("Plugins.Install.Error.InvalidPluginId", "插件 Id 无效。"), nameof(pluginId));
         if (offset == 0) return false;
 
         var states = NormalizeEnabledStates(ReadEnabledStates()).ToList();
@@ -147,7 +148,16 @@ public static class PluginEnablementService
     private static string _SafeFileName(string value)
     {
         if (!PluginPackageService.IsValidPluginId(value))
-            throw new ArgumentException("插件 Id 无效。", nameof(value));
+            throw new ArgumentException(Text("Plugins.Install.Error.InvalidPluginId", "插件 Id 无效。"), nameof(value));
         return value;
+    }
+
+    private static string Text(string key, string fallback, params object?[] args)
+    {
+        var template = Lang.Text(key);
+        if (string.Equals(template, key, StringComparison.Ordinal)
+            || string.Equals(template, $"!{key}!", StringComparison.Ordinal))
+            template = fallback;
+        return string.Format(Lang.Culture, template, args);
     }
 }

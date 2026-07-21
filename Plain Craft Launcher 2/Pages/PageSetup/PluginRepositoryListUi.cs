@@ -1,6 +1,9 @@
 using System;
+using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using PCL.Core.App.Localization;
 using PCL.Core.App.Plugins;
 
 namespace PCL;
@@ -10,26 +13,25 @@ internal static class PluginRepositoryListUi
     public static void BuildRepoList(StackPanel repoList)
     {
         repoList.Children.Clear();
-        repoList.Children.Add(CreateRepoRow("GitHub", "pclnexplugin", "内置 Topic", true, repoList));
-        repoList.Children.Add(CreateRepoRow("NexDeveloper", PluginRepositoryService.GetOfficialIndexUrl(), "内置第三方 JSON", true, repoList));
-        var records = PluginTrustService.GetAllTrustRecords();
+        repoList.Children.Add(CreateRepoRow("GitHub", "pclnexplugin", Lang.Text("Plugins.Repository.BuiltInTopic"), true, repoList));
+        repoList.Children.Add(CreateRepoRow("NexDeveloper", PluginRepositoryService.GetOfficialIndexUrl(), Lang.Text("Plugins.Repository.BuiltInThirdPartyJson"), true, repoList));
+        var records = PluginTrustService.GetAllTrustRecords()
+            .Where(record => record.SourceKind != PluginRepositorySourceKind.Topic)
+            .ToList();
         if (records.Count == 0)
         {
-            var hint = new TextBlock { Text = "暂无自定义插件源。可添加 Topic 关键词、Manifest 或本地/网络 JSON。", FontSize = 12, Margin = new Thickness(0, 8, 0, 0) };
+            var hint = new TextBlock { Text = Lang.Text("Plugins.Repository.NoCustomSourceHint"), FontSize = 12, Margin = new Thickness(0, 8, 0, 0) };
             hint.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
             repoList.Children.Add(hint);
             return;
         }
         foreach (var record in records)
         {
-            var name = record.SourceKind == PluginRepositorySourceKind.Topic
-                ? record.RepoUrl
-                : record.RepoName;
+            var name = record.RepoName;
             var description = record.SourceKind switch
             {
-                PluginRepositorySourceKind.Topic => "Topic",
-                PluginRepositorySourceKind.Manifest => "Manifest",
-                _ => "第三方 JSON"
+                PluginRepositorySourceKind.Manifest => Lang.Text("Plugins.Repository.SourceType.Manifest"),
+                _ => Lang.Text("Plugins.Repository.SourceType.ThirdPartyJson")
             };
             repoList.Children.Add(CreateRepoRow(name, record.RepoUrl, description, false, repoList, record.Enabled));
         }
@@ -67,13 +69,13 @@ internal static class PluginRepositoryListUi
         row.Children.Add(info);
         if (!isBuiltIn)
         {
-            var toggleBtn = new MyButton { Text = enabled ? "禁用" : "启用", Height = 26, MinWidth = 50, Margin = new Thickness(8, 0, 0, 0) };
+            var toggleBtn = new MyButton { Text = enabled ? Lang.Text("Common.Action.Disable") : Lang.Text("Common.Action.Enable"), Height = 26, MinWidth = 50, Margin = new Thickness(8, 0, 0, 0) };
             toggleBtn.SetValue(Grid.ColumnProperty, 1);
             toggleBtn.Click += (_, _) => { PluginTrustService.SetRepositoryEnabled(url, !enabled); BuildRepoList(repoList); };
             row.Children.Add(toggleBtn);
-            var removeBtn = new MyButton { Text = "移除", Height = 26, MinWidth = 50, Margin = new Thickness(4, 0, 0, 0), ColorType = MyButton.ColorState.Red };
+            var removeBtn = new MyButton { Text = Lang.Text("Common.Action.Remove"), Height = 26, MinWidth = 50, Margin = new Thickness(4, 0, 0, 0), ColorType = MyButton.ColorState.Red };
             removeBtn.SetValue(Grid.ColumnProperty, 2);
-            removeBtn.Click += (_, _) => { if (ModMain.MyMsgBox("确定移除仓库 " + name + "？", "确认", button2: "取消", isWarn: true) == 1) { PluginTrustService.RemoveTrust(url); BuildRepoList(repoList); } };
+            removeBtn.Click += (_, _) => { if (ModMain.MyMsgBox(Lang.Text("Plugins.Repository.RemoveConfirmMessage", name), Lang.Text("Common.Action.Confirm"), button2: Lang.Text("Common.Action.Cancel"), isWarn: true) == 1) { PluginTrustService.RemoveTrust(url); BuildRepoList(repoList); } };
             row.Children.Add(removeBtn);
         }
         return row;
@@ -83,33 +85,43 @@ internal static class PluginRepositoryListUi
     {
         try
         {
-            var input = ModMain.MyMsgBoxInput("添加插件源", "请输入来源：\n- topic:pclnexplugin 或直接输入 Topic 关键词\n- manifest:https://example.com/manifest.json\n- 网络或本地 JSON 文件地址");
+            var input = ModMain.MyMsgBoxInput(Lang.Text("Plugins.Repository.AddDialog.Title"), Lang.Text("Plugins.Repository.AddDialog.Message"));
             if (string.IsNullOrWhiteSpace(input)) return;
             input = input.Trim();
             var sourceKind = PluginRepositorySourceKind.Json;
             var url = input;
-            if (input.StartsWith("topic:", StringComparison.OrdinalIgnoreCase))
-            {
-                sourceKind = PluginRepositorySourceKind.Topic;
-                url = input[6..].Trim();
-            }
-            else if (input.StartsWith("manifest:", StringComparison.OrdinalIgnoreCase))
+            if (input.StartsWith("manifest:", StringComparison.OrdinalIgnoreCase))
             {
                 sourceKind = PluginRepositorySourceKind.Manifest;
                 url = input[9..].Trim();
             }
-            else if (!Uri.TryCreate(input, UriKind.Absolute, out _) && !System.IO.File.Exists(input))
+            else if (input.StartsWith("json:", StringComparison.OrdinalIgnoreCase))
             {
-                sourceKind = PluginRepositorySourceKind.Topic;
+                url = input[5..].Trim();
             }
-            if (string.IsNullOrWhiteSpace(url)) throw new ArgumentException("插件源内容不能为空。");
-            var name = sourceKind == PluginRepositorySourceKind.Topic
-                ? url
-                : ModMain.MyMsgBoxInput("插件源名称", "请输入此来源在插件商店中显示的名称：", "自定义插件源");
-            if (string.IsNullOrWhiteSpace(name)) name = sourceKind == PluginRepositorySourceKind.Topic ? url : "自定义插件源";
+            if (string.IsNullOrWhiteSpace(url)) throw new ArgumentException(Lang.Text("Plugins.Repository.AddDialog.EmptyContent"));
+            if (sourceKind == PluginRepositorySourceKind.Manifest)
+            {
+                if (!Uri.TryCreate(url, UriKind.Absolute, out var manifestUri)
+                    || manifestUri.Scheme is not ("http" or "https"))
+                    throw new ArgumentException(Lang.Text("Plugins.Repository.AddDialog.InvalidManifest"));
+            }
+            else if (File.Exists(url))
+            {
+                if (!url.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                    throw new ArgumentException(Lang.Text("Plugins.Repository.AddDialog.InvalidJson"));
+                url = Path.GetFullPath(url);
+            }
+            else if (!Uri.TryCreate(url, UriKind.Absolute, out var jsonUri)
+                     || jsonUri.Scheme is not ("http" or "https"))
+            {
+                throw new ArgumentException(Lang.Text("Plugins.Repository.AddDialog.InvalidJson"));
+            }
+            var name = ModMain.MyMsgBoxInput(Lang.Text("Plugins.Repository.NameDialog.Title"), Lang.Text("Plugins.Repository.NameDialog.Message"), Lang.Text("Plugins.Repository.DefaultName"));
+            if (string.IsNullOrWhiteSpace(name)) name = Lang.Text("Plugins.Repository.DefaultName");
             PluginTrustService.AddTrust(url, name, PluginRepositorySourceType.Custom, sourceKind);
             BuildRepoList(repoList);
         }
-        catch (Exception ex) { ModMain.MyMsgBox("添加失败: " + ex.Message, "错误"); }
+        catch (Exception ex) { ModMain.MyMsgBox(Lang.Text("Plugins.Repository.AddFailed", ex.Message), Lang.Text("Common.Action.Confirm")); }
     }
 }

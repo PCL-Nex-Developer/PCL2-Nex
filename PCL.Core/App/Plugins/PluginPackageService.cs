@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using PCL.Core.App.Localization;
 
 namespace PCL.Core.App.Plugins;
 
@@ -30,16 +31,16 @@ public static class PluginPackageService
     public static PluginPackageValidationResult ValidatePackageManifest(PluginPackageManifest manifest, string? currentPclCoreVersion)
     {
         if (manifest is null)
-            return new PluginPackageValidationResult(false, "清单对象为 null。");
+            return new PluginPackageValidationResult(false, Text("Plugins.Package.Error.ManifestNull", "清单对象为 null。"));
 
         if (string.IsNullOrWhiteSpace(manifest.Id))
-            return new PluginPackageValidationResult(false, "缺少必填字段 Id。");
+            return new PluginPackageValidationResult(false, Text("Plugins.Package.Error.MissingId", "缺少必填字段 Id。"));
 
         if (!IsValidPluginId(manifest.Id))
-            return new PluginPackageValidationResult(false, "插件 Id 无效。请使用至少两个非空点分段，且仅包含 ASCII 字母、数字、下划线和连字符。");
+            return new PluginPackageValidationResult(false, Text("Plugins.Package.Error.InvalidId", "插件 Id 无效。请使用至少两个非空点分段，且仅包含 ASCII 字母、数字、下划线和连字符。"));
 
         if (string.IsNullOrWhiteSpace(manifest.Name))
-            return new PluginPackageValidationResult(false, "缺少必填字段 Name。");
+            return new PluginPackageValidationResult(false, Text("Plugins.Package.Error.MissingName", "缺少必填字段 Name。"));
 
         var legacyField = manifest.AdditionalProperties?.Keys.FirstOrDefault(key => key.Equals("entryType", StringComparison.OrdinalIgnoreCase)
             || key.Equals("loadMethod", StringComparison.OrdinalIgnoreCase)
@@ -49,18 +50,18 @@ public static class PluginPackageService
         if (legacyField is not null)
             return new PluginPackageValidationResult(
                 false,
-                $"旧插件入口字段 {legacyField} 已移除；LoadAsync/UnloadAsync 与 JavaScript 插件不再支持。");
+                Text("Plugins.Package.Error.LegacyFieldRemoved", "旧插件入口字段 {0} 已移除；LoadAsync/UnloadAsync 与 JavaScript 插件不再支持。", legacyField));
 
         if (string.IsNullOrWhiteSpace(manifest.EntryAssembly))
-            return new PluginPackageValidationResult(false, "缺少必填字段 EntryAssembly。");
+            return new PluginPackageValidationResult(false, Text("Plugins.Package.Error.MissingEntryAssembly", "缺少必填字段 EntryAssembly。"));
 
         if (manifest.GetMixinConfigurationPaths().Count == 0)
             return new PluginPackageValidationResult(
                 false,
-                "缺少必填字段 mixinConfig 或 mixinConfigs；LoadAsync/UnloadAsync 与 JavaScript 插件已不再支持。");
+                Text("Plugins.Package.Error.MissingMixinConfig", "缺少必填字段 mixinConfig 或 mixinConfigs；LoadAsync/UnloadAsync 与 JavaScript 插件已不再支持。"));
 
         if (!PluginUpdateService.TryParseVersion(manifest.Version, out _))
-            return new PluginPackageValidationResult(false, "Version 无效或未设置。");
+            return new PluginPackageValidationResult(false, Text("Plugins.Package.Error.InvalidVersion", "Version 无效或未设置。"));
 
         var dependencyValidation = PluginDependencyService.ValidateDeclarations(manifest.Id, manifest.Dependencies);
         if (!dependencyValidation.IsValid)
@@ -70,7 +71,7 @@ public static class PluginPackageService
         if (!string.IsNullOrWhiteSpace(logo)
             && !IsHttpUrl(logo)
             && !IsSafeRelativePackagePath(logo))
-            return new PluginPackageValidationResult(false, "Logo 必须是 HTTP/HTTPS URL 或插件包内的安全相对路径。");
+            return new PluginPackageValidationResult(false, Text("Plugins.Package.Error.InvalidLogo", "Logo 必须是 HTTP/HTTPS URL 或插件包内的安全相对路径。"));
 
         var compatibility = ValidateRuntimeCompatibility(manifest, currentPclCoreVersion);
         if (!compatibility.IsValid) return compatibility;
@@ -122,7 +123,7 @@ public static class PluginPackageService
     public static PluginPackageValidationResult ValidateRuntimeCompatibility(PluginPackageManifest manifest, string? currentPclCoreVersion)
     {
         if (manifest is null)
-            return new PluginPackageValidationResult(false, "清单对象为 null。");
+            return new PluginPackageValidationResult(false, Text("Plugins.Package.Error.ManifestNull", "清单对象为 null。"));
 
         var status = PluginCompatibility.EvaluatePclCoreVersion(manifest.PclCoreVersion, currentPclCoreVersion);
         return status == PluginCoreCompatibilityStatus.TooOld
@@ -159,10 +160,19 @@ public static class PluginPackageService
     {
         var manifest = await ReadManifestFromDirectoryAsync(pluginRoot, ct).ConfigureAwait(false);
         if (manifest is null)
-            return (null, new PluginPackageValidationResult(false, "无法读取目录内的 plugin.json。"));
+            return (null, new PluginPackageValidationResult(false, Text("Plugins.Package.Error.CannotReadPluginJson", "无法读取目录内的 plugin.json。")));
 
         var result = ValidatePackageManifest(manifest);
         return (manifest, result);
+    }
+
+    private static string Text(string key, string fallback, params object?[] args)
+    {
+        var template = Lang.Text(key);
+        if (string.Equals(template, key, StringComparison.Ordinal)
+            || string.Equals(template, $"!{key}!", StringComparison.Ordinal))
+            template = fallback;
+        return string.Format(Lang.Culture, template, args);
     }
 }
 

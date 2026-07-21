@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Media;
+using PCL.Core.App.Localization;
 
 namespace PCL.Core.App.Essentials;
 
@@ -32,7 +33,7 @@ public static class StartupValidation
             windowsDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
 
         if (!IsUsableWindowsDirectory(windowsDirectory))
-            throw new InvalidOperationException("无法确定 Windows 系统目录，WPF 字体系统无法初始化。");
+            throw new InvalidOperationException(Lang.Text("Application.Startup.WpfFontInitFailed"));
 
         Environment.SetEnvironmentVariable("windir", windowsDirectory, EnvironmentVariableTarget.Process);
         return windowsDirectory!;

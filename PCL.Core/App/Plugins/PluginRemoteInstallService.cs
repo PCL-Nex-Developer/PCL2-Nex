@@ -12,6 +12,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using PCL.Core.App;
+using PCL.Core.App.Localization;
 using PCL.Core.IO.Net.Http;
 using PCL.Core.Logging;
 using PCL.Core.Utils;
@@ -28,7 +29,7 @@ public static class PluginRemoteInstallService
     public static async Task<PluginPreparedInstall> PrepareAsync(PluginInstallSourceEntry source, CancellationToken ct = default)
     {
         if (source is null || string.IsNullOrWhiteSpace(source.Url))
-            throw new ArgumentException("安装来源不能为空。", nameof(source));
+            throw new ArgumentException(Lang.Text("Plugins.RemoteInstall.Error.SourceEmpty"), nameof(source));
 
         var type = source.Type.Trim().ToLowerInvariant();
         return type switch
@@ -36,7 +37,7 @@ public static class PluginRemoteInstallService
             "package" => await PrepareRepositoryPackageAsync(source.Url, source.Sha256, ct).ConfigureAwait(false),
             "manifest" => await PrepareManifestAsync(source.Url, ct).ConfigureAwait(false),
             "git" => await PrepareGitAsync(source.Url, source.Ref, ct).ConfigureAwait(false),
-            _ => throw new NotSupportedException("仅支持 manifest、.pclx 或 .zip 插件安装源。")
+            _ => throw new NotSupportedException(Lang.Text("Plugins.RemoteInstall.Error.UnsupportedSource"))
         };
     }
 
@@ -46,7 +47,7 @@ public static class PluginRemoteInstallService
     public static Task<PluginPreparedInstall> PrepareAsync(string source, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(source))
-            throw new ArgumentException("安装来源不能为空。", nameof(source));
+            throw new ArgumentException(Text("Plugins.RemoteInstall.Error.SourceEmpty", "安装来源不能为空。"), nameof(source));
 
         source = source.Trim();
         if (LooksLikePackageUrl(source)) return PreparePackageAsync(source, null, ct);
@@ -57,10 +58,10 @@ public static class PluginRemoteInstallService
     public static async Task<PluginPreparedInstall> PrepareManifestAsync(string manifestUrl, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(manifestUrl))
-            throw new ArgumentException("插件 manifest 地址不能为空。", nameof(manifestUrl));
+            throw new ArgumentException(Lang.Text("Plugins.RemoteInstall.Error.ManifestUrlEmpty"), nameof(manifestUrl));
 
         var manifest = await FetchManifestAsync(manifestUrl, ct).ConfigureAwait(false)
-            ?? throw new InvalidDataException("插件 manifest 解析失败。");
+            ?? throw new InvalidDataException(Lang.Text("Plugins.RemoteInstall.Error.ManifestParseFailed"));
         var version = SelectCompatibleManifestVersion(manifest);
 
         return await PrepareManifestVersionAsync(manifestUrl, version, ct).ConfigureAwait(false);
@@ -69,13 +70,13 @@ public static class PluginRemoteInstallService
     public static async Task<PluginPreparedInstall> PrepareManifestVersionAsync(string manifestUrl, PluginMarketVersion version, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(manifestUrl))
-            throw new ArgumentException("插件 manifest 地址不能为空。", nameof(manifestUrl));
+            throw new ArgumentException(Text("Plugins.RemoteInstall.Error.ManifestUrlEmpty", "插件 manifest 地址不能为空。"), nameof(manifestUrl));
         if (version is null)
             throw new ArgumentNullException(nameof(version));
         if (!LooksLikePackageUrl(version.ResolvedPackageUrl))
-            throw new InvalidDataException("插件 manifest 版本缺少指向 .pclx 或 .zip 的 packageUrl。");
+            throw new InvalidDataException(Lang.Text("Plugins.RemoteInstall.Error.MissingPackageUrl"));
         if (!PluginRepositoryService.IsValidSha256(version.ResolvedSha256))
-            throw new InvalidDataException("插件 manifest 版本缺少有效的 64 位十六进制 SHA-256。");
+            throw new InvalidDataException(Lang.Text("Plugins.RemoteInstall.Error.InvalidSha256"));
 
         var prepared = await PreparePackageAsync(
             version.ResolvedPackageUrl,
@@ -84,7 +85,9 @@ public static class PluginRemoteInstallService
             version.PluginId,
             version.Version,
             version.ResolvedDependencies).ConfigureAwait(false);
-        var sourceLabel = string.IsNullOrWhiteSpace(version.Version) ? "市场 manifest" : "市场 manifest（v" + version.Version + "）";
+        var sourceLabel = string.IsNullOrWhiteSpace(version.Version)
+            ? Lang.Text("Plugins.RemoteInstall.SourceLabel.MarketManifest")
+            : Lang.Text("Plugins.RemoteInstall.SourceLabel.MarketManifestVersion", version.Version);
         return new PluginPreparedInstall(prepared.PluginRoot, prepared.Manifest, PluginInstallSourceType.Manifest,
             manifestUrl, sourceLabel, prepared.CleanupPath, prepared.VerifiedSha256);
     }
@@ -170,7 +173,7 @@ public static class PluginRemoteInstallService
             .ToList();
 
         if (candidates.Count == 0)
-            throw new InvalidDataException("插件 manifest 缺少指向 .pclx 或 .zip 的 versions 条目。");
+            throw new InvalidDataException(Text("Plugins.RemoteInstall.Error.MissingPackageUrl", "插件 manifest 缺少指向 .pclx 或 .zip 的 versions 条目。"));
 
         currentHostVersion ??= PluginCompatibility.CurrentPclCoreVersion;
         var selected = candidates
@@ -181,7 +184,7 @@ public static class PluginRemoteInstallService
             .FirstOrDefault();
 
         if (selected is null)
-            throw new InvalidDataException("插件 manifest 中没有当前平台可安装且未过旧的版本。");
+            throw new InvalidDataException(Text("Plugins.RemoteInstall.Error.NoInstallableVersion", "插件 manifest 中没有当前平台可安装且未过旧的版本。"));
 
         selected.Version.ResolvedPackageUrl = selected.Download.PackageUrl;
         selected.Version.ResolvedSha256 = selected.Download.Sha256;
@@ -197,11 +200,11 @@ public static class PluginRemoteInstallService
         IReadOnlyList<PluginDependency>? expectedDependencies = null)
     {
         if (string.IsNullOrWhiteSpace(packageUrl))
-            throw new ArgumentException("插件包地址不能为空。", nameof(packageUrl));
+            throw new ArgumentException(Lang.Text("Plugins.RemoteInstall.Error.PackageUrlEmpty"), nameof(packageUrl));
         if (!LooksLikePackageUrl(packageUrl))
-            throw new NotSupportedException("插件包必须是 .pclx 或 .zip 文件。");
+            throw new NotSupportedException(Lang.Text("Plugins.RemoteInstall.Error.NotPackageFile"));
         if (!Uri.TryCreate(packageUrl, UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp))
-            throw new NotSupportedException("插件包地址必须是 HTTP 或 HTTPS。");
+            throw new NotSupportedException(Lang.Text("Plugins.RemoteInstall.Error.NotHttpUrl"));
 
         var extension = Path.GetExtension(uri.AbsolutePath);
         if (string.IsNullOrWhiteSpace(extension)) extension = ".zip";
@@ -239,7 +242,7 @@ public static class PluginRemoteInstallService
                     }
                 }
 
-                if (response is null) throw lastDownloadError ?? new HttpRequestException("插件包下载失败。");
+                if (response is null) throw lastDownloadError ?? new HttpRequestException(Lang.Text("Plugins.RemoteInstall.Error.DownloadFailed"));
                 response.EnsureSuccessStatusCode();
                 await using var remoteStream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
                 await using var fileStream = File.Create(packagePath);
@@ -253,14 +256,14 @@ public static class PluginRemoteInstallService
             var verifiedSha256 = ValidateSha256(packagePath, expectedSha256);
             await Task.Run(() => ExtractZipSafely(packagePath, extractDir), ct).ConfigureAwait(false);
             var pluginRoot = FindPluginRoot(extractDir)
-                ?? throw new InvalidDataException("插件包中未找到 plugin.json。请确认该文件是 PCL 插件包。");
+                ?? throw new InvalidDataException(Lang.Text("Plugins.RemoteInstall.Error.NoPluginJsonInPackage"));
             var (manifest, result) = await PluginPackageService.ReadAndValidateDirectoryAsync(pluginRoot, ct).ConfigureAwait(false);
             if (!result.IsValid || manifest is null)
-                throw new InvalidDataException(result.ErrorMessage ?? "插件包校验失败。");
+                throw new InvalidDataException(result.ErrorMessage ?? Lang.Text("Plugins.RemoteInstall.Error.PackageValidationFailed"));
             ValidateSelectedMarketIdentity(manifest, expectedPluginId, expectedVersion, expectedDependencies);
 
             return new PluginPreparedInstall(pluginRoot, manifest, PluginInstallSourceType.Repository,
-                packageUrl, "远程插件包", workDir, verifiedSha256);
+                packageUrl, Lang.Text("Plugins.RemoteInstall.SourceLabel.RemotePackage"), workDir, verifiedSha256);
         }
         catch
         {
@@ -302,7 +305,7 @@ public static class PluginRemoteInstallService
     private static Task<PluginPreparedInstall> PrepareRepositoryPackageAsync(string packageUrl, string? expectedSha256, CancellationToken ct)
     {
         if (!PluginRepositoryService.IsValidSha256(expectedSha256))
-            throw new InvalidDataException("市场插件包必须提供有效的 64 位十六进制 SHA-256。");
+            throw new InvalidDataException(Lang.Text("Plugins.RemoteInstall.Error.MarketPackageSha256Required"));
         return PreparePackageAsync(packageUrl, expectedSha256, ct);
     }
 
@@ -343,22 +346,22 @@ public static class PluginRemoteInstallService
         if (!string.IsNullOrWhiteSpace(expectedPluginId)
             && !string.Equals(packageManifest.Id, expectedPluginId, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException(
-                $"插件包 ID {packageManifest.Id} 与市场 manifest 的 {expectedPluginId} 不一致。");
+                Text("Plugins.RemoteInstall.Error.PackageIdMismatch", "插件包 ID {0} 与市场 manifest 的 {1} 不一致。", packageManifest.Id, expectedPluginId));
 
         if (!string.IsNullOrWhiteSpace(expectedVersion))
         {
             var expected = TryParsePackageVersion(expectedVersion)
-                ?? throw new InvalidDataException("市场 manifest 包含无效的插件版本。");
+                ?? throw new InvalidDataException(Text("Plugins.RemoteInstall.Error.InvalidMarketVersion", "市场 manifest 包含无效的插件版本。"));
             var actual = TryParsePackageVersion(packageManifest.Version)
-                ?? throw new InvalidDataException("插件包包含无效的 SemVer 版本。");
+                ?? throw new InvalidDataException(Text("Plugins.RemoteInstall.Error.InvalidPackageSemVer", "插件包包含无效的 SemVer 版本。"));
             if (actual != expected)
                 throw new InvalidDataException(
-                    $"插件包版本 {packageManifest.Version} 与市场 manifest 的 {expectedVersion} 不一致。");
+                    Text("Plugins.RemoteInstall.Error.PackageVersionMismatch", "插件包版本 {0} 与市场 manifest 的 {1} 不一致。", packageManifest.Version, expectedVersion));
         }
 
         if (expectedDependencies is not null
             && !PluginDependencyService.DependencyListsEqual(packageManifest.Dependencies, expectedDependencies))
-            throw new InvalidDataException("插件包 dependencies 与市场 manifest 声明不一致。");
+            throw new InvalidDataException(Text("Plugins.RemoteInstall.Error.DependencyMismatch", "插件包 dependencies 与市场 manifest 声明不一致。"));
     }
 
     internal static void ApplyGitHubHeaders(
@@ -388,7 +391,7 @@ public static class PluginRemoteInstallService
     public static PluginGitSource ParseGitSource(string source, string? reference = null)
     {
         if (string.IsNullOrWhiteSpace(source))
-            throw new ArgumentException("安装来源不能为空。", nameof(source));
+            throw new ArgumentException(Text("Plugins.RemoteInstall.Error.SourceEmpty", "安装来源不能为空。"), nameof(source));
 
         var cloneUrl = source.Trim();
         if (cloneUrl.StartsWith("git+", StringComparison.OrdinalIgnoreCase)) cloneUrl = cloneUrl[4..];
@@ -414,7 +417,7 @@ public static class PluginRemoteInstallService
         if (string.IsNullOrWhiteSpace(gitRef)) gitRef = inlineRef;
 
         if (string.IsNullOrWhiteSpace(cloneUrl))
-            throw new ArgumentException("Git 仓库地址不能为空。", nameof(source));
+            throw new ArgumentException(Text("Plugins.RemoteInstall.Error.GitUrlEmpty", "Git 仓库地址不能为空。"), nameof(source));
 
         return new PluginGitSource(cloneUrl, string.IsNullOrWhiteSpace(gitRef) ? null : gitRef);
     }
@@ -435,12 +438,14 @@ public static class PluginRemoteInstallService
         await RunGitAsync(BuildCloneArguments(cloneUrl, gitSource.Reference, workDir), ct).ConfigureAwait(false);
 
         var pluginRoot = FindPluginRoot(workDir)
-            ?? throw new InvalidDataException("Git 仓库中未找到 plugin.json。请确认该仓库根目录或子目录包含 PCL 插件。" );
+            ?? throw new InvalidDataException(Lang.Text("Plugins.RemoteInstall.Error.NoPluginJsonInGit"));
         var (manifest, result) = await PluginPackageService.ReadAndValidateDirectoryAsync(pluginRoot, ct).ConfigureAwait(false);
         if (!result.IsValid || manifest is null)
-            throw new InvalidDataException(result.ErrorMessage ?? "插件目录校验失败。");
+            throw new InvalidDataException(result.ErrorMessage ?? Lang.Text("Plugins.RemoteInstall.Error.DirectoryValidationFailed"));
 
-        var sourceLabel = string.IsNullOrWhiteSpace(gitSource.Reference) ? "Git 安装" : "Git 安装（" + gitSource.Reference + "）";
+        var sourceLabel = string.IsNullOrWhiteSpace(gitSource.Reference)
+            ? Lang.Text("Plugins.RemoteInstall.SourceLabel.GitInstall")
+            : Lang.Text("Plugins.RemoteInstall.SourceLabel.GitInstallWithRef", gitSource.Reference);
         return new PluginPreparedInstall(pluginRoot, manifest, PluginInstallSourceType.Git, gitSource.ToDisplayString(), sourceLabel, workDir);
     }
 
@@ -465,7 +470,7 @@ public static class PluginRemoteInstallService
             if (string.IsNullOrWhiteSpace(entry.FullName)) continue;
             var targetPath = Path.GetFullPath(Path.Combine(destinationRoot, entry.FullName));
             if (!targetPath.StartsWith(destinationRoot, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException("插件包包含不安全的路径。");
+                throw new InvalidDataException(Lang.Text("Plugins.RemoteInstall.Error.UnsafePathInPackage"));
 
             if (string.IsNullOrEmpty(entry.Name))
             {
@@ -481,14 +486,14 @@ public static class PluginRemoteInstallService
     internal static string ValidateSha256(string filePath, string? expectedSha256)
     {
         if (!string.IsNullOrWhiteSpace(expectedSha256) && !PluginRepositoryService.IsValidSha256(expectedSha256))
-            throw new InvalidDataException("插件包 SHA-256 格式无效。");
+            throw new InvalidDataException(Lang.Text("Plugins.RemoteInstall.Error.InvalidPackageSha256Format"));
 
         using var stream = File.OpenRead(filePath);
         var actual = Convert.ToHexString(SHA256.HashData(stream));
         if (string.IsNullOrWhiteSpace(expectedSha256)) return actual;
         var expected = expectedSha256.Trim().Replace(" ", string.Empty).Replace("-", string.Empty);
         if (!string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException("插件包 SHA-256 校验失败。");
+            throw new InvalidDataException(Lang.Text("Plugins.RemoteInstall.Error.PackageSha256Mismatch"));
         return actual;
     }
 
@@ -518,7 +523,7 @@ public static class PluginRemoteInstallService
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException("无法启动 git。请确认已安装 Git 并加入 PATH。", ex);
+            throw new InvalidOperationException(Lang.Text("Plugins.RemoteInstall.Error.GitNotFound"), ex);
         }
 
         var stdoutTask = process.StandardOutput.ReadToEndAsync(ct);
@@ -528,7 +533,7 @@ public static class PluginRemoteInstallService
         var stderr = await stderrTask.ConfigureAwait(false);
 
         if (process.ExitCode != 0)
-            throw new InvalidOperationException("Git 克隆失败：" + (string.IsNullOrWhiteSpace(stderr) ? stdout : stderr));
+            throw new InvalidOperationException(Lang.Text("Plugins.RemoteInstall.Error.GitCloneFailed", string.IsNullOrWhiteSpace(stderr) ? stdout : stderr));
     }
 
     private static string QuoteArg(string value)
@@ -543,6 +548,14 @@ public static class PluginRemoteInstallService
         return args + QuoteArg(cloneUrl) + " " + QuoteArg(workDir);
     }
 
+    private static string Text(string key, string fallback, params object?[] args)
+    {
+        var template = Lang.Text(key);
+        if (string.Equals(template, key, StringComparison.Ordinal)
+            || string.Equals(template, $"!{key}!", StringComparison.Ordinal))
+            template = fallback;
+        return string.Format(Lang.Culture, template, args);
+    }
 }
 
 public sealed record PluginGitSource(string CloneUrl, string? Reference)

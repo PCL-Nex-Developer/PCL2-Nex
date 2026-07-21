@@ -1,4 +1,4 @@
-<ResourceDictionary
+﻿<ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:sys="clr-namespace:System;assembly=mscorlib"
@@ -3124,4 +3124,401 @@
     <sys:String x:Key="Event.Sanitize.UnsupportedTypeHint">is the unsupported official PCL EventType, which has been removed from the homepage.</sys:String>
     <sys:String x:Key="Event.Sanitize.UnknownTypeHint">is the unrecognized EventType, which has been removed from the homepage.</sys:String>
 
+    <!-- Plugins -->
+
+    <sys:String x:Key="Plugins.Compatibility.Status.Compatible">Compatible</sys:String>
+    <sys:String x:Key="Plugins.Compatibility.Status.TooOld">Core version too old</sys:String>
+    <sys:String x:Key="Plugins.Compatibility.Status.Future">Plugin uses a future Core version</sys:String>
+    <sys:String x:Key="Plugins.Compatibility.Status.Unknown">Unknown</sys:String>
+    <sys:String x:Key="Plugins.Compatibility.Blocking.TooOld">The PCL.Core version {0} referenced by the plugin is below the currently supported range.</sys:String>
+    <sys:String x:Key="Plugins.Compatibility.Blocking.Future">This plugin uses a newer PCL.Core version than the current launcher. It may not work properly or cause crashes.</sys:String>
+    <sys:String x:Key="Plugins.Compatibility.Blocking.Unknown">The plugin's pclCoreVersion is missing or malformed. Compatibility cannot be determined.</sys:String>
+
+    <sys:String x:Key="Plugins.Dependency.Error.InvalidDependencyId">Dependencies contain an invalid plugin ID.</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.SelfDependency">Plugin {0} cannot depend on itself.</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.DuplicateDependency">Dependency {0} is declared more than once.</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.InvalidVersionConstraint">Version constraint for dependency {0} is invalid: {1}</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.MissingDependency">Missing dependency {0}.</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.NotEnabled">Dependency {0} is installed but not enabled.</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.VersionNotSatisfiedGeneric">Dependency {0} version does not satisfy the requirement.</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.VersionNotSatisfied">Dependency {0} version does not satisfy requirement {1}.</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.InvalidInstalledVersion">Installed dependency version {0} is not a valid SemVer.</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.InvalidVersionExpression">Cannot parse version constraint {0}. Please use full SemVer, e.g. >=1.0.0 &lt;2.0.0.</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.VersionConstraintNotSatisfied">Dependency version {0} does not satisfy constraint {1}.</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.DuplicatePluginId">Duplicate installed plugin ID detected: {0}.</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.CircularDependency">Circular plugin dependency detected: {0}.</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.DependencyLoadFailed">Dependency {0} failed to load.</sys:String>
+
+    <sys:String x:Key="Plugins.Install.Error.ManifestValidationFailed">Plugin manifest validation failed.</sys:String>
+    <sys:String x:Key="Plugins.Install.Error.UserCancelledCompatibility">User cancelled plugin compatibility confirmation.</sys:String>
+    <sys:String x:Key="Plugins.Install.Error.DependencyCheckFailed">Plugin dependency check failed.</sys:String>
+    <sys:String x:Key="Plugins.Install.Error.EntryAssemblyNotFound">Plugin entry file does not exist: {0}</sys:String>
+    <sys:String x:Key="Plugins.Install.Error.MixinConfigNotFound">Mixin configuration file does not exist: {0}</sys:String>
+    <sys:String x:Key="Plugins.Install.Error.InvalidPluginId">Invalid plugin ID.</sys:String>
+    <sys:String x:Key="Plugins.Install.Error.EnableThroughAsyncRequired">Enabling plugins must go through SetEnabledAsync for Core compatibility confirmation.</sys:String>
+    <sys:String x:Key="Plugins.Install.Error.CannotReadManifest">Cannot read plugin manifest.</sys:String>
+
+    <sys:String x:Key="Plugins.RemoteInstall.Error.SourceEmpty">Installation source cannot be empty.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.UnsupportedSource">Only manifest, .pclx, or .zip plugin installation sources are supported.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.ManifestUrlEmpty">Plugin manifest URL cannot be empty.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.ManifestParseFailed">Plugin manifest parsing failed.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.MissingPackageUrl">Plugin manifest version is missing a packageUrl pointing to .pclx or .zip.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.InvalidSha256">Plugin manifest version is missing a valid 64-character hex SHA-256.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.SourceLabel.MarketManifest">Market manifest</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.SourceLabel.MarketManifestVersion">Market manifest (v{0})</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.PackageUrlEmpty">Plugin package URL cannot be empty.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.NotPackageFile">Plugin package must be a .pclx or .zip file.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.NotHttpUrl">Plugin package URL must be HTTP or HTTPS.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.DownloadFailed">Plugin package download failed.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.NoPluginJsonInPackage">plugin.json not found in the package. Please make sure this is a PCL plugin package.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.PackageValidationFailed">Plugin package validation failed.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.SourceLabel.RemotePackage">Remote package</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.MarketPackageSha256Required">Market plugin package must provide a valid 64-character hex SHA-256.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.InvalidPackageSha256Format">Plugin package SHA-256 format is invalid.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.PackageSha256Mismatch">Plugin package SHA-256 verification failed.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.NoPluginJsonInGit">plugin.json not found in the Git repository. Please make sure the repository root or subdirectory contains a PCL plugin.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.DirectoryValidationFailed">Plugin directory validation failed.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.SourceLabel.GitInstall">Git install</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.SourceLabel.GitInstallWithRef">Git install ({0})</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.UnsafePathInPackage">The package contains an unsafe path.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.GitNotFound">Cannot start git. Please make sure Git is installed and added to PATH.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.GitCloneFailed">Git clone failed: {0}</sys:String>
+
+    <sys:String x:Key="Plugins.Repository.Error.ReadmeTooLarge">README file is too large.</sys:String>
+    <sys:String x:Key="Plugins.Repository.Error.ReadmeSizeLimitExceeded">README exceeds the size limit.</sys:String>
+
+    <!-- Plugins.Repository.UI -->
+
+    <sys:String x:Key="Plugins.Repository.BuiltInTopic">Built-in Topic</sys:String>
+    <sys:String x:Key="Plugins.Repository.BuiltInThirdPartyJson">Built-in third-party JSON</sys:String>
+    <sys:String x:Key="Plugins.Repository.NoCustomSourceHint">No custom plugin sources yet. You can add multiple Manifest or local/remote plugin-market JSON sources.</sys:String>
+    <sys:String x:Key="Plugins.Repository.SourceType.Manifest">Manifest</sys:String>
+    <sys:String x:Key="Plugins.Repository.SourceType.ThirdPartyJson">Third-party JSON</sys:String>
+    <sys:String x:Key="Plugins.Repository.RemoveConfirmMessage">Are you sure you want to remove repository {0}?</sys:String>
+    <sys:String x:Key="Plugins.Repository.AddDialog.Title">Add plugin source</sys:String>
+    <sys:String x:Key="Plugins.Repository.AddDialog.Message">Enter a Manifest URL or plugin-market JSON source. You can add multiple sources one by one.&#x0a;- manifest:https://example.com/manifest.json&#x0a;- https://example.com/plugin-market.json&#x0a;- A local .json file path</sys:String>
+    <sys:String x:Key="Plugins.Repository.AddDialog.EmptyContent">Plugin source content cannot be empty.</sys:String>
+    <sys:String x:Key="Plugins.Repository.AddDialog.InvalidManifest">Manifest source must be an HTTP or HTTPS URL.</sys:String>
+    <sys:String x:Key="Plugins.Repository.AddDialog.InvalidJson">JSON source must be an HTTP/HTTPS URL or an existing local .json file.</sys:String>
+    <sys:String x:Key="Plugins.Repository.NameDialog.Title">Plugin source name</sys:String>
+    <sys:String x:Key="Plugins.Repository.NameDialog.Message">Enter the display name for this source in the plugin store:</sys:String>
+    <sys:String x:Key="Plugins.Repository.DefaultName">Custom plugin source</sys:String>
+    <sys:String x:Key="Plugins.Repository.AddFailed">Failed to add: {0}</sys:String>
+    <sys:String x:Key="Plugins.Repository.ManagementTitle">Plugin source management</sys:String>
+    <sys:String x:Key="Plugins.Repository.ManagementDescription">Manage multiple Manifest and third-party plugin-market JSON sources</sys:String>
+    <sys:String x:Key="Plugins.Repository.AddSource">Add source</sys:String>
+    <sys:String x:Key="Plugins.Repository.GitHubTokenLabel">GitHub Token (optional)</sys:String>
+    <sys:String x:Key="Plugins.Repository.GitHubTokenHint">For private repositories and increased API rate limits; leave blank for anonymous access</sys:String>
+    <sys:String x:Key="Plugins.Repository.GitHubTokenToolTip">The token is encrypted and only sent to supported GitHub raw domains or their selected mirrors.</sys:String>
+    <sys:String x:Key="Plugins.Repository.GitHubTokenPrivacyNote">The token is not sent to third-party JSON, README, or download domains.</sys:String>
+
+    <!-- Common.Action extras -->
+
+    <sys:String x:Key="Common.Action.Disable">Disable</sys:String>
+    <sys:String x:Key="Common.Action.Enable">Enable</sys:String>
+    <sys:String x:Key="Common.Action.Remove">Remove</sys:String>
+    <sys:String x:Key="Common.Action.SpeedTest">Speed test</sys:String>
+    <sys:String x:Key="Common.Action.SpeedTesting">Testing...</sys:String>
+
+    <!-- Setup.Misc.Network extras -->
+
+    <sys:String x:Key="Setup.Misc.Network.GitHubAcceleration">GitHub acceleration</sys:String>
+    <sys:String x:Key="Setup.Misc.Network.GitHubMirror.ToolTip">Rewrite GitHub file links to {0}</sys:String>
+    <sys:String x:Key="Setup.Misc.Network.AcceleratedDomains">Accelerated domains</sys:String>
+    <sys:String x:Key="Setup.Misc.Network.SpeedTest.InProgress">Testing GitHub acceleration speed, please wait...</sys:String>
+    <sys:String x:Key="Setup.Misc.Network.SpeedTest.Failed">GitHub acceleration speed test failed. Please try again later.</sys:String>
+    <sys:String x:Key="Setup.Misc.Network.SpeedTest.Success">Selected {0}, speed test result approx. {1} MB/s.</sys:String>
+
+    <!-- Setup.Left -->
+
+    <sys:String x:Key="Setup.Left.Error.UnknownSubPage">Unknown settings sub-page type: {0}</sys:String>
+
+    <!-- Tools.Left -->
+
+    <sys:String x:Key="Tools.Left.Error.UnknownSubPage">Unknown tools sub-page type: {0}</sys:String>
+
+    <!-- Application.Startup -->
+
+    <sys:String x:Key="Application.Startup.WpfFontInitFailed">Unable to determine the Windows system directory. The WPF font system cannot initialize.</sys:String>
+
+    <!-- Update -->
+
+    <sys:String x:Key="Update.VersionPrefix">PCL Nex {0}</sys:String>
+
+    <!-- Setup.Ui extras -->
+
+    <sys:String x:Key="Setup.Ui.Error.ImageFormatInvalid">Failed to change the title bar image. The image file may not be in a standard format.&#x0a;You can try opening the file with Paint and re-saving it to convert it to a standard format.</sys:String>
+    <sys:String x:Key="Setup.Ui.Logo.SetImageFailed">Failed to set the title bar image</sys:String>
+    <sys:String x:Key="Setup.Ui.Logo.AdjustImageFailed">Failed to adjust the title bar image</sys:String>
+    <sys:String x:Key="Setup.Ui.Logo.CleanupFailed">Failed to clean up the incorrect title bar image</sys:String>
+    <sys:String x:Key="Setup.Ui.Logo.CopyImageFailed">Failed to copy the title bar image</sys:String>
+    <sys:String x:Key="Setup.Ui.Logo.ClearImageFailed">Failed to clear the title bar image</sys:String>
+    <sys:String x:Key="Setup.Ui.Background.VideoFormatError">Failed to refresh background content. The video file may not be in H.264 (AVC) format.&#x0a;You can try opening the video file with a transcoding tool and setting the target format to H.264 (AVC), then transcode the video.&#x0a;File: {0}</sys:String>
+    <sys:String x:Key="Setup.Ui.Background.LoadFailed">Failed to refresh background content ({0})</sys:String>
+
+    <!-- PageDownloadPluginDetail -->
+    <sys:String x:Key="Plugins.Detail.Error.NotSelected">No version selected</sys:String>
+    <sys:String x:Key="Plugins.Detail.Error.PlatformMismatch">This plugin is not supported on the current operating system ({0})</sys:String>
+    <sys:String x:Key="Plugins.Detail.Error.InstallFailed">Failed to install plugin: {0}</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.LatestVersion">Latest version</sys:String>
+    <sys:String x:Key="Plugins.Detail.Tooltip.OfficialDeveloper">Official developer certified</sys:String>
+    <sys:String x:Key="Plugins.Detail.Tooltip.TrustedDeveloper">User trust certified</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.DeveloperUnknown">Unknown developer</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.SourceOfficial">Official source</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.SourceGitHubTopic">GitHub Topic</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.SourceTrusted">Trusted source</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.SourceUntrusted">Untrusted source</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.CoreVersion">PCL.Core {0}</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.PlatformIncompatible">Platform incompatible</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.VersionPrefix">Version</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.Installed">Installed</sys:String>
+    <sys:String x:Key="Plugins.Detail.Button.InstallThisVersion">Install this version</sys:String>
+    <sys:String x:Key="Plugins.Detail.Button.ReinstallThisVersion">Reinstall this version</sys:String>
+    <sys:String x:Key="Plugins.Detail.Button.Reinstall">Reinstall</sys:String>
+    <sys:String x:Key="Plugins.Detail.Button.Update">Update</sys:String>
+    <sys:String x:Key="Plugins.Detail.Dialog.Message.ConfirmUninstall">Are you sure you want to uninstall plugin {0}?&#x0a;This will delete plugin files and data.</sys:String>
+
+    <!-- PageDownloadPluginStore -->
+    <sys:String x:Key="Plugins.Store.Loading">Loading plugin store...</sys:String>
+    <sys:String x:Key="Plugins.Store.LoadFailed">Failed to load plugin store list</sys:String>
+    <sys:String x:Key="Plugins.Store.LoadError">Load failed: {0}</sys:String>
+    <sys:String x:Key="Plugins.Store.Empty">No plugins available.</sys:String>
+    <sys:String x:Key="Plugins.Store.NoDescription">No description</sys:String>
+    <sys:String x:Key="Plugins.Store.Tooltip.Uninstall">Uninstall plugin</sys:String>
+    <sys:String x:Key="Plugins.Store.Tag.UpdateAvailable">Update available</sys:String>
+    <sys:String x:Key="Plugins.Store.Tag.Installed">Installed</sys:String>
+    <sys:String x:Key="Plugins.Store.Tag.PlatformIncompatible">Platform incompatible</sys:String>
+    <sys:String x:Key="Plugins.Store.VersionRange.Any">Any</sys:String>
+    <sys:String x:Key="Plugins.Store.Source.Unknown">Unknown source</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.ConfirmMessage">About to install plugin:&#x0a;&#x0a;Name: {0}&#x0a;Update source: {1}&#x0a;Download source: {2}&#x0a;&#x0a;Important security reminder: Plugins run code inside the launcher and may read or modify local files, access the network, modify launcher behavior, or even perform malicious actions.&#x0a;Only install from sources you fully trust.</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.DeveloperWarning">&#x0a;&#x0a;Source reminder: This GitHub developer is not in the official or local allowlist.</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.TrustWarning">&#x0a;&#x0a;This plugin is from an untrusted third-party repository. Continuing will trust this repository and install.</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.Dialog.TrustConfirm">Trust Confirmation</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.Dialog.ConfirmInstall">Confirm Install</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.Downloading">Downloading plugin package, please wait...</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.Dialog.Installing">Installing</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.Success">Plugin {0} installed successfully!&#x0a;Restart the launcher for changes to take effect.</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.Dialog.InstallComplete">Install Complete</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.Error">Install failed: {0}</sys:String>
+    <sys:String x:Key="Plugins.Store.Uninstall.Running">Plugin is running. Please disable and restart the launcher before uninstalling.</sys:String>
+    <sys:String x:Key="Plugins.Store.Uninstall.Dialog.CannotUninstall">Cannot Uninstall</sys:String>
+    <sys:String x:Key="Plugins.Store.Uninstall.Dialog.Confirm">Are you sure you want to uninstall plugin {0}?</sys:String>
+    <sys:String x:Key="Plugins.Store.Uninstall.Dialog.Title">Confirm Uninstall</sys:String>
+    <sys:String x:Key="Plugins.Store.Uninstall.Error">Uninstall failed: {0}</sys:String>
+    <sys:String x:Key="Plugins.Store.Filter.All">All</sys:String>
+
+    <!-- PagePluginsInstalled -->
+    <sys:String x:Key="Plugins.Installed.Label.SourceLocal">Local plugin directory</sys:String>
+    <sys:String x:Key="Plugins.Installed.Label.SourceLegacy">Legacy layout (root DLL)</sys:String>
+    <sys:String x:Key="Plugins.Installed.Label.StateNotLoaded">Not loaded</sys:String>
+    <sys:String x:Key="Plugins.Installed.Label.StateDisabled">Disabled</sys:String>
+    <sys:String x:Key="Plugins.Installed.Label.SourcePrefix">Source: </sys:String>
+    <sys:String x:Key="Plugins.Installed.Label.StatePrefix">Status: </sys:String>
+    <sys:String x:Key="Plugins.Installed.Label.LoadOrder">Load order: </sys:String>
+    <sys:String x:Key="Plugins.Installed.Button.Uninstall">Uninstall</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.PluginEnabled">Plugin {0} has been enabled.&#x0a;Please restart the launcher for changes to take effect.</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.PluginDisabled">Plugin {0} has been disabled.&#x0a;Please restart the launcher for changes to take effect.</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.PluginStatus">Plugin Status</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.OperationFailed">Operation failed: {0}</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.MoveFailed">Failed to adjust order: {0}</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.PluginRunning">Plugin {0} is currently running.&#x0a;Please disable the plugin and restart the launcher before uninstalling.</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.CannotUninstall">Cannot Uninstall</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Message.ConfirmUninstall">Are you sure you want to uninstall plugin {0}?&#x0a;This will delete plugin files and data, and requires a launcher restart.</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.ConfirmUninstall">Confirm Uninstall</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.UninstallSuccess">Plugin {0} has been uninstalled.</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.UninstallComplete">Uninstall Complete</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.RemoteInstall">Remote Install</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Message.RemoteInstallUrl">Please enter the plugin manifest URL, or directly enter the .pclx / .zip plugin package URL:</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.RemoteInstallProtocolError">Remote install only supports HTTP or HTTPS addresses.</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.RemoteInstallFailed">Install Failed</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.ParsingSource">Parsing plugin source, please wait...</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.InstallPreparing">Install Preparation</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.InstallSecurityWarning">About to install plugin ({0}):&#x0a;&#x0a;Name: {1}&#x0a;Source: {2}&#x0a;&#x0a;Not verified by repository trust.&#x0a;&#x0a;Important security reminder: Plugins run code inside the launcher and may read or modify local files, access the network, modify the launcher interface, or even perform malicious actions.&#x0a;Only install from sources you fully trust.</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.ConfirmInstall">Confirm Install</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.InstallSuccess">Plugin {0} installed successfully!&#x0a;Please restart the launcher for changes to take effect.</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.InstallComplete">Install Complete</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.SelectPackage">Select Plugin Package</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.FileFilter">PCL Plugin Package(*.pclx;*.zip)|*.pclx;*.zip</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.ImportFailed">Import failed: {0}</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.ImportSecurityWarning">About to import plugin ({0}):&#x0a;&#x0a;Name: {1}&#x0a;Source: {2}&#x0a;&#x0a;Important security reminder: Plugins run code inside the launcher and may read or modify local files, access the network, modify the launcher interface, or even perform malicious actions.&#x0a;Only import plugins you fully trust.</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.ConfirmImport">Confirm Import</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.ImportSuccess">Plugin {0} imported successfully!&#x0a;Please restart the launcher for changes to take effect.</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.ImportComplete">Import Complete</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.CheckingUpdates">Checking for plugin updates...</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.AllUpToDate">All marketplace plugins are up to date.</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.UpdatesAvailable">Found {0} updateable plugin(s).</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.PluginUpdates">Plugin Updates</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.CheckFailed">Check failed: {0}</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.CheckUpdateFailed">Check for updates failed: {0}</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.NoUpdatesAvailable">No updates available.</sys:String>
+    <sys:String x:Key="Plugins.Installed.Button.Update">Update</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.UpdateConfirm">About to update plugin:&#x0a;&#x0a;Name: {0}&#x0a;Current version: v{1}&#x0a;Latest version: v{2}&#x0a;Download source: {3}</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.ConfirmUpdate">Confirm Update</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.UpdateReconfirm">&#x0a;&#x0a;This update involves source or capability changes. Please confirm you trust this version.</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.UpdateSuccess">Plugin {0} has been updated to v{1}!&#x0a;Please restart the launcher for changes to take effect.</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.UpdateComplete">Update Complete</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.UpdateFailed">Update failed: {0}</sys:String>
+    <sys:String x:Key="Plugins.Installed.Empty">No plugins installed. You can install from the store or use remote install below.</sys:String>
+
+    <!-- Common plugin dialog titles -->
+    <sys:String x:Key="Plugins.Common.Dialog.Title.Error">Error</sys:String>
+    <sys:String x:Key="Plugins.Common.Dialog.Title.CannotUninstall">Cannot Uninstall</sys:String>
+    <sys:String x:Key="Plugins.Common.Dialog.Title.ConfirmUninstall">Confirm Uninstall</sys:String>
+
+    <!-- PageDownloadPluginDetail (additional) -->
+    <sys:String x:Key="Plugins.Detail.Label.PluginNotFound">Plugin does not exist</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.CannotReadEntry">Cannot read plugin marketplace entry.</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.LoadingReadme">Loading README...</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.ReadmeLoadFailed">README load failed: {0}</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.ReadmeNotProvided">This plugin does not provide a README.</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.Developer">Developer</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.Source">Source</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.NoHistoryVersion">No historical versions available.</sys:String>
+    <sys:String x:Key="Plugins.Detail.Button.InstallSelected">Install selected version</sys:String>
+    <sys:String x:Key="Plugins.Detail.Button.UpdateToThis">Update to this version</sys:String>
+    <sys:String x:Key="Plugins.Detail.Button.DowngradeToThis">Downgrade to this version</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.PackageNotAvailable">No package available for current platform</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.PackageAvailable">Package available for current platform</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.Sha256Recorded">SHA-256 recorded</sys:String>
+    <sys:String x:Key="Plugins.Detail.Message.PackageNotAvailable">This version has no package for the current platform.</sys:String>
+    <sys:String x:Key="Plugins.Detail.Dialog.Title.CannotInstall">Cannot Install</sys:String>
+    <sys:String x:Key="Plugins.Detail.Message.UninstallSuccess">Plugin {0} has been uninstalled.</sys:String>
+    <sys:String x:Key="Plugins.Detail.Message.UninstallFailed">Uninstall failed: {0}</sys:String>
+    <sys:String x:Key="Plugins.Detail.Message.DeveloperUntrusted">Developer {0} untrusted</sys:String>
+    <sys:String x:Key="Plugins.Detail.Message.DeveloperTrusted">Developer {0} trusted</sys:String>
+    <sys:String x:Key="Plugins.Detail.Button.UntrustDeveloper">Untrust</sys:String>
+    <sys:String x:Key="Plugins.Detail.Button.TrustDeveloper">Trust developer</sys:String>
+    <sys:String x:Key="Plugins.Detail.Developer.Official">Official developer</sys:String>
+    <sys:String x:Key="Plugins.Detail.Developer.Trusted">Trusted developer</sys:String>
+    <sys:String x:Key="Plugins.Detail.Developer.Untrusted">Untrusted developer</sys:String>
+
+    <!-- PageDownloadPluginStore (additional) -->
+    <sys:String x:Key="Plugins.Store.Developer.Official">Official Developer</sys:String>
+    <sys:String x:Key="Plugins.Store.Developer.Trusted">Trusted User Developer</sys:String>
+    <sys:String x:Key="Plugins.Store.Developer.Other">Other Developer</sys:String>
+
+    <!-- PluginMarketplaceService -->
+    <sys:String x:Key="Plugins.Marketplace.Error.ManifestEmpty">Plugin manifest is empty.</sys:String>
+    <sys:String x:Key="Plugins.Marketplace.Error.SourceJsonEmpty">Plugin source JSON is empty.</sys:String>
+    <sys:String x:Key="Plugins.Marketplace.Error.UnsupportedSourceVersion">Unsupported plugin source JSON version.</sys:String>
+    <sys:String x:Key="Plugins.Marketplace.Label.CustomSource">Custom source</sys:String>
+    <sys:String x:Key="Plugins.Marketplace.Error.UnrecognizedJson">Plugin JSON is not a developers/manifests/plugins source document, manifest, or legacy index.</sys:String>
+    <sys:String x:Key="Plugins.Marketplace.Error.TopicsNotSupported">plugin-market.json cannot declare topics. GitHub Topic discovery is maintained by the launcher.</sys:String>
+    <sys:String x:Key="Plugins.Marketplace.Error.ManifestTooLarge">Plugin manifest file is too large.</sys:String>
+    <sys:String x:Key="Plugins.Marketplace.Error.ManifestLoadFailed">Plugin manifest fetch or parse failed.</sys:String>
+    <sys:String x:Key="Plugins.Marketplace.Error.SourceJsonTooLarge">Plugin source JSON file is too large.</sys:String>
+    <sys:String x:Key="Plugins.Marketplace.Error.InvalidSource">Plugin source must be an HTTP/HTTPS JSON address or local JSON file.</sys:String>
+    <sys:String x:Key="Plugins.Marketplace.Error.SourceJsonFetchFailed">Plugin source JSON fetch failed.</sys:String>
+    <sys:String x:Key="Plugins.Marketplace.Error.SourceJsonSizeLimitExceeded">Plugin source JSON exceeds size limit.</sys:String>
+
+    <!-- PluginPackageService -->
+    <sys:String x:Key="Plugins.Package.Error.ManifestNull">Manifest object is null.</sys:String>
+    <sys:String x:Key="Plugins.Package.Error.MissingId">Missing required field Id.</sys:String>
+    <sys:String x:Key="Plugins.Package.Error.InvalidId">Invalid plugin ID. Use at least two non-empty dot segments, containing only ASCII letters, numbers, underscores, and hyphens.</sys:String>
+    <sys:String x:Key="Plugins.Package.Error.MissingName">Missing required field Name.</sys:String>
+    <sys:String x:Key="Plugins.Package.Error.LegacyFieldRemoved">Legacy plugin entry field {0} has been removed; LoadAsync/UnloadAsync and JavaScript plugins are no longer supported.</sys:String>
+    <sys:String x:Key="Plugins.Package.Error.MissingEntryAssembly">Missing required field EntryAssembly.</sys:String>
+    <sys:String x:Key="Plugins.Package.Error.MissingMixinConfig">Missing required field mixinConfig or mixinConfigs; LoadAsync/UnloadAsync and JavaScript plugins are no longer supported.</sys:String>
+    <sys:String x:Key="Plugins.Package.Error.InvalidVersion">Version is invalid or not set.</sys:String>
+    <sys:String x:Key="Plugins.Package.Error.InvalidLogo">Logo must be an HTTP/HTTPS URL or a safe relative path within the plugin package.</sys:String>
+    <sys:String x:Key="Plugins.Package.Error.CannotReadPluginJson">Cannot read plugin.json in directory.</sys:String>
+
+    <!-- PluginLocalInstallService -->
+    <sys:String x:Key="Plugins.LocalInstall.Error.ZipNotFound">Plugin zip file does not exist.</sys:String>
+    <sys:String x:Key="Plugins.LocalInstall.Error.NoPluginJson">plugin.json not found in zip. Please make sure this is a PCL plugin package.</sys:String>
+    <sys:String x:Key="Plugins.LocalInstall.Error.DirectoryValidationFailed">Plugin directory validation failed.</sys:String>
+    <sys:String x:Key="Plugins.LocalInstall.Label.LocalPclx">Local pclx</sys:String>
+    <sys:String x:Key="Plugins.LocalInstall.Label.LocalZip">Local zip</sys:String>
+    <sys:String x:Key="Plugins.LocalInstall.Error.UnsafePath">The package contains an unsafe path.</sys:String>
+
+    <!-- PluginLoaderService -->
+    <sys:String x:Key="Plugins.Loader.ServiceName">PCL.Mixin Plugin Engine</sys:String>
+    <sys:String x:Key="Plugins.Loader.Error.EntryAssemblyNotFound">Plugin entry assembly does not exist.</sys:String>
+    <sys:String x:Key="Plugins.Loader.Error.MissingMixinConfig">Plugin does not declare mixinConfig or mixinConfigs; legacy LoadAsync plugins are no longer supported.</sys:String>
+    <sys:String x:Key="Plugins.Loader.Error.MixinConfigRootEmpty">Mixin configuration root object is empty.</sys:String>
+    <sys:String x:Key="Plugins.Loader.Error.JavaScriptRuntimeRemoved">JavaScript/Jint plugin runtime has been removed.</sys:String>
+    <sys:String x:Key="Plugins.Loader.Error.FileOutsidePluginDir">Plugin file cannot be located outside the plugin directory: {0}</sys:String>
+    <sys:String x:Key="Plugins.Loader.Error.LegacyDllNotSupported">Legacy flat DLL plugins are no longer supported, skipped: {0}. Please use a PCLX package with Mixin configuration instead.</sys:String>
+
+    <!-- UriActionService -->
+    <sys:String x:Key="UriAction.Error.UnknownAction">Unknown URI action: {0}</sys:String>
+    <sys:String x:Key="UriAction.Error.ActionExecutionFailed">URI action execution failed: {0}</sys:String>
+    <sys:String x:Key="UriAction.Error.MissingServerParam">URI server launch is missing the server parameter.</sys:String>
+    <sys:String x:Key="UriAction.Error.MissingVersionParam">URI vanilla download is missing the version parameter.</sys:String>
+    <sys:String x:Key="UriAction.Error.MissingModpackParam">URI modpack install is missing the file or url parameter.</sys:String>
+    <sys:String x:Key="UriAction.Error.InvalidModpackUrl">URI modpack download address is invalid.</sys:String>
+    <sys:String x:Key="UriAction.Title.ModpackInstall">URI Modpack Install</sys:String>
+    <sys:String x:Key="UriAction.Title.DownloadModpack">Download Modpack File</sys:String>
+    <sys:String x:Key="UriAction.Title.InstallingModpack">Installing Modpack</sys:String>
+    <sys:String x:Key="UriAction.Error.ModpackInstallFailed">URI modpack install failed: {0}</sys:String>
+    <sys:String x:Key="UriAction.Success.ModpackInstallComplete">URI modpack install completed</sys:String>
+    <sys:String x:Key="UriAction.Error.InvalidPluginSource">URI plugin source is invalid.</sys:String>
+    <sys:String x:Key="UriAction.Error.UnsupportedPluginSourceType">Unsupported URI plugin source type.</sys:String>
+    <sys:String x:Key="UriAction.Warning.PluginInstallSecurity">About to install plugin ({0}):\n\nName: {1}\nSource: {2}\n\nImportant security reminder: Plugins run code inside the launcher and may read or modify local files, access the network, modify the launcher interface, or even perform malicious actions.\nOnly install from sources you fully trust.</sys:String>
+    <sys:String x:Key="UriAction.Action.ConfirmInstall">Confirm Install</sys:String>
+    <sys:String x:Key="UriAction.Success.PluginInstalled">Plugin {0} installed successfully!</sys:String>
+    <sys:String x:Key="UriAction.Title.InstallComplete">Install Complete</sys:String>
+    <sys:String x:Key="UriAction.Error.PluginInstallFailed">URI plugin install failed</sys:String>
+    <sys:String x:Key="UriAction.Error.PluginInstallFailedWithReason">URI plugin install failed: {0}</sys:String>
+    <sys:String x:Key="UriAction.Error.InvalidPluginSource2">URI plugin source is invalid.</sys:String>
+    <sys:String x:Key="UriAction.Info.OfficialTopicBuiltIn">Official GitHub Topic is already built in, no need to add again.</sys:String>
+    <sys:String x:Key="UriAction.Info.OfficialDeveloperBuiltIn">NexDeveloper official trusted developer file is already built in, no need to add again.</sys:String>
+    <sys:String x:Key="UriAction.Info.OfficialSourceBuiltIn">Official plugin source is already built in, no need to add again.</sys:String>
+    <sys:String x:Key="UriAction.Warning.AddPluginSource">About to add third-party plugin source:\n\nName: {0}\nType: {1}\nSource: {2}\n\nPlugin sources affect which plugins are shown and updatable in the store. Only add sources you trust.</sys:String>
+    <sys:String x:Key="UriAction.Action.ConfirmAddSource">Confirm Add Source</sys:String>
+    <sys:String x:Key="UriAction.Success.SourceAdded">Plugin source added: {0}</sys:String>
+
+    <!-- PluginLoaderService (additional) -->
+    <sys:String x:Key="Plugins.Loader.Error.MixinConfigNotFound">Mixin configuration file does not exist.</sys:String>
+    <sys:String x:Key="Plugins.Loader.Error.MixinConfigReadFailed">Failed to read Mixin configuration: {0}</sys:String>
+    <sys:String x:Key="Plugins.Loader.Error.LegacyPropertyRemoved">Legacy plugin entry field {0} has been removed; plugin must declare Mixin configuration</sys:String>
+
+    <!-- PluginRemoteInstallService -->
+    <sys:String x:Key="Plugins.RemoteInstall.Error.SourceEmpty">Installation source cannot be empty.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.ManifestUrlEmpty">Plugin manifest URL cannot be empty.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.MissingPackageUrl">Plugin manifest version is missing a packageUrl pointing to .pclx or .zip.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.NoInstallableVersion">No installable and not outdated version for current platform in plugin manifest.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.PackageIdMismatch">Plugin package ID {0} does not match market manifest {1}.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.InvalidMarketVersion">Market manifest contains invalid plugin version.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.InvalidPackageSemVer">Plugin package contains invalid SemVer version.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.PackageVersionMismatch">Plugin package version {0} does not match market manifest {1}.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.DependencyMismatch">Plugin package dependencies do not match market manifest declaration.</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.GitUrlEmpty">Git repository URL cannot be empty.</sys:String>
+
+    <!-- PluginInstallService -->
+    <sys:String x:Key="Plugins.Install.Error.InvalidPluginId">Invalid plugin ID.</sys:String>
+
+    <!-- PluginDeveloperTrustService -->
+    <sys:String x:Key="Plugins.Trust.Error.InvalidGitHubLogin">Invalid GitHub Login.</sys:String>
+
+    <!-- FormMain -->
+    <sys:String x:Key="Main.Error.ReportUrl">Please submit an error report at https://github.com/PCL-Nex-Developer/PCL2-Nex/issues to help the community resolve this problem! (This may also be an issue with the original PCL)</sys:String>
+
+    <!-- PageSetupLauncherMisc -->
+    <sys:String x:Key="Setup.Misc.Network.ProxyHint">e.g. http://127.0.0.1:1080/</sys:String>
+    <sys:String x:Key="Setup.Misc.Network.GitHubMirror.ToolTip1">Rewrite GitHub file links to https://gh-proxy.org/https://github.com/...</sys:String>
+    <sys:String x:Key="Setup.Misc.Network.GitHubMirror.ToolTip2">Rewrite GitHub file links to https://v4.gh-proxy.org/https://github.com/...</sys:String>
+    <sys:String x:Key="Setup.Misc.Network.GitHubMirror.ToolTip3">Rewrite GitHub file links to https://v6.gh-proxy.org/https://github.com/...</sys:String>
+    <sys:String x:Key="Setup.Misc.Network.GitHubMirror.ToolTip4">Rewrite GitHub file links to https://cdn.gh-proxy.org/https://github.com/...</sys:String>
+
+    <!-- PageSetupLauncherMisc.xaml.cs -->
+    <sys:String x:Key="Setup.Misc.ExportConfigFileName">PCL Global Config.json</sys:String>
+
+    <!-- PluginUriSourceParser -->
+    <sys:String x:Key="Plugins.UriParser.Error.MissingInstallParam">URI plugin install is missing source, manifest, or package parameter.</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.InvalidSource">URI plugin source is invalid. Only local .pclx/.zip, remote plugin package, manifest, or Git repository are supported.</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.CustomTopicNotSupported">Custom Topic plugin sources are not supported; GitHub Topic discovery is maintained by the launcher.</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.MissingSourceParam">URI add plugin source is missing source, manifest, or json parameter.</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.SourceContentEmpty">URI plugin source content cannot be empty.</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.ManifestMustBeHttp">URI manifest plugin source must use HTTP or HTTPS address.</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.LocalSourceMustBeFile">URI local plugin source must be an existing JSON file.</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.JsonSourceMustBeHttpOrFile">URI JSON plugin source must be an HTTP/HTTPS address or an existing local JSON file.</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Label.CustomPluginSource">Custom plugin source</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.InstallSourceEmpty">URI plugin source cannot be empty.</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.ManifestMustBeHttp2">URI plugin manifest must use HTTP or HTTPS address.</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.InvalidGitSource">URI Git plugin source is invalid.</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.PackageSourceEmpty">URI plugin package source cannot be empty.</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.PackageMustBePclxOrZip">URI plugin package must be .pclx or .zip file.</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.InvalidLocalOrRemotePackage">URI local plugin package does not exist; remote plugin package must use HTTP or HTTPS address.</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.UnsupportedSourceKey">URI plugin source {0} only supports json or manifest.</sys:String>
 </ResourceDictionary>

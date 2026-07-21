@@ -1,4 +1,4 @@
-<ResourceDictionary
+﻿<ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:sys="clr-namespace:System;assembly=mscorlib"
@@ -3123,4 +3123,401 @@
     <sys:String x:Key="Event.Sanitize.UnsupportedTypeHint">是不受支持的 PCL 官方版 EventType，已从主页中移除。</sys:String>
     <sys:String x:Key="Event.Sanitize.UnknownTypeHint">是无法解析的 EventType，已从主页中移除。</sys:String>
 
+    <!-- Plugins -->
+
+    <sys:String x:Key="Plugins.Compatibility.Status.Compatible">兼容</sys:String>
+    <sys:String x:Key="Plugins.Compatibility.Status.TooOld">Core 版本过旧</sys:String>
+    <sys:String x:Key="Plugins.Compatibility.Status.Future">插件使用未来 Core 版本</sys:String>
+    <sys:String x:Key="Plugins.Compatibility.Status.Unknown">未知</sys:String>
+    <sys:String x:Key="Plugins.Compatibility.Blocking.TooOld">插件引用的 PCL.Core 版本 {0} 已低于当前启动器支持范围。</sys:String>
+    <sys:String x:Key="Plugins.Compatibility.Blocking.Future">该插件使用了比当前启动器更新的 PCL.Core 版本，可能无法正常使用或导致崩溃。</sys:String>
+    <sys:String x:Key="Plugins.Compatibility.Blocking.Unknown">插件的 pclCoreVersion 缺失或格式错误，无法确认兼容性。</sys:String>
+
+    <sys:String x:Key="Plugins.Dependency.Error.InvalidDependencyId">前置插件包含无效的插件 ID。</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.SelfDependency">插件 {0} 不能依赖自身。</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.DuplicateDependency">前置插件 {0} 被重复声明。</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.InvalidVersionConstraint">前置插件 {0} 的版本约束无效：{1}</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.MissingDependency">缺少前置插件 {0}。</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.NotEnabled">前置插件 {0} 已安装但未启用。</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.VersionNotSatisfiedGeneric">前置插件 {0} 的版本不满足要求。</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.VersionNotSatisfied">前置插件 {0} 的版本不满足要求 {1}。</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.InvalidInstalledVersion">已安装的前置插件版本 {0} 不是有效 SemVer。</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.InvalidVersionExpression">无法解析版本约束 {0}。请使用完整 SemVer，例如 >=1.0.0 &lt;2.0.0。</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.VersionConstraintNotSatisfied">前置插件版本 {0} 不满足约束 {1}。</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.DuplicatePluginId">检测到重复安装的插件 ID：{0}。</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.CircularDependency">检测到插件循环依赖：{0}。</sys:String>
+    <sys:String x:Key="Plugins.Dependency.Error.DependencyLoadFailed">前置插件 {0} 无法加载。</sys:String>
+
+    <sys:String x:Key="Plugins.Install.Error.ManifestValidationFailed">插件清单校验失败。</sys:String>
+    <sys:String x:Key="Plugins.Install.Error.UserCancelledCompatibility">用户取消了插件兼容性确认。</sys:String>
+    <sys:String x:Key="Plugins.Install.Error.DependencyCheckFailed">插件前置依赖检查失败。</sys:String>
+    <sys:String x:Key="Plugins.Install.Error.EntryAssemblyNotFound">插件入口文件不存在: {0}</sys:String>
+    <sys:String x:Key="Plugins.Install.Error.MixinConfigNotFound">Mixin 配置文件不存在: {0}</sys:String>
+    <sys:String x:Key="Plugins.Install.Error.InvalidPluginId">插件 Id 无效。</sys:String>
+    <sys:String x:Key="Plugins.Install.Error.EnableThroughAsyncRequired">启用插件必须通过 SetEnabledAsync 执行 Core 兼容性确认。</sys:String>
+    <sys:String x:Key="Plugins.Install.Error.CannotReadManifest">无法读取插件清单。</sys:String>
+
+    <sys:String x:Key="Plugins.RemoteInstall.Error.SourceEmpty">安装来源不能为空。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.UnsupportedSource">仅支持 manifest、.pclx 或 .zip 插件安装源。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.ManifestUrlEmpty">插件 manifest 地址不能为空。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.ManifestParseFailed">插件 manifest 解析失败。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.MissingPackageUrl">插件 manifest 版本缺少指向 .pclx 或 .zip 的 packageUrl。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.InvalidSha256">插件 manifest 版本缺少有效的 64 位十六进制 SHA-256。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.SourceLabel.MarketManifest">市场 manifest</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.SourceLabel.MarketManifestVersion">市场 manifest（v{0}）</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.PackageUrlEmpty">插件包地址不能为空。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.NotPackageFile">插件包必须是 .pclx 或 .zip 文件。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.NotHttpUrl">插件包地址必须是 HTTP 或 HTTPS。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.DownloadFailed">插件包下载失败。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.NoPluginJsonInPackage">插件包中未找到 plugin.json。请确认该文件是 PCL 插件包。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.PackageValidationFailed">插件包校验失败。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.SourceLabel.RemotePackage">远程插件包</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.MarketPackageSha256Required">市场插件包必须提供有效的 64 位十六进制 SHA-256。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.InvalidPackageSha256Format">插件包 SHA-256 格式无效。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.PackageSha256Mismatch">插件包 SHA-256 校验失败。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.NoPluginJsonInGit">Git 仓库中未找到 plugin.json。请确认该仓库根目录或子目录包含 PCL 插件。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.DirectoryValidationFailed">插件目录校验失败。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.SourceLabel.GitInstall">Git 安装</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.SourceLabel.GitInstallWithRef">Git 安装（{0}）</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.UnsafePathInPackage">插件包包含不安全的路径。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.GitNotFound">无法启动 git。请确认已安装 Git 并加入 PATH。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.GitCloneFailed">Git 克隆失败：{0}</sys:String>
+
+    <sys:String x:Key="Plugins.Repository.Error.ReadmeTooLarge">README 文件过大。</sys:String>
+    <sys:String x:Key="Plugins.Repository.Error.ReadmeSizeLimitExceeded">README 超过大小限制。</sys:String>
+
+    <!-- Plugins.Repository.UI -->
+
+    <sys:String x:Key="Plugins.Repository.BuiltInTopic">内置 Topic</sys:String>
+    <sys:String x:Key="Plugins.Repository.BuiltInThirdPartyJson">内置第三方 JSON</sys:String>
+    <sys:String x:Key="Plugins.Repository.NoCustomSourceHint">暂无自定义插件源。可逐个添加多个 Manifest 或本地/网络 plugin-market JSON。</sys:String>
+    <sys:String x:Key="Plugins.Repository.SourceType.Manifest">Manifest</sys:String>
+    <sys:String x:Key="Plugins.Repository.SourceType.ThirdPartyJson">第三方 JSON</sys:String>
+    <sys:String x:Key="Plugins.Repository.RemoveConfirmMessage">确定移除仓库 {0}？</sys:String>
+    <sys:String x:Key="Plugins.Repository.AddDialog.Title">添加插件源</sys:String>
+    <sys:String x:Key="Plugins.Repository.AddDialog.Message">请输入 Manifest 地址或 plugin-market JSON 来源，可逐个添加多个来源：&#x0a;- manifest:https://example.com/manifest.json&#x0a;- https://example.com/plugin-market.json&#x0a;- 本地 .json 文件路径</sys:String>
+    <sys:String x:Key="Plugins.Repository.AddDialog.EmptyContent">插件源内容不能为空。</sys:String>
+    <sys:String x:Key="Plugins.Repository.AddDialog.InvalidManifest">Manifest 来源必须是 HTTP 或 HTTPS 地址。</sys:String>
+    <sys:String x:Key="Plugins.Repository.AddDialog.InvalidJson">JSON 来源必须是 HTTP/HTTPS 地址或已有的本地 .json 文件。</sys:String>
+    <sys:String x:Key="Plugins.Repository.NameDialog.Title">插件源名称</sys:String>
+    <sys:String x:Key="Plugins.Repository.NameDialog.Message">请输入此来源在插件商店中显示的名称：</sys:String>
+    <sys:String x:Key="Plugins.Repository.DefaultName">自定义插件源</sys:String>
+    <sys:String x:Key="Plugins.Repository.AddFailed">添加失败: {0}</sys:String>
+    <sys:String x:Key="Plugins.Repository.ManagementTitle">插件源管理</sys:String>
+    <sys:String x:Key="Plugins.Repository.ManagementDescription">管理多个 Manifest 和第三方 plugin-market JSON 来源</sys:String>
+    <sys:String x:Key="Plugins.Repository.AddSource">添加源</sys:String>
+    <sys:String x:Key="Plugins.Repository.GitHubTokenLabel">GitHub Token（可选）</sys:String>
+    <sys:String x:Key="Plugins.Repository.GitHubTokenHint">用于私有仓库和提高 API Rate Limit；留空则匿名访问</sys:String>
+    <sys:String x:Key="Plugins.Repository.GitHubTokenToolTip">Token 会加密保存，并且只发送给受支持的 GitHub 原始域或其已选镜像。</sys:String>
+    <sys:String x:Key="Plugins.Repository.GitHubTokenPrivacyNote">Token 不会发送给第三方 JSON、README 或下载域名。</sys:String>
+
+    <!-- Common.Action extras -->
+
+    <sys:String x:Key="Common.Action.Disable">禁用</sys:String>
+    <sys:String x:Key="Common.Action.Enable">启用</sys:String>
+    <sys:String x:Key="Common.Action.Remove">移除</sys:String>
+    <sys:String x:Key="Common.Action.SpeedTest">测速</sys:String>
+    <sys:String x:Key="Common.Action.SpeedTesting">测速中</sys:String>
+
+    <!-- Setup.Misc.Network extras -->
+
+    <sys:String x:Key="Setup.Misc.Network.GitHubAcceleration">GitHub 加速</sys:String>
+    <sys:String x:Key="Setup.Misc.Network.GitHubMirror.ToolTip">将 GitHub 文件链接改写为 {0}</sys:String>
+    <sys:String x:Key="Setup.Misc.Network.AcceleratedDomains">加速域名</sys:String>
+    <sys:String x:Key="Setup.Misc.Network.SpeedTest.InProgress">正在测试 GitHub 加速站速度，请稍候……</sys:String>
+    <sys:String x:Key="Setup.Misc.Network.SpeedTest.Failed">GitHub 加速测速失败，请稍后再试。</sys:String>
+    <sys:String x:Key="Setup.Misc.Network.SpeedTest.Success">已选择 {0}，测速约 {1} MB/s。</sys:String>
+
+    <!-- Setup.Left -->
+
+    <sys:String x:Key="Setup.Left.Error.UnknownSubPage">未知的设置子页面种类：{0}</sys:String>
+
+    <!-- Tools.Left -->
+
+    <sys:String x:Key="Tools.Left.Error.UnknownSubPage">未知的工具子页面种类：{0}</sys:String>
+
+    <!-- Application.Startup -->
+
+    <sys:String x:Key="Application.Startup.WpfFontInitFailed">无法确定 Windows 系统目录，WPF 字体系统无法初始化。</sys:String>
+
+    <!-- Update -->
+
+    <sys:String x:Key="Update.VersionPrefix">PCL Nex {0}</sys:String>
+
+    <!-- Setup.Ui extras -->
+
+    <sys:String x:Key="Setup.Ui.Error.ImageFormatInvalid">改变标题栏图片失败，该图片文件可能并非标准格式。&#x0a;你可以尝试使用画图打开该文件并重新保存，这会让图片变为标准格式。</sys:String>
+    <sys:String x:Key="Setup.Ui.Logo.SetImageFailed">设置标题栏图片失败</sys:String>
+    <sys:String x:Key="Setup.Ui.Logo.AdjustImageFailed">调整标题栏图片失败</sys:String>
+    <sys:String x:Key="Setup.Ui.Logo.CleanupFailed">清理错误的标题栏图片失败</sys:String>
+    <sys:String x:Key="Setup.Ui.Logo.CopyImageFailed">复制标题栏图片失败</sys:String>
+    <sys:String x:Key="Setup.Ui.Logo.ClearImageFailed">清空标题栏图片失败</sys:String>
+    <sys:String x:Key="Setup.Ui.Background.VideoFormatError">刷新背景内容失败，该视频文件可能并非 H.264（AVC） 格式。&#x0a;你可以尝试使用视频转码工具打开视频文件并设定目标格式为 H.264（AVC） ，然后转码该视频。&#x0a;文件：{0}</sys:String>
+    <sys:String x:Key="Setup.Ui.Background.LoadFailed">刷新背景内容失败（{0}）</sys:String>
+
+    <!-- PageDownloadPluginDetail -->
+    <sys:String x:Key="Plugins.Detail.Error.NotSelected">未选择版本</sys:String>
+    <sys:String x:Key="Plugins.Detail.Error.PlatformMismatch">当前操作系统不支持该插件（{0}）</sys:String>
+    <sys:String x:Key="Plugins.Detail.Error.InstallFailed">安装插件失败：{0}</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.LatestVersion">最新版本</sys:String>
+    <sys:String x:Key="Plugins.Detail.Tooltip.OfficialDeveloper">官方开发者认证</sys:String>
+    <sys:String x:Key="Plugins.Detail.Tooltip.TrustedDeveloper">用户信任认证</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.DeveloperUnknown">未知开发者</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.SourceOfficial">官方来源</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.SourceGitHubTopic">GitHub Topic</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.SourceTrusted">已信任来源</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.SourceUntrusted">未信任来源</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.CoreVersion">PCL.Core {0}</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.PlatformIncompatible">平台不兼容</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.VersionPrefix">版本</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.Installed">已安装</sys:String>
+    <sys:String x:Key="Plugins.Detail.Button.InstallThisVersion">安装此版本</sys:String>
+    <sys:String x:Key="Plugins.Detail.Button.ReinstallThisVersion">重新安装此版本</sys:String>
+    <sys:String x:Key="Plugins.Detail.Button.Reinstall">重新安装</sys:String>
+    <sys:String x:Key="Plugins.Detail.Button.Update">更新</sys:String>
+    <sys:String x:Key="Plugins.Detail.Dialog.Message.ConfirmUninstall">确定卸载插件 {0}？&#x0a;此操作会删除插件文件与数据。</sys:String>
+
+    <!-- PageDownloadPluginStore -->
+    <sys:String x:Key="Plugins.Store.Loading">正在获取插件商店列表</sys:String>
+    <sys:String x:Key="Plugins.Store.LoadFailed">插件商店列表获取失败</sys:String>
+    <sys:String x:Key="Plugins.Store.LoadError">加载失败: {0}</sys:String>
+    <sys:String x:Key="Plugins.Store.Empty">暂无可用插件。</sys:String>
+    <sys:String x:Key="Plugins.Store.NoDescription">暂无简介</sys:String>
+    <sys:String x:Key="Plugins.Store.Tooltip.Uninstall">卸载插件</sys:String>
+    <sys:String x:Key="Plugins.Store.Tag.UpdateAvailable">可更新</sys:String>
+    <sys:String x:Key="Plugins.Store.Tag.Installed">已安装</sys:String>
+    <sys:String x:Key="Plugins.Store.Tag.PlatformIncompatible">平台不兼容</sys:String>
+    <sys:String x:Key="Plugins.Store.VersionRange.Any">任意</sys:String>
+    <sys:String x:Key="Plugins.Store.Source.Unknown">未知来源</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.ConfirmMessage">即将安装插件：&#x0a;&#x0a;名称: {0}&#x0a;更新来源: {1}&#x0a;下载源: {2}&#x0a;&#x0a;重大安全提醒：插件会在启动器内运行代码，可能读取或修改本地文件、访问网络、修改启动器行为，甚至执行恶意操作。&#x0a;请只安装你完全信任的来源。</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.DeveloperWarning">&#x0a;&#x0a;来源提醒：该 GitHub 开发者不在官方或本地白名单中。</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.TrustWarning">&#x0a;&#x0a;该插件来自未信任的第三方仓库。继续将信任该仓库并安装。</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.Dialog.TrustConfirm">信任确认</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.Dialog.ConfirmInstall">确认安装</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.Downloading">正在获取插件包，请稍候...</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.Dialog.Installing">安装中</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.Success">插件 {0} 安装成功！&#x0a;重启启动器后生效。</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.Dialog.InstallComplete">安装完成</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.Error">安装失败: {0}</sys:String>
+    <sys:String x:Key="Plugins.Store.Uninstall.Running">插件正在运行。请先禁用并重启启动器，再进行卸载。</sys:String>
+    <sys:String x:Key="Plugins.Store.Uninstall.Dialog.CannotUninstall">无法卸载</sys:String>
+    <sys:String x:Key="Plugins.Store.Uninstall.Dialog.Confirm">确定卸载插件 {0}？</sys:String>
+    <sys:String x:Key="Plugins.Store.Uninstall.Dialog.Title">确认卸载</sys:String>
+    <sys:String x:Key="Plugins.Store.Uninstall.Error">卸载失败: {0}</sys:String>
+    <sys:String x:Key="Plugins.Store.Filter.All">全部</sys:String>
+
+    <!-- PagePluginsInstalled -->
+    <sys:String x:Key="Plugins.Installed.Label.SourceLocal">本地插件目录</sys:String>
+    <sys:String x:Key="Plugins.Installed.Label.SourceLegacy">旧布局（根目录 DLL）</sys:String>
+    <sys:String x:Key="Plugins.Installed.Label.StateNotLoaded">未加载</sys:String>
+    <sys:String x:Key="Plugins.Installed.Label.StateDisabled">已禁用</sys:String>
+    <sys:String x:Key="Plugins.Installed.Label.SourcePrefix">来源: </sys:String>
+    <sys:String x:Key="Plugins.Installed.Label.StatePrefix">状态: </sys:String>
+    <sys:String x:Key="Plugins.Installed.Label.LoadOrder">加载顺序: </sys:String>
+    <sys:String x:Key="Plugins.Installed.Button.Uninstall">卸载</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.PluginEnabled">插件 {0} 已启用。&#x0a;请重启启动器后生效。</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.PluginDisabled">插件 {0} 已禁用。&#x0a;请重启启动器后生效。</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.PluginStatus">插件状态</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.OperationFailed">操作失败: {0}</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.MoveFailed">调整顺序失败: {0}</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.PluginRunning">插件 {0} 正在运行。&#x0a;请先禁用插件并重启启动器，再进行卸载。</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.CannotUninstall">无法卸载</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Message.ConfirmUninstall">确定卸载插件 {0}？&#x0a;此操作将删除插件文件和数据，需要重启启动器。</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.ConfirmUninstall">确认卸载</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.UninstallSuccess">插件 {0} 已卸载。</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.UninstallComplete">卸载完成</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.RemoteInstall">远程安装</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Message.RemoteInstallUrl">请输入插件 manifest URL，或直接输入 .pclx / .zip 插件包 URL：</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.RemoteInstallProtocolError">远程安装仅支持 HTTP 或 HTTPS 地址。</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.RemoteInstallFailed">安装失败</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.ParsingSource">正在解析插件来源，请稍候...</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.InstallPreparing">安装准备</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.InstallSecurityWarning">即将安装插件（{0}）：&#x0a;&#x0a;名称: {1}&#x0a;来源: {2}&#x0a;&#x0a;未经仓库信任验证。&#x0a;&#x0a;重大安全提醒：插件会在启动器内运行代码，可能读取或修改本地文件、访问网络、修改启动器界面，甚至执行恶意操作。&#x0a;请只安装你完全信任的来源。</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.ConfirmInstall">确认安装</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.InstallSuccess">插件 {0} 安装成功！&#x0a;请重启启动器后生效。</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.InstallComplete">安装完成</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.SelectPackage">选择插件包</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.FileFilter">PCL 插件包(*.pclx;*.zip)|*.pclx;*.zip</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.ImportFailed">导入失败: {0}</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.ImportSecurityWarning">即将导入插件（{0}）：&#x0a;&#x0a;名称: {1}&#x0a;来源: {2}&#x0a;&#x0a;重大安全提醒：插件会在启动器内运行代码，可能读取或修改本地文件、访问网络、修改启动器界面，甚至执行恶意操作。&#x0a;请只导入你完全信任的插件。</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.ConfirmImport">确认导入</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.ImportSuccess">插件 {0} 导入成功！&#x0a;请重启启动器后生效。</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.ImportComplete">导入完成</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.CheckingUpdates">正在检查插件更新...</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.AllUpToDate">所有市场插件都是最新版本。</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.UpdatesAvailable">发现 {0} 个可更新插件。</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.PluginUpdates">插件更新</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.CheckFailed">检查失败: {0}</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.CheckUpdateFailed">检查更新失败: {0}</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.NoUpdatesAvailable">暂无可用更新。</sys:String>
+    <sys:String x:Key="Plugins.Installed.Button.Update">更新</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.UpdateConfirm">即将更新插件：&#x0a;&#x0a;名称: {0}&#x0a;当前版本: v{1}&#x0a;最新版本: v{2}&#x0a;下载源: {3}</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.ConfirmUpdate">确认更新</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.UpdateReconfirm">&#x0a;&#x0a;该更新涉及来源变化或能力变化，请确认你信任此版本。</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.UpdateSuccess">插件 {0} 已更新到 v{1}！&#x0a;请重启启动器后生效。</sys:String>
+    <sys:String x:Key="Plugins.Installed.Dialog.Title.UpdateComplete">更新完成</sys:String>
+    <sys:String x:Key="Plugins.Installed.Message.UpdateFailed">更新失败: {0}</sys:String>
+    <sys:String x:Key="Plugins.Installed.Empty">暂无已安装插件。可从商店安装，或通过下方远程安装。</sys:String>
+
+    <!-- Common plugin dialog titles -->
+    <sys:String x:Key="Plugins.Common.Dialog.Title.Error">错误</sys:String>
+    <sys:String x:Key="Plugins.Common.Dialog.Title.CannotUninstall">无法卸载</sys:String>
+    <sys:String x:Key="Plugins.Common.Dialog.Title.ConfirmUninstall">确认卸载</sys:String>
+
+    <!-- PageDownloadPluginDetail (additional) -->
+    <sys:String x:Key="Plugins.Detail.Label.PluginNotFound">插件不存在</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.CannotReadEntry">无法读取插件市场条目。</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.LoadingReadme">正在加载 README...</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.ReadmeLoadFailed">README 加载失败：{0}</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.ReadmeNotProvided">该插件没有提供 README。</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.Developer">开发者</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.Source">来源</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.NoHistoryVersion">没有可选择的历史版本。</sys:String>
+    <sys:String x:Key="Plugins.Detail.Button.InstallSelected">安装所选版本</sys:String>
+    <sys:String x:Key="Plugins.Detail.Button.UpdateToThis">更新到此版本</sys:String>
+    <sys:String x:Key="Plugins.Detail.Button.DowngradeToThis">降级到此版本</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.PackageNotAvailable">当前平台没有可用安装包</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.PackageAvailable">当前平台安装包可用</sys:String>
+    <sys:String x:Key="Plugins.Detail.Label.Sha256Recorded">SHA-256 已记录</sys:String>
+    <sys:String x:Key="Plugins.Detail.Message.PackageNotAvailable">该版本没有适用于当前平台的安装包。</sys:String>
+    <sys:String x:Key="Plugins.Detail.Dialog.Title.CannotInstall">无法安装</sys:String>
+    <sys:String x:Key="Plugins.Detail.Message.UninstallSuccess">插件 {0} 已卸载。</sys:String>
+    <sys:String x:Key="Plugins.Detail.Message.UninstallFailed">卸载失败：{0}</sys:String>
+    <sys:String x:Key="Plugins.Detail.Message.DeveloperUntrusted">已取消信任开发者 {0}</sys:String>
+    <sys:String x:Key="Plugins.Detail.Message.DeveloperTrusted">已信任开发者 {0}</sys:String>
+    <sys:String x:Key="Plugins.Detail.Button.UntrustDeveloper">取消信任</sys:String>
+    <sys:String x:Key="Plugins.Detail.Button.TrustDeveloper">信任开发者</sys:String>
+    <sys:String x:Key="Plugins.Detail.Developer.Official">官方开发者</sys:String>
+    <sys:String x:Key="Plugins.Detail.Developer.Trusted">已信任开发者</sys:String>
+    <sys:String x:Key="Plugins.Detail.Developer.Untrusted">未信任开发者</sys:String>
+
+    <!-- PageDownloadPluginStore (additional) -->
+    <sys:String x:Key="Plugins.Store.Developer.Official">官方开发者</sys:String>
+    <sys:String x:Key="Plugins.Store.Developer.Trusted">用户信任开发者</sys:String>
+    <sys:String x:Key="Plugins.Store.Developer.Other">其他开发者</sys:String>
+
+    <!-- PluginMarketplaceService -->
+    <sys:String x:Key="Plugins.Marketplace.Error.ManifestEmpty">插件 manifest 为空。</sys:String>
+    <sys:String x:Key="Plugins.Marketplace.Error.SourceJsonEmpty">插件来源 JSON 为空。</sys:String>
+    <sys:String x:Key="Plugins.Marketplace.Error.UnsupportedSourceVersion">不支持的插件来源 JSON 版本。</sys:String>
+    <sys:String x:Key="Plugins.Marketplace.Label.CustomSource">自定义来源</sys:String>
+    <sys:String x:Key="Plugins.Marketplace.Error.UnrecognizedJson">插件 JSON 不是 developers/manifests/plugins 来源文档、manifest 或旧索引。</sys:String>
+    <sys:String x:Key="Plugins.Marketplace.Error.TopicsNotSupported">plugin-market.json 不能声明 topics，GitHub Topic 由启动器内置维护。</sys:String>
+    <sys:String x:Key="Plugins.Marketplace.Error.ManifestTooLarge">插件 manifest 文件过大。</sys:String>
+    <sys:String x:Key="Plugins.Marketplace.Error.ManifestLoadFailed">插件 manifest 获取或解析失败。</sys:String>
+    <sys:String x:Key="Plugins.Marketplace.Error.SourceJsonTooLarge">插件来源 JSON 文件过大。</sys:String>
+    <sys:String x:Key="Plugins.Marketplace.Error.InvalidSource">插件来源必须是 HTTP/HTTPS JSON 地址或本地 JSON 文件。</sys:String>
+    <sys:String x:Key="Plugins.Marketplace.Error.SourceJsonFetchFailed">插件来源 JSON 获取失败。</sys:String>
+    <sys:String x:Key="Plugins.Marketplace.Error.SourceJsonSizeLimitExceeded">插件来源 JSON 超过大小限制。</sys:String>
+
+    <!-- PluginPackageService -->
+    <sys:String x:Key="Plugins.Package.Error.ManifestNull">清单对象为 null。</sys:String>
+    <sys:String x:Key="Plugins.Package.Error.MissingId">缺少必填字段 Id。</sys:String>
+    <sys:String x:Key="Plugins.Package.Error.InvalidId">插件 Id 无效。请使用至少两个非空点分段，且仅包含 ASCII 字母、数字、下划线和连字符。</sys:String>
+    <sys:String x:Key="Plugins.Package.Error.MissingName">缺少必填字段 Name。</sys:String>
+    <sys:String x:Key="Plugins.Package.Error.LegacyFieldRemoved">旧插件入口字段 {0} 已移除；LoadAsync/UnloadAsync 与 JavaScript 插件不再支持。</sys:String>
+    <sys:String x:Key="Plugins.Package.Error.MissingEntryAssembly">缺少必填字段 EntryAssembly。</sys:String>
+    <sys:String x:Key="Plugins.Package.Error.MissingMixinConfig">缺少必填字段 mixinConfig 或 mixinConfigs；LoadAsync/UnloadAsync 与 JavaScript 插件已不再支持。</sys:String>
+    <sys:String x:Key="Plugins.Package.Error.InvalidVersion">Version 无效或未设置。</sys:String>
+    <sys:String x:Key="Plugins.Package.Error.InvalidLogo">Logo 必须是 HTTP/HTTPS URL 或插件包内的安全相对路径。</sys:String>
+    <sys:String x:Key="Plugins.Package.Error.CannotReadPluginJson">无法读取目录内的 plugin.json。</sys:String>
+
+    <!-- PluginLocalInstallService -->
+    <sys:String x:Key="Plugins.LocalInstall.Error.ZipNotFound">插件 zip 文件不存在。</sys:String>
+    <sys:String x:Key="Plugins.LocalInstall.Error.NoPluginJson">zip 中未找到 plugin.json。请确认该 zip 是 PCL 插件包。</sys:String>
+    <sys:String x:Key="Plugins.LocalInstall.Error.DirectoryValidationFailed">插件目录校验失败。</sys:String>
+    <sys:String x:Key="Plugins.LocalInstall.Label.LocalPclx">本地 pclx</sys:String>
+    <sys:String x:Key="Plugins.LocalInstall.Label.LocalZip">本地 zip</sys:String>
+    <sys:String x:Key="Plugins.LocalInstall.Error.UnsafePath">zip 包包含不安全的路径。</sys:String>
+
+    <!-- PluginLoaderService -->
+    <sys:String x:Key="Plugins.Loader.ServiceName">PCL.Mixin 插件引擎</sys:String>
+    <sys:String x:Key="Plugins.Loader.Error.EntryAssemblyNotFound">插件主程序集不存在。</sys:String>
+    <sys:String x:Key="Plugins.Loader.Error.MissingMixinConfig">插件未声明 mixinConfig 或 mixinConfigs；旧 LoadAsync 插件不再受支持。</sys:String>
+    <sys:String x:Key="Plugins.Loader.Error.MixinConfigRootEmpty">Mixin 配置根对象为空。</sys:String>
+    <sys:String x:Key="Plugins.Loader.Error.JavaScriptRuntimeRemoved">JavaScript/Jint 插件运行时已移除。</sys:String>
+    <sys:String x:Key="Plugins.Loader.Error.FileOutsidePluginDir">插件文件不能位于插件目录之外：{0}</sys:String>
+    <sys:String x:Key="Plugins.Loader.Error.LegacyDllNotSupported">旧平铺 DLL 插件不再受支持，已跳过：{0}。请改用包含 Mixin 配置的 PCLX 包。</sys:String>
+
+    <!-- UriActionService -->
+    <sys:String x:Key="UriAction.Error.UnknownAction">未知 URI 动作：{0}</sys:String>
+    <sys:String x:Key="UriAction.Error.ActionExecutionFailed">URI 动作执行失败：{0}</sys:String>
+    <sys:String x:Key="UriAction.Error.MissingServerParam">URI 启动服务器缺少 server 参数。</sys:String>
+    <sys:String x:Key="UriAction.Error.MissingVersionParam">URI 下载原版缺少 version 参数。</sys:String>
+    <sys:String x:Key="UriAction.Error.MissingModpackParam">URI 安装整合包缺少 file 或 url 参数。</sys:String>
+    <sys:String x:Key="UriAction.Error.InvalidModpackUrl">URI 整合包下载地址无效。</sys:String>
+    <sys:String x:Key="UriAction.Title.ModpackInstall">URI 整合包安装</sys:String>
+    <sys:String x:Key="UriAction.Title.DownloadModpack">下载整合包文件</sys:String>
+    <sys:String x:Key="UriAction.Title.InstallingModpack">安装整合包</sys:String>
+    <sys:String x:Key="UriAction.Error.ModpackInstallFailed">URI 整合包安装失败：{0}</sys:String>
+    <sys:String x:Key="UriAction.Success.ModpackInstallComplete">URI 整合包安装已完成</sys:String>
+    <sys:String x:Key="UriAction.Error.InvalidPluginSource">URI 插件来源无效。</sys:String>
+    <sys:String x:Key="UriAction.Error.UnsupportedPluginSourceType">不支持的 URI 插件来源类型。</sys:String>
+    <sys:String x:Key="UriAction.Warning.PluginInstallSecurity">即将安装插件（{0}）：\n\n名称: {1}\n来源: {2}\n\n重大安全提醒：插件会在启动器内运行代码，可能读取或修改本地文件、访问网络、修改启动器界面，甚至执行恶意操作。\n请只安装你完全信任的来源。</sys:String>
+    <sys:String x:Key="UriAction.Action.ConfirmInstall">确认安装</sys:String>
+    <sys:String x:Key="UriAction.Success.PluginInstalled">插件 {0} 安装成功！</sys:String>
+    <sys:String x:Key="UriAction.Title.InstallComplete">安装完成</sys:String>
+    <sys:String x:Key="UriAction.Error.PluginInstallFailed">URI 安装插件失败</sys:String>
+    <sys:String x:Key="UriAction.Error.PluginInstallFailedWithReason">URI 安装插件失败：{0}</sys:String>
+    <sys:String x:Key="UriAction.Error.InvalidPluginSource2">URI 插件源无效。</sys:String>
+    <sys:String x:Key="UriAction.Info.OfficialTopicBuiltIn">官方 GitHub Topic 已内置，无需重复添加。</sys:String>
+    <sys:String x:Key="UriAction.Info.OfficialDeveloperBuiltIn">NexDeveloper 官方可信开发者文件已内置，无需重复添加。</sys:String>
+    <sys:String x:Key="UriAction.Info.OfficialSourceBuiltIn">官方插件源已内置，无需重复添加。</sys:String>
+    <sys:String x:Key="UriAction.Warning.AddPluginSource">即将添加第三方插件源：\n\n名称: {0}\n类型: {1}\n来源: {2}\n\n插件源会影响商店中可展示和可更新的插件。请只添加你信任的来源。</sys:String>
+    <sys:String x:Key="UriAction.Action.ConfirmAddSource">确认添加插件源</sys:String>
+    <sys:String x:Key="UriAction.Success.SourceAdded">插件源已添加：{0}</sys:String>
+
+    <!-- PluginLoaderService (additional) -->
+    <sys:String x:Key="Plugins.Loader.Error.MixinConfigNotFound">Mixin 配置文件不存在。</sys:String>
+    <sys:String x:Key="Plugins.Loader.Error.MixinConfigReadFailed">读取 Mixin 配置失败：{0}</sys:String>
+    <sys:String x:Key="Plugins.Loader.Error.LegacyPropertyRemoved">旧插件入口字段 {0} 已移除；插件必须声明 Mixin 配置</sys:String>
+
+    <!-- PluginRemoteInstallService -->
+    <sys:String x:Key="Plugins.RemoteInstall.Error.SourceEmpty">安装来源不能为空。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.ManifestUrlEmpty">插件 manifest 地址不能为空。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.MissingPackageUrl">插件 manifest 缺少指向 .pclx 或 .zip 的 versions 条目。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.NoInstallableVersion">插件 manifest 中没有当前平台可安装且未过旧的版本。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.PackageIdMismatch">插件包 ID {0} 与市场 manifest 的 {1} 不一致。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.InvalidMarketVersion">市场 manifest 包含无效的插件版本。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.InvalidPackageSemVer">插件包包含无效的 SemVer 版本。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.PackageVersionMismatch">插件包版本 {0} 与市场 manifest 的 {1} 不一致。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.DependencyMismatch">插件包 dependencies 与市场 manifest 声明不一致。</sys:String>
+    <sys:String x:Key="Plugins.RemoteInstall.Error.GitUrlEmpty">Git 仓库地址不能为空。</sys:String>
+
+    <!-- PluginInstallService -->
+    <sys:String x:Key="Plugins.Install.Error.InvalidPluginId">插件 Id 无效。</sys:String>
+
+    <!-- PluginDeveloperTrustService -->
+    <sys:String x:Key="Plugins.Trust.Error.InvalidGitHubLogin">GitHub Login 无效。</sys:String>
+
+    <!-- FormMain -->
+    <sys:String x:Key="Main.Error.ReportUrl">请在 https://github.com/PCL-Nex-Developer/PCL2-Nex/issues 提交错误报告，以便于社区解决此问题！（这也有可能是原版 PCL 的问题）</sys:String>
+
+    <!-- PageSetupLauncherMisc -->
+    <sys:String x:Key="Setup.Misc.Network.ProxyHint">比如 http://127.0.0.1:1080/</sys:String>
+    <sys:String x:Key="Setup.Misc.Network.GitHubMirror.ToolTip1">将 GitHub 文件链接改写为 https://gh-proxy.org/https://github.com/...</sys:String>
+    <sys:String x:Key="Setup.Misc.Network.GitHubMirror.ToolTip2">将 GitHub 文件链接改写为 https://v4.gh-proxy.org/https://github.com/...</sys:String>
+    <sys:String x:Key="Setup.Misc.Network.GitHubMirror.ToolTip3">将 GitHub 文件链接改写为 https://v6.gh-proxy.org/https://github.com/...</sys:String>
+    <sys:String x:Key="Setup.Misc.Network.GitHubMirror.ToolTip4">将 GitHub 文件链接改写为 https://cdn.gh-proxy.org/https://github.com/...</sys:String>
+
+    <!-- PageSetupLauncherMisc.xaml.cs -->
+    <sys:String x:Key="Setup.Misc.ExportConfigFileName">PCL 全局配置.json</sys:String>
+
+    <!-- PluginUriSourceParser -->
+    <sys:String x:Key="Plugins.UriParser.Error.MissingInstallParam">URI 安装插件缺少 source、manifest 或 package 参数。</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.InvalidSource">URI 插件来源无效。仅支持本地 .pclx/.zip、远程插件包、manifest 或 Git 仓库。</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.CustomTopicNotSupported">自定义 Topic 插件源不受支持；GitHub Topic 由启动器内置维护。</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.MissingSourceParam">URI 添加插件源缺少 source、manifest 或 json 参数。</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.SourceContentEmpty">URI 插件源内容不能为空。</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.ManifestMustBeHttp">URI manifest 插件源必须使用 HTTP 或 HTTPS 地址。</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.LocalSourceMustBeFile">URI 本地插件源必须是已有的 JSON 文件。</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.JsonSourceMustBeHttpOrFile">URI JSON 插件源必须是 HTTP/HTTPS 地址或已有的本地 JSON 文件。</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Label.CustomPluginSource">自定义插件源</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.InstallSourceEmpty">URI 插件来源不能为空。</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.ManifestMustBeHttp2">URI 插件 manifest 必须使用 HTTP 或 HTTPS 地址。</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.InvalidGitSource">URI Git 插件来源无效。</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.PackageSourceEmpty">URI 插件包来源不能为空。</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.PackageMustBePclxOrZip">URI 插件包必须是 .pclx 或 .zip 文件。</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.InvalidLocalOrRemotePackage">URI 本地插件包不存在，远程插件包必须使用 HTTP 或 HTTPS 地址。</sys:String>
+    <sys:String x:Key="Plugins.UriParser.Error.UnsupportedSourceKey">URI 插件源 {0} 仅支持 json 或 manifest。</sys:String>
 </ResourceDictionary>
