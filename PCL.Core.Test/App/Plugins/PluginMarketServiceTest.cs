@@ -316,21 +316,18 @@ public class PluginMarketServiceTest
     [TestMethod]
     public void DeveloperTrust_ShouldRequireOfficialLevelAndIgnoreLoginCase()
     {
-        var allowlist = new PluginDeveloperAllowlist
-        {
-            Developers =
-            [
-                new PluginDeveloperRecord { GitHubLogin = "OfficialUser", Level = "official" },
-                new PluginDeveloperRecord { GitHubLogin = "NotOfficial", Level = "community" }
-            ]
-        };
+        PluginDeveloperRecord[] officialDevelopers =
+        [
+            new() { GitHubLogin = "OfficialUser", Level = "official" },
+            new() { GitHubLogin = "NotOfficial", Level = "community" }
+        ];
 
         Assert.AreEqual(PluginDeveloperTrustLevel.Official,
-            PluginDeveloperTrustService.GetTrustLevel("officialuser", allowlist, []));
+            PluginDeveloperTrustService.GetTrustLevel("officialuser", officialDevelopers, []));
         Assert.AreEqual(PluginDeveloperTrustLevel.Local,
-            PluginDeveloperTrustService.GetTrustLevel("LocalUser", allowlist, ["localuser"]));
+            PluginDeveloperTrustService.GetTrustLevel("LocalUser", officialDevelopers, ["localuser"]));
         Assert.AreEqual(PluginDeveloperTrustLevel.Other,
-            PluginDeveloperTrustService.GetTrustLevel("NotOfficial", allowlist, []));
+            PluginDeveloperTrustService.GetTrustLevel("NotOfficial", officialDevelopers, []));
     }
 
     [TestMethod]
@@ -348,47 +345,65 @@ public class PluginMarketServiceTest
     }
 
     [TestMethod]
-    public async Task DeveloperWhitelistFetch_ShouldUseStableJsonEndpointAndWriteCache()
+    public async Task OfficialMarketSource_ShouldUseRawAddressAndProvideOfficialDevelopers()
     {
         HttpRequestMessage? capturedRequest = null;
         using var client = new HttpClient(new StubHandler(request =>
         {
             capturedRequest = CloneHeaders(request);
-            return Json("""{"version":1,"updatedAt":null,"developers":[{"githubLogin":"OfficialUser","displayName":"Official User","level":"official"}]}""");
+            return Json("""{"version":1,"updatedAt":null,"name":"NexDeveloper","group":"Official","tags":[],"developers":[{"githubLogin":"OfficialUser","displayName":"Official User","level":"official"},{"githubLogin":"NotOfficial","displayName":"Not Official","level":"community"}],"manifests":[],"plugins":[]}""");
         }));
         var cacheDirectory = NewTempDirectory();
-        var cachePath = Path.Combine(cacheDirectory, "developers.json");
         try
         {
-            var result = await PluginDeveloperTrustService.FetchOfficialAsync(client, cachePath);
+            var result = await PluginMarketplaceService.LoadOfficialSourceForTestingAsync(
+                new PluginMarketQueryOptions { CacheDirectory = cacheDirectory, GitHubMirror = 0 }, client);
 
-            Assert.AreEqual("cdn.jsdelivr.net", capturedRequest!.RequestUri!.Host);
-            Assert.AreEqual("/gh/PCL-Nex-Developer/Nex_Server@main/apiv2/developers.json", capturedRequest.RequestUri.AbsolutePath);
+            Assert.AreEqual("raw.githubusercontent.com", capturedRequest!.RequestUri!.Host);
+            Assert.AreEqual("/PCL-Nex-Developer/Nex_Server/refs/heads/main/apiv2/plugin-market.json", capturedRequest.RequestUri.AbsolutePath);
             Assert.IsTrue(capturedRequest.Headers.Accept.Any(value => value.MediaType == "application/json"));
-            Assert.AreEqual(1, result.Developers.Count);
-            Assert.IsTrue(File.Exists(cachePath));
+            Assert.AreEqual(0, result.Errors.Count);
+            Assert.AreEqual("OfficialUser", result.OfficialDevelopers.Single().GitHubLogin);
+            Assert.AreEqual(0, result.TrustedDeveloperLogins.Count);
         }
         finally { Directory.Delete(cacheDirectory, true); }
     }
 
     [TestMethod]
-    public async Task DeveloperWhitelistFetch_ShouldUseCacheThenEmptyFallback()
+    public async Task ThirdPartyMarketSource_ShouldProvideLocalTrustedDevelopersFromSameDocument()
     {
-        using var client = new HttpClient(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)));
+        using var client = new HttpClient(new StubHandler(_ =>
+            Json("""{"version":1,"name":"Community","group":"Community","tags":[],"developers":[{"githubLogin":"CommunityOne","displayName":"One","level":"trusted"},{"githubLogin":"CommunityTwo","displayName":"Two","level":"official"}],"manifests":[],"plugins":[]}""")));
         var cacheDirectory = NewTempDirectory();
-        var cachePath = Path.Combine(cacheDirectory, "developers.json");
         try
         {
-            File.WriteAllText(cachePath,
-                """{"version":1,"updatedAt":null,"developers":[{"githubLogin":"CachedUser","displayName":"Cached User","level":"official"}]}""");
-            var cached = await PluginDeveloperTrustService.FetchOfficialAsync(client, cachePath);
-            Assert.AreEqual("CachedUser", cached.Developers.Single().GitHubLogin);
+            var result = await PluginMarketplaceService.LoadSourceAsync(
+                "https://community.example.test/plugin-market.json",
+                new PluginMarketQueryOptions { CacheDirectory = cacheDirectory, GitHubMirror = 0 },
+                client);
 
-            File.Delete(cachePath);
-            var empty = await PluginDeveloperTrustService.FetchOfficialAsync(client, cachePath);
-            Assert.AreEqual(0, empty.Developers.Count);
+            Assert.AreEqual(0, result.Errors.Count);
+            Assert.AreEqual(0, result.OfficialDevelopers.Count);
+            CollectionAssert.AreEquivalent(
+                new[] { "CommunityOne", "CommunityTwo" }, result.TrustedDeveloperLogins.ToArray());
+            Assert.AreEqual(PluginDeveloperTrustLevel.Local,
+                PluginDeveloperTrustService.GetTrustLevel(
+                    "communitytwo", [], result.TrustedDeveloperLogins));
         }
         finally { Directory.Delete(cacheDirectory, true); }
+    }
+
+    [TestMethod]
+    public async Task MarketSource_ShouldRejectTopicsField()
+    {
+        using var client = new HttpClient(new StubHandler(_ =>
+            Json("""{"version":1,"name":"Invalid","developers":[],"topics":["another-topic"],"manifests":[],"plugins":[]}""")));
+
+        await Assert.ThrowsExactlyAsync<InvalidDataException>(() =>
+            PluginMarketplaceService.LoadSourceAsync(
+                "https://community.example.test/plugin-market.json",
+                new PluginMarketQueryOptions { GitHubMirror = 0 },
+                client));
     }
 
     [TestMethod]
@@ -603,7 +618,7 @@ public class PluginMarketServiceTest
             var manifest = ValidManifestJson("inline")
                 .Replace("\"versions\":", "\"logo\":\"logo.png\",\"readmeUrl\":\"README.md\",\"group\":\"Tools\",\"tags\":[\"utility\"],\"versions\":");
             File.WriteAllText(sourcePath,
-                "{\"version\":1,\"name\":\"Custom\",\"tags\":[\"featured\"],\"topics\":[],\"manifests\":[],\"plugins\":[" + manifest + "]}");
+                "{\"version\":1,\"name\":\"Custom\",\"tags\":[\"featured\"],\"developers\":[{\"githubLogin\":\"Owner\",\"displayName\":\"Owner\",\"level\":\"trusted\"}],\"manifests\":[],\"plugins\":[" + manifest + "]}");
 
             using var client = new HttpClient(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound)));
             var result = await PluginMarketplaceService.LoadSourceAsync(sourcePath,
@@ -616,6 +631,7 @@ public class PluginMarketServiceTest
             CollectionAssert.AreEquivalent(new[] { "utility", "featured" }, entry.Tags);
             Assert.AreEqual(Path.Combine(directory, "logo.png"), entry.Logo);
             Assert.AreEqual(Path.Combine(directory, "README.md"), entry.ReadmeUrl);
+            CollectionAssert.Contains(result.TrustedDeveloperLogins.ToArray(), "Owner");
             Assert.IsFalse(entry.ManifestUrlIsDirect);
             var installSource = PluginRepositoryService.GetInstallSources(entry).Single();
             var persistent = PluginRepositoryService.GetPersistentInstallSource(
@@ -627,13 +643,37 @@ public class PluginMarketServiceTest
     }
 
     [TestMethod]
+    public async Task MarketplaceLoad_ShouldUseOnlyRawNexDeveloperIndex()
+    {
+        var hosts = new List<string>();
+        using var client = new HttpClient(new StubHandler(request =>
+        {
+            hosts.Add(request.RequestUri!.Host);
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        }));
+        var cache = NewTempDirectory();
+        try
+        {
+            var result = await PluginMarketplaceService.LoadOfficialSourceForTestingAsync(new PluginMarketQueryOptions
+            {
+                CacheDirectory = cache,
+                GitHubMirror = 0
+            }, client);
+
+            Assert.AreEqual(1, result.Errors.Count);
+            CollectionAssert.AreEqual(new[] { "raw.githubusercontent.com" }, hosts);
+        }
+        finally { Directory.Delete(cache, true); }
+    }
+
+    [TestMethod]
     public async Task MarketSourceJson_ShouldNeverSendGitHubTokenToThirdPartySource()
     {
         var requests = new List<HttpRequestMessage>();
         using var client = new HttpClient(new StubHandler(request =>
         {
             requests.Add(CloneHeaders(request));
-            return Json("""{"version":1,"name":"Third Party","topics":[],"manifests":[],"plugins":[]}""");
+            return Json("""{"version":1,"name":"Third Party","manifests":[],"plugins":[]}""");
         }));
 
         var result = await PluginMarketplaceService.LoadSourceAsync(
@@ -691,6 +731,41 @@ public class PluginMarketServiceTest
         Assert.IsTrue(entry.ManifestUrlIsDirect);
         Assert.AreEqual(PluginInstallSourceType.Manifest, persistent.Type);
         Assert.AreEqual("https://plugins.example.test/direct/manifest.json", persistent.Url);
+    }
+
+    [TestMethod]
+    public void DirectManifest_WithMalformedPclCoreVersion_ShouldRemainVisibleAsUnknown()
+    {
+        var manifest = new PluginMarketManifest
+        {
+            Id = "example.unknown-core",
+            Name = "Unknown Core",
+            Description = "Compatibility is intentionally unknown",
+            Author = new PluginMarketAuthor { DisplayName = "Example" },
+            Repository = "https://plugins.example.test/unknown-core",
+            Versions =
+            [
+                new PluginMarketVersion
+                {
+                    Version = "1.0.0",
+                    PclCoreVersion = "latest",
+                    Downloads = new PluginMarketDownloads
+                    {
+                        AnyCpu = new PluginMarketDownload
+                        {
+                            PackageUrl = "https://cdn.example.test/unknown-core-1.0.0.pclx",
+                            Sha256 = ValidSha256
+                        }
+                    }
+                }
+            ]
+        };
+
+        var entry = PluginRepositoryService.CreateManifestEntry(
+            manifest, "https://plugins.example.test/unknown-core/manifest.json", Architecture.X64);
+
+        Assert.AreEqual(PluginCoreCompatibilityStatus.Unknown, entry.CompatibilityStatus);
+        Assert.AreEqual("example.unknown-core", entry.Id);
     }
 
     [TestMethod]

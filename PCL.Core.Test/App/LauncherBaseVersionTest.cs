@@ -27,6 +27,7 @@ public class LauncherBaseVersionTest
     [DataRow("v2026.07.1")]
     [DataRow(" 2026.07.1")]
     [DataRow("2026.07.1 ")]
+    [DataRow("0000.07.1")]
     public void TryParse_ShouldRejectNonCanonicalValues(string value)
     {
         Assert.IsFalse(LauncherBaseVersion.TryParse(value, out _));
