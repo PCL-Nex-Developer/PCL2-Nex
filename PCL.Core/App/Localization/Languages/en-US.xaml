@@ -2457,11 +2457,6 @@
     <sys:String x:Key="Instance.Server.Card.CopyAddress">Copy address</sys:String>
     <sys:String x:Key="Instance.Server.Card.Edit">Edit</sys:String>
     <sys:String x:Key="Instance.Server.Card.Remove">Remove</sys:String>
-    <sys:String x:Key="Instance.Server.Card.Connecting">Connecting</sys:String>
-    <sys:String x:Key="Instance.Server.Card.ConnectingDots">Connecting...</sys:String>
-    <sys:String x:Key="Instance.Server.Card.Offline">Offline</sys:String>
-    <sys:String x:Key="Instance.Server.Card.ServerOffline">Server offline</sys:String>
-    <sys:String x:Key="Instance.Server.Card.RefreshingStatus">Refreshing server {0} status...</sys:String>
     <sys:String x:Key="Instance.Server.Card.ConnectingTo">Connecting to server {0}...</sys:String>
     <sys:String x:Key="Instance.Server.Card.LaunchFailed">Failed to launch server</sys:String>
     <sys:String x:Key="Instance.Server.Card.LaunchFailedMsg">Failed to launch server: {0}</sys:String>
@@ -2646,10 +2641,6 @@
     <sys:String x:Key="Tools.Test.Skin.TooFrequent">Skin fetch has been rate-limited. Please try again in 5 minutes!</sys:String>
     <sys:String x:Key="Tools.Test.Skin.Saved">Player {0}'s skin saved!</sys:String>
     <sys:String x:Key="Tools.Test.Skin.FileFilter">Skin image file (*.png)|*.png</sys:String>
-
-    <!-- Tools.Test.ServerQuery -->
-
-    <sys:String x:Key="Tools.Test.ServerQuery.Title">Check server</sys:String>
 
     <!-- Tools.Test.Achievement -->
 
@@ -2847,23 +2838,6 @@
     <sys:String x:Key="Speed.Progress.RemainingThreads">Remaining threads</sys:String>
     <sys:String x:Key="Speed.Error.ClickToCopy">Click to copy error details</sys:String>
     <sys:String x:Key="Speed.Error.Copied">Error details copied!</sys:String>
-
-    <!-- Tools.ServerQuery -->
-
-    <sys:String x:Key="Tools.ServerQuery.Address.Hint">Enter server address</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.Action.Query">Query</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.State.Querying">Querying...</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.State.NoInfo">No server information</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.Title.MinecraftServer">Minecraft server</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.Error.UnableToConnect">Unable to connect: {0}</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.Error.Timeout.Connect">Connection timeout</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.Error.Timeout.ReadWrite">Read/Write timeout</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.Error.InvalidResponse">Server returned invalid information</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.Error.AddressTooLong">Server address too long</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.Error.EmptyPacket">Server returned empty data packet</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.Error.StaleConnection">Server disconnected before returning the pong packet, so latency could not be calculated.</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.Error.IncompleteConnection">Server disconnected before returning the complete status packet.</sys:String>
-    <sys:String x:Key="Tools.ServerQuery.Error.PongDataLength">Pong data must be exactly 8 bytes</sys:String>
 
     <!-- Update -->
 
