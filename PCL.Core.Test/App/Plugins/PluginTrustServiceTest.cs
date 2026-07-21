@@ -142,6 +142,8 @@ public class PluginTrustServiceTest
     public void IsOfficialRepository_ShouldRecognizeBuiltInRegistry()
     {
         Assert.IsTrue(PluginTrustService.IsOfficialRepository(PluginRepositoryService.GetOfficialIndexUrl()));
+        Assert.IsTrue(PluginTrustService.IsOfficialRepository(
+            " HTTPS://RAW.GITHUBUSERCONTENT.COM/PCL-NEX-DEVELOPER/NEX_SERVER/REFS/HEADS/MAIN/APIV2/PLUGIN-MARKET.JSON "));
     }
 
     [TestMethod]

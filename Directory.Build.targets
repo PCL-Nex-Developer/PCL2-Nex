@@ -11,7 +11,7 @@
 
   <Target Name="ValidatePclBaseVersion" BeforeTargets="GenerateAssemblyInfo" Condition="'$(_PclInjectBaseVersion)' == 'true'">
     <Error
-      Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(BaseVersion)', '^\d{4}\.(0[1-9]|1[0-2])\.(0|[1-9]\d*)$'))"
+      Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(BaseVersion)', '^[1-9]\d{3}\.(0[1-9]|1[0-2])\.(0|[1-9]\d*)$'))"
       Text="BaseVersion must use strict yyyy.MM.patch format, for example 2026.07.1." />
   </Target>
 
