@@ -13,7 +13,6 @@ on:
       - '**/*.md'
       - '**/LICENSE'
       - '**/LICENCE'
-      - 'PCL.Core.Test/**'
       - '.github/ISSUE_TEMPLATE/**'
       - '.github/FUNDING.yml'
   pull_request:
@@ -21,6 +20,21 @@ on:
   workflow_dispatch:
 
 jobs:
+  test:
+    name: Test PCL.Core
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - name: Run plugin, version and network contract tests
+        run: >-
+          dotnet test "PCL.Core.Test/PCL.Core.Test.csproj" -c Debug
+          --filter "(FullyQualifiedName~PCL.Core.Test.App.Plugins)|(FullyQualifiedName~LauncherBaseVersionTest)|(FullyQualifiedName~UriSchemeServiceTest)|(FullyQualifiedName~GitHubAcceleratorTest)"
+
   build:
     strategy:
       matrix:
