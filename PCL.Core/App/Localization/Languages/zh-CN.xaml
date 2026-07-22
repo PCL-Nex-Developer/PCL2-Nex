@@ -118,6 +118,7 @@
     <sys:String x:Key="Main.Title.GameLog">实时日志</sys:String>
     <sys:String x:Key="Main.Title.InstanceSetup">实例设置 - {0}</sys:String>
     <sys:String x:Key="Main.Title.ResourceDownload">资源下载 - {0}</sys:String>
+    <sys:String x:Key="Main.Title.PluginDetail">插件详情 - {0}</sys:String>
     <sys:String x:Key="Main.Title.SaveManagement">存档管理 - {0}</sys:String>
 
     <!-- Main.Extra Buttons -->
@@ -3268,6 +3269,12 @@
     <sys:String x:Key="Plugins.Store.Install.TrustWarning">&#x0a;&#x0a;该插件来自未信任的第三方仓库。继续将信任该仓库并安装。</sys:String>
     <sys:String x:Key="Plugins.Store.Install.Dialog.TrustConfirm">信任确认</sys:String>
     <sys:String x:Key="Plugins.Store.Install.Dialog.ConfirmInstall">确认安装</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.TaskName">安装插件：{0}</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.TaskAlreadyRunning">该插件正在安装中。</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.Stage.Download">下载插件包</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.Stage.Prepare">校验并解包插件包</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.Stage.Install">安装插件文件</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.TaskSuccess">插件 {0} 安装完成，重启启动器后生效。</sys:String>
     <sys:String x:Key="Plugins.Store.Install.Downloading">正在获取插件包，请稍候...</sys:String>
     <sys:String x:Key="Plugins.Store.Install.Dialog.Installing">安装中</sys:String>
     <sys:String x:Key="Plugins.Store.Install.Success">插件 {0} 安装成功！&#x0a;重启启动器后生效。</sys:String>
@@ -3279,6 +3286,7 @@
     <sys:String x:Key="Plugins.Store.Uninstall.Dialog.Title">确认卸载</sys:String>
     <sys:String x:Key="Plugins.Store.Uninstall.Error">卸载失败: {0}</sys:String>
     <sys:String x:Key="Plugins.Store.Filter.All">全部</sys:String>
+    <sys:String x:Key="Plugins.Store.Group.Other">其他</sys:String>
 
     <!-- PagePluginsInstalled -->
     <sys:String x:Key="Plugins.Installed.Label.SourceLocal">本地插件目录</sys:String>

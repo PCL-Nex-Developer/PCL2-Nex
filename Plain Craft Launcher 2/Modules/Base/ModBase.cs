@@ -2859,7 +2859,7 @@ public static class ModBase
             for (var attempt = 0; attempt <= 5; attempt++)
                 try
                 {
-                    RunInUi(() => Clipboard.SetText(text));
+                    RunInUiWait(() => Clipboard.SetText(text));
                     success = true;
                     break;
                 }

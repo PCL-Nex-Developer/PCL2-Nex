@@ -210,8 +210,7 @@ public static class PluginRemoteInstallService
         if (string.IsNullOrWhiteSpace(extension)) extension = ".zip";
         var workDir = Path.Combine(PCL.Core.App.Paths.PluginTemp, "remote_" + Guid.NewGuid().ToString("N"));
         var packagePath = Path.Combine(workDir, "package" + extension);
-        var extractDir = Path.Combine(workDir, "extract");
-        Directory.CreateDirectory(extractDir);
+        Directory.CreateDirectory(workDir);
 
         try
         {
@@ -253,17 +252,18 @@ public static class PluginRemoteInstallService
                 response?.Dispose();
             }
 
-            var verifiedSha256 = ValidateSha256(packagePath, expectedSha256);
-            await Task.Run(() => ExtractZipSafely(packagePath, extractDir), ct).ConfigureAwait(false);
-            var pluginRoot = FindPluginRoot(extractDir)
-                ?? throw new InvalidDataException(Lang.Text("Plugins.RemoteInstall.Error.NoPluginJsonInPackage"));
-            var (manifest, result) = await PluginPackageService.ReadAndValidateDirectoryAsync(pluginRoot, ct).ConfigureAwait(false);
-            if (!result.IsValid || manifest is null)
-                throw new InvalidDataException(result.ErrorMessage ?? Lang.Text("Plugins.RemoteInstall.Error.PackageValidationFailed"));
-            ValidateSelectedMarketIdentity(manifest, expectedPluginId, expectedVersion, expectedDependencies);
-
-            return new PluginPreparedInstall(pluginRoot, manifest, PluginInstallSourceType.Repository,
-                packageUrl, Lang.Text("Plugins.RemoteInstall.SourceLabel.RemotePackage"), workDir, verifiedSha256);
+            return await PreparePackageFileAsync(
+                    packagePath,
+                    workDir,
+                    PluginInstallSourceType.Repository,
+                    packageUrl,
+                    Lang.Text("Plugins.RemoteInstall.SourceLabel.RemotePackage"),
+                    expectedSha256,
+                    expectedPluginId,
+                    expectedVersion,
+                    expectedDependencies,
+                    ct)
+                .ConfigureAwait(false);
         }
         catch
         {
@@ -271,6 +271,76 @@ public static class PluginRemoteInstallService
             catch { }
             throw;
         }
+    }
+
+    /// <summary>
+    /// 校验并解包已经由启动器下载管理器获取的插件包。
+    /// 下载文件本身不归返回对象所有，释放返回对象时只会清理解包目录。
+    /// </summary>
+    public static async Task<PluginPreparedInstall> PrepareDownloadedPackageAsync(
+        string packagePath,
+        string sourceUrl,
+        string? expectedSha256 = null,
+        string? expectedPluginId = null,
+        string? expectedVersion = null,
+        IReadOnlyList<PluginDependency>? expectedDependencies = null,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(packagePath) || !File.Exists(packagePath))
+            throw new FileNotFoundException(Lang.Text("Plugins.LocalInstall.Error.ZipNotFound"), packagePath);
+        if (string.IsNullOrWhiteSpace(sourceUrl))
+            throw new ArgumentException(Lang.Text("Plugins.RemoteInstall.Error.PackageUrlEmpty"), nameof(sourceUrl));
+
+        var workDir = Path.Combine(PCL.Core.App.Paths.PluginTemp, "downloaded_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(workDir);
+        try
+        {
+            return await PreparePackageFileAsync(
+                    packagePath,
+                    workDir,
+                    PluginInstallSourceType.Repository,
+                    sourceUrl,
+                    Lang.Text("Plugins.RemoteInstall.SourceLabel.RemotePackage"),
+                    expectedSha256,
+                    expectedPluginId,
+                    expectedVersion,
+                    expectedDependencies,
+                    ct)
+                .ConfigureAwait(false);
+        }
+        catch
+        {
+            try { if (Directory.Exists(workDir)) Directory.Delete(workDir, recursive: true); }
+            catch { }
+            throw;
+        }
+    }
+
+    private static async Task<PluginPreparedInstall> PreparePackageFileAsync(
+        string packagePath,
+        string workDir,
+        PluginInstallSourceType sourceType,
+        string sourceUrl,
+        string sourceLabel,
+        string? expectedSha256,
+        string? expectedPluginId,
+        string? expectedVersion,
+        IReadOnlyList<PluginDependency>? expectedDependencies,
+        CancellationToken ct)
+    {
+        var extractDir = Path.Combine(workDir, "extract");
+        Directory.CreateDirectory(extractDir);
+        var verifiedSha256 = ValidateSha256(packagePath, expectedSha256);
+        await Task.Run(() => ExtractZipSafely(packagePath, extractDir), ct).ConfigureAwait(false);
+        var pluginRoot = FindPluginRoot(extractDir)
+            ?? throw new InvalidDataException(Lang.Text("Plugins.RemoteInstall.Error.NoPluginJsonInPackage"));
+        var (manifest, result) = await PluginPackageService.ReadAndValidateDirectoryAsync(pluginRoot, ct).ConfigureAwait(false);
+        if (!result.IsValid || manifest is null)
+            throw new InvalidDataException(result.ErrorMessage ?? Lang.Text("Plugins.RemoteInstall.Error.PackageValidationFailed"));
+        ValidateSelectedMarketIdentity(manifest, expectedPluginId, expectedVersion, expectedDependencies);
+
+        return new PluginPreparedInstall(
+            pluginRoot, manifest, sourceType, sourceUrl, sourceLabel, workDir, verifiedSha256);
     }
 
     public static bool IsGitSource(string source)

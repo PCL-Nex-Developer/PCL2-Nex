@@ -118,6 +118,7 @@
     <sys:String x:Key="Main.Title.GameLog">Launch log</sys:String>
     <sys:String x:Key="Main.Title.InstanceSetup">Properties - {0}</sys:String>
     <sys:String x:Key="Main.Title.ResourceDownload">Resource download - {0}</sys:String>
+    <sys:String x:Key="Main.Title.PluginDetail">Plugin details - {0}</sys:String>
     <sys:String x:Key="Main.Title.SaveManagement">Save management - {0}</sys:String>
 
     <!-- Main.Extra Buttons -->
@@ -3269,6 +3270,12 @@
     <sys:String x:Key="Plugins.Store.Install.TrustWarning">&#x0a;&#x0a;This plugin is from an untrusted third-party repository. Continuing will trust this repository and install.</sys:String>
     <sys:String x:Key="Plugins.Store.Install.Dialog.TrustConfirm">Trust Confirmation</sys:String>
     <sys:String x:Key="Plugins.Store.Install.Dialog.ConfirmInstall">Confirm Install</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.TaskName">Install plugin: {0}</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.TaskAlreadyRunning">This plugin is already being installed.</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.Stage.Download">Download plugin package</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.Stage.Prepare">Verify and extract plugin package</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.Stage.Install">Install plugin files</sys:String>
+    <sys:String x:Key="Plugins.Store.Install.TaskSuccess">Plugin {0} was installed. Restart the launcher to apply it.</sys:String>
     <sys:String x:Key="Plugins.Store.Install.Downloading">Downloading plugin package, please wait...</sys:String>
     <sys:String x:Key="Plugins.Store.Install.Dialog.Installing">Installing</sys:String>
     <sys:String x:Key="Plugins.Store.Install.Success">Plugin {0} installed successfully!&#x0a;Restart the launcher for changes to take effect.</sys:String>
@@ -3280,6 +3287,7 @@
     <sys:String x:Key="Plugins.Store.Uninstall.Dialog.Title">Confirm Uninstall</sys:String>
     <sys:String x:Key="Plugins.Store.Uninstall.Error">Uninstall failed: {0}</sys:String>
     <sys:String x:Key="Plugins.Store.Filter.All">All</sys:String>
+    <sys:String x:Key="Plugins.Store.Group.Other">Other</sys:String>
 
     <!-- PagePluginsInstalled -->
     <sys:String x:Key="Plugins.Installed.Label.SourceLocal">Local plugin directory</sys:String>

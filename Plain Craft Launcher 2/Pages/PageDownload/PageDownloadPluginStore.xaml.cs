@@ -58,7 +58,7 @@ public partial class PageDownloadPluginStore
         {
             RenderCurrentSearchResults();
             PanLoad.Visibility = Visibility.Collapsed;
-            CardPlugins.Visibility = Visibility.Visible;
+            PanPlugins.Visibility = Visibility.Visible;
             return;
         }
 
@@ -82,7 +82,7 @@ public partial class PageDownloadPluginStore
 
         if (clearLatestVersionCache) _latestVersionCache.Clear();
 
-        CardPlugins.Visibility = Visibility.Collapsed;
+        PanPlugins.Visibility = Visibility.Collapsed;
         PanLoad.Visibility = Visibility.Visible;
         Load.Text = Lang.Text("Plugins.Store.Loading");
         Load.TextError = Lang.Text("Plugins.Store.LoadFailed");
@@ -118,7 +118,7 @@ public partial class PageDownloadPluginStore
             RenderCurrentSearchResults();
             Load.State.LoadingState = MyLoading.MyLoadingState.Stop;
             PanLoad.Visibility = Visibility.Collapsed;
-            CardPlugins.Visibility = Visibility.Visible;
+            PanPlugins.Visibility = Visibility.Visible;
             foreach (var error in market.Errors.Take(20))
                 ModBase.Log($"[Plugins] 市场来源加载失败：{error.Repository}: {error.Message}", ModBase.LogLevel.Debug);
             _ = LoadLatestVersionsAsync(_allEntries, ct);
@@ -128,7 +128,7 @@ public partial class PageDownloadPluginStore
             if (generation != _loadGeneration) return;
             Load.State.LoadingState = MyLoading.MyLoadingState.Stop;
             PanLoad.Visibility = Visibility.Collapsed;
-            CardPlugins.Visibility = Visibility.Visible;
+            PanPlugins.Visibility = Visibility.Visible;
             if (_allEntries is not null) RenderCurrentSearchResults();
         }
         catch (Exception ex)
@@ -136,7 +136,7 @@ public partial class PageDownloadPluginStore
             Load.TextError = Lang.Text("Plugins.Store.LoadError", ex.Message);
             Load.State.LoadingState = MyLoading.MyLoadingState.Error;
             PanLoad.Visibility = Visibility.Visible;
-            CardPlugins.Visibility = Visibility.Collapsed;
+            PanPlugins.Visibility = Visibility.Collapsed;
         }
         finally
         {
@@ -197,20 +197,82 @@ public partial class PageDownloadPluginStore
 
     private void RenderPluginList(IReadOnlyList<PluginRepositoryEntry> entries)
     {
+        var existingGroupCards = PanPlugins.Children.OfType<MyCard>()
+            .Where(card => card.Tag is string)
+            .ToList();
+        var expandedGroups = existingGroupCards
+            .Where(card => !card.IsSwapped)
+            .Select(card => (string)card.Tag)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         PanPlugins.Children.Clear();
 
         if (entries.Count == 0)
         {
             var empty = new TextBlock { Text = Lang.Text("Plugins.Store.Empty"), FontSize = 13, TextWrapping = TextWrapping.Wrap };
             empty.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
-            PanPlugins.Children.Add(empty);
+            PanPlugins.Children.Add(new MyCard
+            {
+                UseAnimation = false,
+                Margin = new Thickness(0, 0, 0, 15),
+                BorderChild = new Border
+                {
+                    Padding = new Thickness(19, 17, 19, 14),
+                    Child = empty
+                }
+            });
             return;
         }
 
         var installed = PluginUpdateService.GetInstalledPluginRecords();
-        foreach (var entry in SortEntries(entries))
-            PanPlugins.Children.Add(CreatePluginRow(entry, installed));
+        var groups = entries
+            .GroupBy(GetPluginGroupName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        void PopulateGroup(StackPanel stack)
+        {
+            foreach (var entry in (IEnumerable<PluginRepositoryEntry>)stack.Tag)
+                stack.Children.Add(CreatePluginRow(entry, installed));
+        }
+
+        for (var index = 0; index < groups.Count; index++)
+        {
+            var group = groups[index];
+            var groupEntries = SortEntries(group).ToList();
+            var stack = new StackPanel
+            {
+                Margin = new Thickness(20, MyCard.SwapedHeight, 18, 0),
+                VerticalAlignment = VerticalAlignment.Top,
+                RenderTransform = new System.Windows.Media.TranslateTransform(),
+                Tag = groupEntries
+            };
+            var card = new MyCard
+            {
+                Title = $"{group.Key} ({groupEntries.Count})",
+                Margin = new Thickness(0, 0, 0, 15),
+                Tag = group.Key
+            };
+            card.Children.Add(stack);
+            card.SwapControl = stack;
+
+            if (expandedGroups.Contains(group.Key) || (existingGroupCards.Count == 0 && index == 0))
+            {
+                MyCard.StackInstall(ref stack, PopulateGroup);
+                card.SwapControl = stack;
+            }
+            else
+            {
+                card.InstallMethod = PopulateGroup;
+                card.IsSwapped = true;
+            }
+
+            PanPlugins.Children.Add(card);
+        }
     }
+
+    private static string GetPluginGroupName(PluginRepositoryEntry entry)
+        => string.IsNullOrWhiteSpace(entry.Group)
+            ? Lang.Text("Plugins.Store.Group.Other")
+            : entry.Group.Trim();
 
     private IEnumerable<PluginRepositoryEntry> SortEntries(IEnumerable<PluginRepositoryEntry> entries)
     {
@@ -390,21 +452,18 @@ public partial class PageDownloadPluginStore
                 if (ModMain.MyMsgBox(confirmMsg, Lang.Text("Plugins.Store.Install.Dialog.ConfirmInstall"), button2: Lang.Text("Common.Action.Cancel"), isWarn: true) != 1) return false;
             }
 
-            ModMain.MyMsgBox(Lang.Text("Plugins.Store.Install.Downloading"), Lang.Text("Plugins.Store.Install.Dialog.Installing"));
-            using var prepared = await PrepareInstallAsync(entry, sourceEntry, selectedVersion);
-            var persistentSource = PluginRepositoryService.GetPersistentInstallSource(
-                entry, sourceEntry, prepared.SourceType, prepared.SourceUrl);
-            await PluginInstallService.InstallFromDirectoryAsync(
-                prepared.PluginRoot,
-                prepared.Manifest,
-                persistentSource.Type,
-                persistentSource.Url,
-                installedSha256: prepared.VerifiedSha256);
-            ModMain.frmMain?.RefreshRestartButton(true);
+            var installVersion = selectedVersion ?? entry.SelectedVersion;
+            if (installVersion is null
+                && string.Equals(sourceEntry.Type, "manifest", StringComparison.OrdinalIgnoreCase)
+                && _latestVersionCache.TryGetValue(GetEntryCacheKey(entry), out var latest))
+                installVersion = latest.ManifestVersion;
 
-            ModMain.MyMsgBox(Lang.Text("Plugins.Store.Install.Success", prepared.Manifest.Name), Lang.Text("Plugins.Store.Install.Dialog.InstallComplete"));
-            _ = LoadStoreAsync();
-            return true;
+            return await PluginInstallTaskManager.StartStoreInstallAsync(
+                entry,
+                sourceEntry,
+                installVersion,
+                () => PluginRemoteInstallService.PrepareAsync(sourceEntry),
+                RenderCurrentSearchResults);
         }
         catch (Exception ex)
         {
@@ -412,39 +471,6 @@ public partial class PageDownloadPluginStore
             ModMain.MyMsgBox(Lang.Text("Plugins.Store.Install.Error", ex.Message), Lang.Text("Plugins.Common.Dialog.Title.Error"));
             return false;
         }
-    }
-
-    private async Task<PluginPreparedInstall> PrepareInstallAsync(
-        PluginRepositoryEntry entry,
-        PluginInstallSourceEntry sourceEntry,
-        PluginMarketVersion? selectedVersion)
-    {
-        var manifestVersion = selectedVersion ?? entry.SelectedVersion;
-        if (manifestVersion is not null)
-        {
-            var download = PluginRepositoryService.SelectDownload(manifestVersion, System.Runtime.InteropServices.RuntimeInformation.OSArchitecture)
-                ?? throw new InvalidDataException(Lang.Text("Plugins.Detail.Message.PackageNotAvailable"));
-            manifestVersion.ResolvedPackageUrl = download.PackageUrl;
-            manifestVersion.ResolvedSha256 = download.Sha256;
-            if (entry.ManifestUrlIsDirect && !string.IsNullOrWhiteSpace(entry.ManifestUrl))
-                return await PluginRemoteInstallService.PrepareManifestVersionAsync(entry.ManifestUrl, manifestVersion)
-                    .ConfigureAwait(false);
-            return await PluginRemoteInstallService.PreparePackageAsync(
-                    download.PackageUrl,
-                    download.Sha256,
-                    expectedPluginId: entry.Id,
-                    expectedVersion: manifestVersion.Version,
-                    expectedDependencies: manifestVersion.ResolvedDependencies)
-                .ConfigureAwait(false);
-        }
-
-        if (string.Equals(sourceEntry.Type, "manifest", StringComparison.OrdinalIgnoreCase)
-            && _latestVersionCache.TryGetValue(GetEntryCacheKey(entry), out var latest))
-        {
-            return await PluginRemoteInstallService.PrepareManifestVersionAsync(sourceEntry.Url, latest.ManifestVersion).ConfigureAwait(false);
-        }
-
-        return await PluginRemoteInstallService.PrepareAsync(sourceEntry).ConfigureAwait(false);
     }
 
     internal void OnDeveloperTrustChanged()

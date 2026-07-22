@@ -24,27 +24,41 @@ public static class AnnouncementService
         {
             foreach (var item in showAnnounce)
             {
+                var buttons = GetDialogButtons(item);
                 ModMain.MyMsgBox(item.Detail, item.Title,
-                    item.Btn1 is null ? "" : item.Btn1.Text,
-                    item.Btn2 is null ? "" : item.Btn2.Text,
-                    Lang.Text("Common.Action.Close"),
-                    button1Action: () =>
-                    {
-                        if (EventTypeMapper.TryParse(
-                                item.Btn1.Command, out var eventType))
-                            CustomEvent.Raise(eventType, item.Btn1.CommandParameter);
-                    },
-                    button2Action: () =>
-                    {
-                        if (EventTypeMapper.TryParse(
-                                item.Btn2.Command, out var eventType))
-                            CustomEvent.Raise(eventType, item.Btn2.CommandParameter);
-                    });
+                    button1: buttons[0].Text,
+                    button2: buttons.Count > 1 ? buttons[1].Text : "",
+                    button3: buttons.Count > 2 ? buttons[2].Text : "",
+                    button1Action: buttons[0].Action,
+                    button2Action: buttons.Count > 1 ? buttons[1].Action : null,
+                    button3Action: buttons.Count > 2 ? buttons[2].Action : null);
             }
         });
 
         showedAnnounced.AddRange(showAnnounce.Select(x => x.Id));
         showedAnnounced = showedAnnounced.Distinct().ToList();
         States.Hint.ShowedAnnouncements = showedAnnounced.Join("|");
+    }
+
+    private static List<(string Text, Action? Action)> GetDialogButtons(VersionAnnouncementContentModel item)
+    {
+        var buttons = new List<(string Text, Action? Action)>();
+        AddButton(item.Btn1);
+        AddButton(item.Btn2);
+        buttons.Add((Lang.Text("Common.Action.Close"), null));
+        return buttons;
+
+        void AddButton(AnnouncementBtnInfoModel? button)
+        {
+            if (button is null || string.IsNullOrWhiteSpace(button.Text)) return;
+            buttons.Add((button.Text.Trim(), () => RaiseButtonEvent(button)));
+        }
+    }
+
+    private static void RaiseButtonEvent(AnnouncementBtnInfoModel button)
+    {
+        if (string.IsNullOrWhiteSpace(button.Command)) return;
+        if (EventTypeMapper.TryParse(button.Command, out var eventType))
+            CustomEvent.Raise(eventType, button.CommandParameter);
     }
 }
