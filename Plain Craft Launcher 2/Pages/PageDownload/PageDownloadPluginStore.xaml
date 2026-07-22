@@ -113,9 +113,7 @@
                         </StackPanel>
                     </Grid>
                 </local:MyCard>
-                <local:MyCard x:Name="CardPlugins" UseAnimation="False" Visibility="Collapsed">
-                    <StackPanel x:Name="PanPlugins" Margin="12" />
-                </local:MyCard>
+                <StackPanel x:Name="PanPlugins" Visibility="Collapsed" />
             </StackPanel>
         </local:MyScrollViewer>
         <local:MyCard HorizontalAlignment="Center" VerticalAlignment="Center" SnapsToDevicePixels="True"
