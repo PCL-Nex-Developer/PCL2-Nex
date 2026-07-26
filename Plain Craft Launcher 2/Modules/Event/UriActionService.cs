@@ -5,6 +5,7 @@ using System.Linq;
 using PCL.Core.App;
 using PCL.Core.App.Cli;
 using PCL.Core.App.Essentials;
+using PCL.Core.App.IoC;
 using PCL.Core.App.Localization;
 using PCL.Core.App.Plugins;
 using PCL.Network;
@@ -29,48 +30,87 @@ public static class UriActionService
             var action = NormalizeAction(request.ActionType ?? request.Command);
             if (string.IsNullOrWhiteSpace(action)) return;
 
-            switch (action)
+            // URI 动作可能在启动器冷启动时（WindowCreated 阶段）于 UI 线程被同步触发，
+            // 此时 Minecraft 文件夹、实例列表与档案尚未初始化，直接执行会导致
+            // 空引用异常或与加载流程互锁卡死（#URL Scheme 启动卡死）。
+            // 统一转到工作线程，等待启动器就绪后再实际执行。
+            ModBase.RunInThread(() =>
             {
-                case "launch":
-                case "launch-game":
-                case "play":
-                    LaunchGame(request);
-                    break;
-                case "launch-server":
-                case "join-server":
-                case "join":
-                    LaunchGame(request, requireServer: true);
-                    break;
-                case "download-vanilla":
-                case "download-minecraft":
-                case "install-vanilla":
-                case "install-minecraft":
-                    DownloadVanilla(request);
-                    break;
-                case "install-modpack":
-                case "download-modpack":
-                case "modpack":
-                    InstallModpack(request);
-                    break;
-                case "install-plugin":
-                case "plugin-install":
-                    InstallPlugin(request);
-                    break;
-                case "add-plugin-source":
-                case "add-plugin-repo":
-                case "add-plugin-repository":
-                case "plugin-source":
-                    AddPluginSource(request);
-                    break;
-                default:
-                    HintService.Hint(Lang.Text("UriAction.Error.UnknownAction", action), HintType.Error);
-                    break;
-            }
+                try
+                {
+                    WaitForLauncherReady();
+                    ExecuteAction(action, request);
+                }
+                catch (Exception ex)
+                {
+                    ModBase.Log(ex, "处理 URI 动作失败", ModBase.LogLevel.Feedback);
+                    HintService.Hint(Lang.Text("UriAction.Error.ActionExecutionFailed", ex.Message), HintType.Error);
+                }
+            });
         }
         catch (Exception ex)
         {
             ModBase.Log(ex, "处理 URI 动作失败", ModBase.LogLevel.Feedback);
             HintService.Hint(Lang.Text("UriAction.Error.ActionExecutionFailed", ex.Message), HintType.Error);
+        }
+    }
+
+    /// <summary>
+    ///     等待启动器完成初始化（生命周期进入 Running 且 Minecraft 文件夹已就绪），
+    ///     避免 URI 动作在冷启动过程中抢跑。最多等待约 30 秒。
+    /// </summary>
+    private static void WaitForLauncherReady()
+    {
+        Lifecycle.WaitForState(LifecycleState.Running);
+        for (var i = 0; i < 300; i++)
+        {
+            if (!string.IsNullOrEmpty(ModFolder.mcFolderSelected) &&
+                ModFolder.mcFolderListLoader.State != ModBase.LoadState.Loading &&
+                ModInstanceList.mcInstanceListLoader.State != ModBase.LoadState.Loading)
+                return;
+            Thread.Sleep(100);
+        }
+        ModBase.Log("[UriAction] 等待启动器就绪超时，仍尝试执行 URI 动作", ModBase.LogLevel.Debug);
+    }
+
+    private static void ExecuteAction(string action, UriActionRequest request)
+    {
+        switch (action)
+        {
+            case "launch":
+            case "launch-game":
+            case "play":
+                LaunchGame(request);
+                break;
+            case "launch-server":
+            case "join-server":
+            case "join":
+                LaunchGame(request, requireServer: true);
+                break;
+            case "download-vanilla":
+            case "download-minecraft":
+            case "install-vanilla":
+            case "install-minecraft":
+                DownloadVanilla(request);
+                break;
+            case "install-modpack":
+            case "download-modpack":
+            case "modpack":
+                InstallModpack(request);
+                break;
+            case "install-plugin":
+            case "plugin-install":
+                InstallPlugin(request);
+                break;
+            case "add-plugin-source":
+            case "add-plugin-repo":
+            case "add-plugin-repository":
+            case "plugin-source":
+                AddPluginSource(request);
+                break;
+            default:
+                HintService.Hint(Lang.Text("UriAction.Error.UnknownAction", action), HintType.Error);
+                break;
         }
     }
 
