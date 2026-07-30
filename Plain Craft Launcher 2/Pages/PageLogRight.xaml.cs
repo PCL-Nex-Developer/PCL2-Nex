@@ -16,11 +16,14 @@ public partial class PageLogRight
     public Run labFatal;
     public Run labInfo;
     public Run labWarn;
+    private ModWatcher.Watcher? _boundWatcher;
+    private ModWatcher.Watcher.GameExitEventHandler? _boundGameExitHandler;
 
     public PageLogRight()
     {
         Initialized += (_, _) => Init();
         Loaded += PageLogRight_Loaded;
+        Unloaded += PageLogRight_Unloaded;
         InitializeComponent();
     }
 
@@ -61,21 +64,30 @@ public partial class PageLogRight
         ModAnimation.AniControlEnabled -= 1;
     }
 
+    private void PageLogRight_Unloaded(object sender, RoutedEventArgs e)
+    {
+        UnbindWatcher();
+    }
+
     public void Reload()
     {
         // 初始化
         if (ModMain.frmLogLeft.currentLog is null || ModMain.frmLogLeft.currentUuid <= 0 ||
             ModMain.frmLogLeft.shownLogs.Count == 0)
         {
+            UnbindWatcher();
             ModMain.frmMain.PageChange(ModMain.frmMain.pageCurrent);
             return;
         }
 
+        var watcher = ModMain.frmLogLeft.currentLog;
+
         PanAllBack.Visibility = Visibility.Visible;
         CardOperation.Visibility = Visibility.Visible;
-        BtnOperationKill.IsEnabled = !ModMain.frmLogLeft.currentLog.gameProcess.HasExited;
-        BtnOperationExportStackDump.IsEnabled = !ModMain.frmLogLeft.currentLog.gameProcess.HasExited &&
-                                                !string.IsNullOrWhiteSpace(ModMain.frmLogLeft.currentLog.jStackPath);
+        BindWatcher(watcher);
+        BtnOperationKill.IsEnabled = !watcher.gameProcess.HasExited;
+        BtnOperationExportStackDump.IsEnabled = !watcher.gameProcess.HasExited &&
+                                                !string.IsNullOrWhiteSpace(watcher.jStackPath);
         SliderMaxLog.Value = Config.System.MaxGameLog;
         // y = 10x + 50 (0 <= x <= 5, 50 <= y <= 100)
         // y = 50x - 150 (5 < x <= 13, 100 < y <= 500)
@@ -93,31 +105,56 @@ public partial class PageLogRight
         // 绑定日志输出
         PanLog.Document = ModMain.frmLogLeft.flowDocuments[ModMain.frmLogLeft.currentUuid];
         // 绑定事件
-        ModMain.frmLogLeft.currentLog.LogOutput += OnLogOutput;
-        ModMain.frmLogLeft.currentLog.GameExit += OnGameExit;
-        RefreshLabText();
+        RefreshLabText(watcher);
     }
 
-    private void RefreshLabText()
+    private void BindWatcher(ModWatcher.Watcher watcher)
+    {
+        if (!IsLoaded || ReferenceEquals(_boundWatcher, watcher))
+            return;
+
+        UnbindWatcher();
+        _boundWatcher = watcher;
+        _boundGameExitHandler = () => OnGameExit(watcher);
+        watcher.LogOutput += OnLogOutput;
+        watcher.GameExit += _boundGameExitHandler;
+    }
+
+    private void UnbindWatcher()
+    {
+        if (_boundWatcher is null)
+            return;
+
+        _boundWatcher.LogOutput -= OnLogOutput;
+        if (_boundGameExitHandler is not null)
+            _boundWatcher.GameExit -= _boundGameExitHandler;
+        _boundWatcher = null;
+        _boundGameExitHandler = null;
+    }
+
+    private void RefreshLabText(ModWatcher.Watcher watcher)
     {
         // 刷新计数器
 
-        labFatal.Text = $"{ModMain.frmLogLeft.currentLog.countFatal} {Lang.Text("LogPage.Level.Fatal")}";
-        labError.Text = $"{ModMain.frmLogLeft.currentLog.countError} {Lang.Text("LogPage.Level.Error")}";
-        labWarn.Text = $"{ModMain.frmLogLeft.currentLog.countWarn} {Lang.Text("LogPage.Level.Warn")}";
-        labInfo.Text = $"{ModMain.frmLogLeft.currentLog.countInfo} {Lang.Text("LogPage.Level.Info")}";
-        labDebug.Text = $"{ModMain.frmLogLeft.currentLog.countDebug} {Lang.Text("LogPage.Level.Debug")}";
+        labFatal.Text = $"{watcher.countFatal} {Lang.Text("LogPage.Level.Fatal")}";
+        labError.Text = $"{watcher.countError} {Lang.Text("LogPage.Level.Error")}";
+        labWarn.Text = $"{watcher.countWarn} {Lang.Text("LogPage.Level.Warn")}";
+        labInfo.Text = $"{watcher.countInfo} {Lang.Text("LogPage.Level.Info")}";
+        labDebug.Text = $"{watcher.countDebug} {Lang.Text("LogPage.Level.Debug")}";
     }
 
     private void OnLogOutput(ModWatcher.Watcher sender, ModWatcher.LogOutputEventArgs e)
     {
+        if (!ReferenceEquals(_boundWatcher, sender))
+            return;
+
         ModBase.RunInUi(() =>
         {
-            if (ModMain.frmLogLeft.currentLog is not null)
-            {
-                if (CheckAutoScroll.Checked == true) PanBack.ScrollToBottom();
-                RefreshLabText();
-            }
+            if (!IsLoaded || !ReferenceEquals(_boundWatcher, sender))
+                return;
+
+            if (CheckAutoScroll.Checked == true) PanBack.ScrollToBottom();
+            RefreshLabText(sender);
         });
     }
 
@@ -189,10 +226,16 @@ public partial class PageLogRight
         });
     }
 
-    private void OnGameExit()
+    private void OnGameExit(ModWatcher.Watcher watcher)
     {
-        ModBase.RunInUi(() => BtnOperationKill.IsEnabled = false);
-        ModBase.RunInUi(() => BtnOperationExportStackDump.IsEnabled = false);
+        ModBase.RunInUi(() =>
+        {
+            if (!IsLoaded || !ReferenceEquals(_boundWatcher, watcher))
+                return;
+
+            BtnOperationKill.IsEnabled = false;
+            BtnOperationExportStackDump.IsEnabled = false;
+        });
     }
 
     #endregion
