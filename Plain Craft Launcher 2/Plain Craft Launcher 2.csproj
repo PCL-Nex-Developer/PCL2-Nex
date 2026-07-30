@@ -114,7 +114,7 @@
         <ApplicationDefinition Include="App.xaml" Condition="Exists('App.xaml')" />
         <Page Include="**\*.xaml" Exclude="bin\**;obj\**;@(ApplicationDefinition)" />
         <Resource Include="Images\**" />
-        <Resource Include="Resources\**" />
+        <Resource Include="Resources\**" Exclude="Resources\**\*.xaml" />
         <EmbeddedResource Include="metadata.json" />
     </ItemGroup>
     <ItemGroup>
