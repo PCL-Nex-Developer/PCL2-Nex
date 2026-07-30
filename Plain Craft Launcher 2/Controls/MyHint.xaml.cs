@@ -135,7 +135,7 @@ public partial class MyHint
 
     private void MyHint_Loaded(object sender, RoutedEventArgs e)
     {
-        ThemeService.ColorModeChanged += (v, theme) => _ThemeChanged(v, theme);
+        ThemeService.ColorModeChanged += _ThemeChanged;
         if (CanClose && ConfigService.TryGetConfigItemNoType(RelativeSetup, out var item) && item.GetValueNoType() is not null)
             Visibility = Visibility.Collapsed;
     }

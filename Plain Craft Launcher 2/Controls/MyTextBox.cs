@@ -164,11 +164,7 @@ public class MyTextBox : TextBox
             if (IsLoaded && labWrong is not null)
                 ChangeValidateResult(IsValidated, true);
             else
-                ModBase.RunInNewThread(() =>
-                {
-                    Thread.Sleep(30);
-                    ModBase.RunInUi(() => ChangeValidateResult(IsValidated, false));
-                }, "DelayedValidate Change");
+                ChangeValidateResult(IsValidated, false);
         }
 
         // 更新错误信息
@@ -176,26 +172,6 @@ public class MyTextBox : TextBox
         {
             if (IsLoaded && labWrong is not null)
                 labWrong.Text = ValidateResult;
-            else
-                ModBase.RunInNewThread(() =>
-                {
-                    var isFinished = false;
-                    while (!isFinished)
-                    {
-                        Thread.Sleep(20);
-                        ModBase.RunInUiWait(() =>
-                        {
-                            if (labWrong is not null)
-                            {
-                                labWrong.Text = ValidateResult;
-                                isFinished = true;
-                            }
-
-                            if (!IsLoaded)
-                                isFinished = true;
-                        });
-                    }
-                }, "DelayedValidate Text");
         }
     }
 

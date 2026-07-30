@@ -260,7 +260,6 @@ internal sealed class MixinRuntime : IMixinRuntime, IDisposable
                     }
                 }
 
-                foreach (var target in affected) RefreshPatch(target);
                 _appliedApplications.Add(key);
                 AddConflictWarnings(affected, warnings);
             }

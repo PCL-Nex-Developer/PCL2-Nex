@@ -150,20 +150,27 @@ public partial class MyLoading
         [MethodImpl(MethodImplOptions.Synchronized)]
         set
         {
+            if (ReferenceEquals(field, value))
+                return;
+
             if (field is not null)
             {
-                field.ProgressChanged -= (_, _) => RefreshText();
-                field.LoadingStateChanged -= (_, _) => RefreshState();
+                field.ProgressChanged -= StateOnProgressChanged;
+                field.LoadingStateChanged -= StateOnLoadingStateChanged;
             }
 
             field = value;
             if (field is not null)
             {
-                field.ProgressChanged += (_, _) => RefreshText();
-                field.LoadingStateChanged += (_, _) => RefreshState();
+                field.ProgressChanged += StateOnProgressChanged;
+                field.LoadingStateChanged += StateOnLoadingStateChanged;
             }
         }
     }
+
+    private void StateOnProgressChanged(double newProgress, double oldProgress) => RefreshText();
+
+    private void StateOnLoadingStateChanged(MyLoadingState newState, MyLoadingState oldState) => RefreshState();
 
     public ILoadingTrigger State
     {
