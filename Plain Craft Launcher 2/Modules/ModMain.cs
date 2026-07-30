@@ -13,6 +13,7 @@ using Microsoft.VisualBasic;
 using Microsoft.Win32;
 using PCL.Core.App;
 using PCL.Core.App.Configuration;
+using PCL.Core.App.IoC;
 using PCL.Core.App.Localization;
 using PCL.Core.UI;
 using PCL.Core.Utils;
@@ -174,11 +175,14 @@ public static class ModMain
         {
             try
             {
-                while (true)
+                while (!Lifecycle.HasShutdownStarted)
                 {
                     ModBase.RunInUiWait(TimerMain);
                     Thread.Sleep((int)Math.Round(50d * 0.98d));
                 }
+            }
+            catch (OperationCanceledException) when (Lifecycle.HasShutdownStarted)
+            {
             }
             catch (Exception ex)
             {
@@ -192,7 +196,7 @@ public static class ModMain
             try
             {
                 var lastTime = Environment.TickCount;
-                while (true)
+                while (!Lifecycle.HasShutdownStarted)
                 {
                     if (lastTime != Environment.TickCount)
                     {
@@ -202,6 +206,9 @@ public static class ModMain
 
                     Thread.Sleep(1);
                 }
+            }
+            catch (OperationCanceledException) when (Lifecycle.HasShutdownStarted)
+            {
             }
             catch (Exception ex)
             {

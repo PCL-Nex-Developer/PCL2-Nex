@@ -432,6 +432,12 @@ public partial class FormMain
     // 关闭
     private void FormMain_Closing(object sender, CancelEventArgs e)
     {
+        if (Lifecycle.HasShutdownStarted)
+        {
+            e.Cancel = false;
+            return;
+        }
+
         EndProgram(true);
         e.Cancel = true;
     }
@@ -501,6 +507,7 @@ public partial class FormMain
                     }, 210),
                     ModAnimation.AaCode(() => EndProgramForce(force: false, isUpdating: isUpdating), 230)
                 }, "Form Close");
+                _ = EnsureProgramExitAsync(isUpdating);
             }
             else
             {
@@ -512,33 +519,53 @@ public partial class FormMain
     }
 
     private static bool isLogShown;
+    private static int endProgramForceStarted;
+
+    private static async Task EnsureProgramExitAsync(bool isUpdating)
+    {
+        await Task.Delay(350).ConfigureAwait(false);
+        if (!Lifecycle.HasShutdownStarted)
+            EndProgramForce(force: false, isUpdating: isUpdating);
+    }
 
     public static void EndProgramForce(ModBase.ProcessReturnValues returnCode = ModBase.ProcessReturnValues.Success,
         bool force = true, bool isUpdating = false)
     {
-        // On Error Resume Next
-        // 关闭联机大厅
-        ModBase.isProgramEnded = true;
-        ModAnimation.AniControlEnabled += 1;
-        if (UpdateManager.isUpdateWaitingRestart && !isUpdating)
-            UpdateManager.UpdateRestart(false, false);
-        if (returnCode == ModBase.ProcessReturnValues.Exception)
+        if (Interlocked.Exchange(ref endProgramForceStarted, 1) != 0)
+            return;
+
+        try
         {
-            if (!isLogShown)
+            // On Error Resume Next
+            // 关闭联机大厅
+            ModBase.isProgramEnded = true;
+            ModAnimation.AniControlEnabled += 1;
+            if (UpdateManager.isUpdateWaitingRestart && !isUpdating)
+                UpdateManager.UpdateRestart(false, false);
+            if (returnCode == ModBase.ProcessReturnValues.Exception)
             {
-                ModBase.FeedbackInfo();
-                ModBase.Log(Lang.Text("Main.Error.ReportUrl"));
-                isLogShown = true;
-                ModBase.ShellOnly(LogWrapper.CurrentLogger.CurrentLogFiles.Last());
+                if (!isLogShown)
+                {
+                    ModBase.FeedbackInfo();
+                    ModBase.Log(Lang.Text("Main.Error.ReportUrl"));
+                    isLogShown = true;
+                    ModBase.ShellOnly(LogWrapper.CurrentLogger.CurrentLogFiles.Last());
+                }
+
+                Thread.Sleep(500); // 防止 PCL 在记事本打开前就被掐掉
             }
 
-            Thread.Sleep(500); // 防止 PCL 在记事本打开前就被掐掉
+            ModBase.Log("[System] 程序已退出，返回值：" + ModBase.GetStringFromEnum(returnCode));
+            // If ReturnCode <> ProcessReturnValues.Success Then Environment.Exit(ReturnCode)
+            // Process.GetCurrentProcess.Kill()
+            Lifecycle.Shutdown((int)returnCode, force);
         }
-
-        ModBase.Log("[System] 程序已退出，返回值：" + ModBase.GetStringFromEnum(returnCode));
-        // If ReturnCode <> ProcessReturnValues.Success Then Environment.Exit(ReturnCode)
-        // Process.GetCurrentProcess.Kill()
-        Lifecycle.Shutdown((int)returnCode, force);
+        catch
+        {
+            if (!Lifecycle.HasShutdownStarted)
+                Interlocked.Exchange(ref endProgramForceStarted, 0);
+            throw;
+        }
     }
 
     private void BtnTitleClose_Click(object sender, EventArgs e)

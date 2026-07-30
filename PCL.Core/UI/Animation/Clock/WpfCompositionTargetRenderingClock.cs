@@ -1,9 +1,7 @@
 using System;
-using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Windows.Media;
-using PCL.Core.Utils;
+using System.Windows.Threading;
 
 namespace PCL.Core.UI.Animation.Clock;
 
@@ -11,81 +9,166 @@ namespace PCL.Core.UI.Animation.Clock;
 /// 一个基于 WPF CompositionTarget.Rendering 事件的时钟实现。
 /// 该时钟引发的所有事件均在 UI 线程上执行。
 /// </summary>
-public class WpfCompositionTargetRenderingClock(int fps = 60) : IUIClock, IDisposable
+public sealed class WpfCompositionTargetRenderingClock : IUIClock, IDisposable
 {
-    private CancellationTokenSource? _cts;
-    
-    private TimeSpan _lastTime = TimeSpan.Zero;
-    private long _lastFrame;
-    
-    public event EventHandler<long>? Tick;
-    
-    public int Fps { get; set; } = fps;
+    private readonly Dispatcher _dispatcher;
+    private readonly object _stateLock = new();
+    private int _isRunning;
+    private int _stateVersion;
+    private int _appliedVersion = -1;
+    private int _renderingVersion = -1;
+    private bool _isSubscribed;
+    private TimeSpan _startTime;
+    private TimeSpan _lastRenderingTime;
+    private long _lastFrame = -1;
 
-    public bool IsRunning => _cts is not null && !_cts.IsCancellationRequested;
-    
-    ~WpfCompositionTargetRenderingClock()
+    public WpfCompositionTargetRenderingClock(Dispatcher dispatcher, int fps = 60)
     {
-        Dispose();
+        _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
+        Fps = fps;
     }
-    
+
+    public event EventHandler<long>? Tick;
+
+    public int Fps { get; set; }
+
+    public bool IsRunning => Volatile.Read(ref _isRunning) != 0;
+
     public void Start()
     {
-        if (IsRunning) return;
+        lock (_stateLock)
+        {
+            if (IsRunning)
+                return;
+            if (_dispatcher.HasShutdownStarted || _dispatcher.HasShutdownFinished)
+                throw new InvalidOperationException("WPF Dispatcher 已停止，无法启动动画时钟");
 
-        _cts = new CancellationTokenSource();
+            Interlocked.Exchange(ref _isRunning, 1);
+            _stateVersion++;
+        }
 
-        CompositionTarget.Rendering += _OnCompositionTargetOnRendering;
+        ScheduleStateUpdate();
     }
 
-    private void _OnCompositionTargetOnRendering(object? _, EventArgs args)
+    private void OnRendering(object? sender, EventArgs args)
     {
-        if (args is not RenderingEventArgs renderingEventArgs) return;
-
-        if (_cts!.IsCancellationRequested)
-        {
-            CompositionTarget.Rendering -= _OnCompositionTargetOnRendering;
+        if (args is not RenderingEventArgs renderingArgs)
             return;
-        }
 
-        if (Fps == int.MaxValue)
+        lock (_stateLock)
         {
-            _lastFrame++;
-            Tick?.Invoke(this, _lastFrame);
-        }
-        else
-        {
-            if (_lastTime == TimeSpan.Zero)
+            if (!IsRunning || _renderingVersion != _stateVersion)
+                return;
+
+            var renderingTime = renderingArgs.RenderingTime;
+            if (renderingTime == _lastRenderingTime)
+                return;
+
+            long frame;
+            if (Fps == int.MaxValue)
             {
-                _lastTime = renderingEventArgs.RenderingTime;
+                frame = _lastFrame + 1;
+            }
+            else
+            {
+                if (_startTime == TimeSpan.MinValue)
+                    _startTime = renderingTime;
+                var elapsedTicks = renderingTime.Ticks - _startTime.Ticks;
+                frame = (elapsedTicks + TimeSpan.TicksPerMillisecond / 2) * Fps /
+                        TimeSpan.TicksPerSecond;
+                if (frame <= _lastFrame)
+                    return;
             }
 
-            var frame = FrameUtils.TimeSpanToFrameIndex(_lastTime, renderingEventArgs.RenderingTime, Fps);
-            if (frame == _lastFrame) return;
+            _lastRenderingTime = renderingTime;
             _lastFrame = frame;
-
-            _lastTime = renderingEventArgs.RenderingTime;
-
             Tick?.Invoke(this, frame);
         }
     }
-    
+
     public void Stop()
     {
-        CompositionTarget.Rendering -= _OnCompositionTargetOnRendering;
-        
-        if (_cts is null) return;
-        _cts.Cancel();
-        _cts = null;
+        lock (_stateLock)
+        {
+            if (!IsRunning)
+                return;
+
+            Interlocked.Exchange(ref _isRunning, 0);
+            _stateVersion++;
+        }
+        if (_dispatcher.HasShutdownStarted || _dispatcher.HasShutdownFinished)
+            return;
+
+        ScheduleStateUpdate();
     }
-    
+
     public void Dispose()
     {
-        CompositionTarget.Rendering -= _OnCompositionTargetOnRendering;
-        
-        _cts?.Cancel();
-        _cts?.Dispose();
-        
+        Stop();
         GC.SuppressFinalize(this);
+    }
+
+    private void ScheduleStateUpdate()
+    {
+        var version = Volatile.Read(ref _stateVersion);
+        if (_dispatcher.CheckAccess())
+        {
+            ApplyState(version);
+        }
+        else
+        {
+            try
+            {
+                var operation = _dispatcher.BeginInvoke(() => ApplyState(version), DispatcherPriority.Send);
+                operation.Aborted += (_, _) =>
+                {
+                    RollBackAbortedStart(version);
+                };
+                if (operation.Status == DispatcherOperationStatus.Aborted)
+                    RollBackAbortedStart(version);
+            }
+            catch
+            {
+                RollBackAbortedStart(version);
+                throw;
+            }
+        }
+    }
+
+    private void ApplyState(int version)
+    {
+        lock (_stateLock)
+        {
+            if (version != _stateVersion || _appliedVersion == version)
+                return;
+            _appliedVersion = version;
+
+            if (IsRunning)
+            {
+                _startTime = TimeSpan.MinValue;
+                _lastRenderingTime = TimeSpan.MinValue;
+                _lastFrame = -1;
+                _renderingVersion = version;
+                if (_isSubscribed)
+                    return;
+                CompositionTarget.Rendering += OnRendering;
+                _isSubscribed = true;
+            }
+            else if (_isSubscribed)
+            {
+                CompositionTarget.Rendering -= OnRendering;
+                _isSubscribed = false;
+                _renderingVersion = -1;
+            }
+        }
+    }
+
+    private void RollBackAbortedStart(int version)
+    {
+        lock (_stateLock)
+        {
+            if (version == _stateVersion && IsRunning)
+                Interlocked.Exchange(ref _isRunning, 0);
+        }
     }
 }

@@ -10,6 +10,7 @@ using PCL.Core.UI.Animation.Animatable;
 using PCL.Core.UI.Animation.Clock;
 using PCL.Core.UI.Animation.UIAccessProvider;
 using PCL.Core.UI.Animation.ValueProcessor;
+using PCL.Core.Utils;
 using PCL.Core.Utils.Threading;
 
 namespace PCL.Core.UI.Animation.Core;
@@ -51,7 +52,7 @@ public sealed class AnimationService : GeneralService
         ValueProcessorManager.Register(new ThicknessValueProcessor());
     }
 
-    private static Channel<(IAnimation Animation, IAnimatable Target)> _animationChannel = null!;
+    private static Channel<AnimationEntry> _animationChannel = null!;
     // private static Channel<IAnimationFrame> _frameChannel = null!;
     private static Channel<(IAnimationFrame Frame, IAnimation Source)> _frameChannel = null!;
     // private static ConcurrentDictionary<IAnimatable, IAnimationFrame> _frameDictionary = null!;
@@ -63,6 +64,8 @@ public sealed class AnimationService : GeneralService
     private static Task[] _computeTasks = [];
     private static readonly object _activityLock = new();
     private static int _activeAnimationCount;
+    private static long _lastClockFrame = -1;
+    private static int _isStopping;
     
     public static int Fps { get; set; } = 60;
     public static double Scale { get; set; } = 1d;
@@ -72,7 +75,7 @@ public sealed class AnimationService : GeneralService
     private static void _Initialize()
     {
         // 初始化 Channel 与 Dictionary
-        _animationChannel = Channel.CreateUnbounded<(IAnimation, IAnimatable)>();
+        _animationChannel = Channel.CreateUnbounded<AnimationEntry>();
         // _frameChannel = Channel.CreateUnbounded<IAnimationFrame>();
         _frameChannel = Channel.CreateUnbounded<(IAnimationFrame, IAnimation)>();
         
@@ -84,6 +87,7 @@ public sealed class AnimationService : GeneralService
         _cts = new CancellationTokenSource();
         _resetEvent = new AsyncCountResetEvent(_taskCount);
         _activeAnimationCount = 0;
+        _isStopping = 0;
         
         // 注册 ValueProcessor
         _RegisterValueProcessors();
@@ -119,7 +123,7 @@ public sealed class AnimationService : GeneralService
         });
 
         // 初始化 Clock 并注册 Tick 事件
-        _clock = new WinMMClock(Fps);
+        _clock = new WpfCompositionTargetRenderingClock(Lifecycle.CurrentApplication.Dispatcher, Fps);
         _clock.Tick += ClockOnTick;
         
         // 运行动画计算 Task
@@ -133,6 +137,7 @@ public sealed class AnimationService : GeneralService
         // 取消动画计算 Task
         lock (_activityLock)
         {
+            Interlocked.Exchange(ref _isStopping, 1);
             _cts.Cancel();
             _activeAnimationCount = 0;
             _clock.Stop();
@@ -170,19 +175,23 @@ public sealed class AnimationService : GeneralService
 
     private static void ClockOnTick(object? sender, long e)
     {
-        // 通知所有等待的动画计算 Task 进行下一帧计算
+        if (Volatile.Read(ref _isStopping) != 0)
+            return;
+
+        Interlocked.Exchange(ref _lastClockFrame, e);
         _resetEvent.Set(_taskCount);
     }
 
     private static async Task _AnimationComputeTaskAsync()
     {
         // 本地动画列表，确保没有一直无法计算的动画
-        var animationList = new List<(IAnimation Animation, IAnimatable Target)>(8);
+        var animationList = new List<AnimationEntry>(8);
         try
         {
             // 持续监听 Channel 中的动画
             while (!_cts.IsCancellationRequested)
             {
+                var currentClockFrame = Volatile.Read(ref _lastClockFrame);
                 // 读取所有可用的动画到本地列表
                 while (_animationChannel.Reader.TryRead(out var animation))
                 {
@@ -206,6 +215,21 @@ public sealed class AnimationService : GeneralService
                         {
                             RemoveAnimation(i, animationEntry.Animation);
                             continue;
+                        }
+
+                        if (currentClockFrame < 0 || animationEntry.LastClockFrame >= currentClockFrame)
+                            continue;
+
+                        animationEntry.LastClockFrame = currentClockFrame;
+
+                        if (animationEntry.Animation is IFromToAnimation fromTo &&
+                            animationEntry.Animation.CurrentFrame < fromTo.TotalFrames)
+                        {
+                            var elapsedFrames = FrameUtils.StampToFrameIndex(animationEntry.StartStamp, Fps);
+                            var desiredFrame = animationEntry.StartAnimationFrame + elapsedFrames;
+                            if (desiredFrame > animationEntry.Animation.CurrentFrame)
+                                animationEntry.Animation.CurrentFrame = (int)Math.Min(desiredFrame,
+                                    Math.Max(0, fromTo.TotalFrames - 1));
                         }
 
                         var frame = animationEntry.Animation.ComputeNextFrame(animationEntry.Target);
@@ -285,7 +309,10 @@ public sealed class AnimationService : GeneralService
             try
             {
                 if (!_clock.IsRunning)
+                {
+                    Interlocked.Exchange(ref _lastClockFrame, -1);
                     _clock.Start();
+                }
             }
             catch (Exception ex)
             {
@@ -296,7 +323,8 @@ public sealed class AnimationService : GeneralService
                 return false;
             }
 
-            if (!_animationChannel.Writer.TryWrite((animation, target)))
+            if (!_animationChannel.Writer.TryWrite(new AnimationEntry(animation, target,
+                    Volatile.Read(ref _lastClockFrame), FrameUtils.NowStamp(), animation.CurrentFrame)))
             {
                 if (_activeAnimationCount == 0)
                     _clock.Stop();
@@ -332,7 +360,18 @@ public sealed class AnimationService : GeneralService
 
             _clock.Stop();
             _resetEvent.Reset();
+            Interlocked.Exchange(ref _lastClockFrame, -1);
         }
+    }
+
+    private sealed class AnimationEntry(IAnimation animation, IAnimatable target, long lastClockFrame,
+        long startStamp, int startAnimationFrame)
+    {
+        public IAnimation Animation { get; } = animation;
+        public IAnimatable Target { get; } = target;
+        public long LastClockFrame { get; set; } = lastClockFrame;
+        public long StartStamp { get; } = startStamp;
+        public int StartAnimationFrame { get; } = startAnimationFrame;
     }
     
     internal static Task PushAnimationAsync(IAnimation animation, IAnimatable target)
