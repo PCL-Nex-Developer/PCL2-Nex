@@ -22,21 +22,19 @@ internal static class ModStyle
             DependencyProperty.Register(nameof(UpdateInterval), typeof(TimeSpan), typeof(TimerRun),
                 new PropertyMetadata(TimeSpan.FromSeconds(1d)));
 
-        private object _isDisposed = false;
+        private bool _isDisposed;
 
-        private DispatcherTimer _timer;
+        private DispatcherTimer? _timer;
 
         public TimerRun(TimeSpan interval = default, bool autoStart = false)
         {
-            _timer = new DispatcherTimer();
-            _timer.Tick += _TimerTick;
             UpdateInterval = interval == default ? TimeSpan.FromSeconds(1d) : interval;
             AutoStart = autoStart;
             Loaded += OnLoaded;
             Unloaded += OnUnloaded;
         }
 
-        private object _isTimerRunning => _timer is not null && _timer.IsEnabled;
+        private bool _isTimerRunning => _timer?.IsEnabled == true;
 
         // UpdateInterval 属性
         public TimeSpan UpdateInterval
@@ -52,12 +50,15 @@ internal static class ModStyle
 
         public void Dispose()
         {
-            if ((bool)_isDisposed)
+            if (_isDisposed)
                 return;
             _isDisposed = true;
             // 资源释放
-            _timer.Tick -= _TimerTick;
-            _timer?.Stop();
+            if (_timer is not null)
+            {
+                _timer.Tick -= _TimerTick;
+                _timer.Stop();
+            }
             _timer = null;
         }
 
@@ -95,13 +96,20 @@ internal static class ModStyle
                 return;
             }
 
-            if (!(bool)_isTimerRunning)
-                _timer?.Start();
+            if (_isDisposed || _isTimerRunning)
+                return;
+
+            if (_timer is null)
+            {
+                _timer = new DispatcherTimer { Interval = UpdateInterval };
+                _timer.Tick += _TimerTick;
+            }
+            _timer.Start();
         }
 
         public void StopTimer()
         {
-            if ((bool)_isTimerRunning)
+            if (_isTimerRunning)
                 _timer?.Stop();
         }
     }
@@ -169,6 +177,13 @@ internal static class ModStyle
             if (lab is null)
             {
                 ModBase.Log("[Style] SetColorfulTextLab: lab is null");
+                return;
+            }
+
+            if (!text.Contains('§'))
+            {
+                if (lab.Text != text)
+                    lab.Text = text;
                 return;
             }
 

@@ -12,6 +12,10 @@ public partial class PageSpeedLeft
 
     // 定时器任务
     private readonly Dictionary<string, MyCard> rightCards = new();
+    private readonly DispatcherTimer watcherTimer = new()
+    {
+        Interval = TimeSpan.FromMilliseconds(watcherInterval)
+    };
 
     // 初始化
     private bool isLoad;
@@ -20,12 +24,15 @@ public partial class PageSpeedLeft
     {
         InitializeComponent();
         Loaded += Page_Loaded;
+        Unloaded += Page_Unloaded;
+        watcherTimer.Tick += (_, _) => Watcher();
     }
 
     private void Page_Loaded(object sender, RoutedEventArgs e)
     {
         // 进入时就刷新一次显示
         Watcher();
+        watcherTimer.Start();
 
         // 如果在页面切换动画的 “上一页消失” 部分已经完成了下载，就直接尝试返回
         TryReturnToHome();
@@ -33,11 +40,6 @@ public partial class PageSpeedLeft
         if (isLoad)
             return;
         isLoad = true;
-
-        // 监控定时器
-        var timer = new DispatcherTimer { Interval = new TimeSpan(0, 0, 0, 0, watcherInterval) };
-        timer.Tick += (_, _) => Watcher();
-        timer.Start();
 
         // 非调试模式隐藏线程数
         if (!ModBase.modeDebug)
@@ -47,6 +49,11 @@ public partial class PageSpeedLeft
             RowDefinitions[14].Height = new GridLength(0d);
             RowDefinitions[15].Height = new GridLength(0d);
         }
+    }
+
+    private void Page_Unloaded(object sender, RoutedEventArgs e)
+    {
+        watcherTimer.Stop();
     }
 
     private void Watcher()
