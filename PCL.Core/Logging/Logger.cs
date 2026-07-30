@@ -113,9 +113,9 @@ public sealed class Logger : IAsyncDisposable
 
         try
         {
-            while (!_disposed || _logChannel.Reader.TryPeek(out _))
+            while (await _logChannel.Reader.WaitToReadAsync().ConfigureAwait(false))
             {
-                if (_logChannel.Reader.TryRead(out var message))
+                while (_logChannel.Reader.TryRead(out var message))
                 {
 #if DEBUG
                     message = message.ReplaceLineBreak("\r\n");
@@ -127,19 +127,26 @@ public sealed class Logger : IAsyncDisposable
 
                     var elapsed = Stopwatch.GetElapsedTime(lastFlush);
                     if (lineCount >= maxBatchLines || elapsed > writeTimeout)
-                    {
                         await DoRefreshAsync().ConfigureAwait(false);
-                    }
                 }
-                else
+
+                if (lineCount == 0)
+                    continue;
+
+                var remaining = writeTimeout - Stopwatch.GetElapsedTime(lastFlush);
+                if (remaining > TimeSpan.Zero && !_logChannel.Reader.Completion.IsCompleted)
                 {
-                    if (lineCount != 0)
-                    {
-                        await DoRefreshAsync().ConfigureAwait(false);
-                    }
-                    await Task.Delay(80).ConfigureAwait(false);
+                    await Task.Delay(remaining < TimeSpan.FromMilliseconds(80)
+                        ? remaining
+                        : TimeSpan.FromMilliseconds(80)).ConfigureAwait(false);
                 }
+
+                if (!_logChannel.Reader.TryPeek(out _) || _logChannel.Reader.Completion.IsCompleted)
+                    await DoRefreshAsync().ConfigureAwait(false);
             }
+
+            if (lineCount != 0)
+                await DoRefreshAsync().ConfigureAwait(false);
 
             async Task DoRefreshAsync()
             {
