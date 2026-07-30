@@ -30,6 +30,7 @@ public partial class RegistryChangeMonitor : IDisposable
     private readonly ManualResetEvent _stopEvent = new(false);
     private readonly ManualResetEvent _registryEvent = new(false);
     private readonly Thread _monitorThread;
+    private int _disposed;
 
     public event EventHandler? Changed;
 
@@ -54,9 +55,7 @@ public partial class RegistryChangeMonitor : IDisposable
             while (!_stopEvent.WaitOne(0))
             {
                 // Wait for either registry change or stop signal
-                var index = WaitHandle.WaitAny(
-                    [_registryEvent, _stopEvent],
-                    TimeSpan.FromSeconds(1)); // Timeout to check for stop periodically
+                var index = WaitHandle.WaitAny([_registryEvent, _stopEvent]);
 
                 if (index == 1) break; // Stop requested
 
@@ -64,13 +63,17 @@ public partial class RegistryChangeMonitor : IDisposable
                 {
                     _registryEvent.Reset();
                     Changed?.Invoke(this, EventArgs.Empty);
+                    if (_stopEvent.WaitOne(0)) break;
                     _RegisterForNotification(); // Re-register for next change
                 }
             }
         }
         finally
         {
+            if (_hKey != IntPtr.Zero)
+                _ = _RegCloseKey(_hKey);
             _registryEvent.Dispose();
+            _stopEvent.Dispose();
         }
     }
 
@@ -93,16 +96,12 @@ public partial class RegistryChangeMonitor : IDisposable
 
     public void Dispose()
     {
-        _stopEvent.Set();
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        try { _stopEvent.Set(); }
+        catch (ObjectDisposedException) { return; }
 
-        // Give thread a chance to exit gracefully
-        if (_monitorThread is {IsAlive: true})
-            _monitorThread.Join(1000);
-
-        if (_hKey != IntPtr.Zero)
-            _ = _RegCloseKey(_hKey);
-
-        _stopEvent.Dispose();
+        if (_monitorThread is {IsAlive: true} && Thread.CurrentThread != _monitorThread)
+            _monitorThread.Join();
         GC.SuppressFinalize(this);
     }
 }
