@@ -897,7 +897,8 @@ public static class ModMain
     
     // 基础
     text = text.Replace("{pcl_version}", replacer(Basics.VersionName));
-    text = text.Replace("{identify}", replacer(Identify.LauncherId));
+    if (text.Contains("{identify}", StringComparison.Ordinal))
+        text = text.Replace("{identify}", replacer(Identify.LauncherId));
     text = text.Replace("{path}", replacer(Basics.ExecutableDirectory));
     text = text.Replace("{path_with_name}", replacer(Basics.ExecutableName));
     text = text.Replace("{path_temp}", replacer(ModBase.pathTemp));

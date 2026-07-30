@@ -99,7 +99,6 @@ public sealed partial class StartupService
         var cp = Encoding.GetEncoding(0);
         info.Append("\n默认代码页: ").Append(cp.EncodingName).Append(" (").Append(cp.CodePage).Append(')');
         info.Append("\n管理员身份: ").Append(ProcessInterop.IsAdmin());
-        info.Append("\n识别码: ").Append(Identify.LauncherId);
         Context.Info(info.ToString());
         return;
         string GetArchitectureName(Architecture arch) => arch switch

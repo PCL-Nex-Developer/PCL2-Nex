@@ -4,6 +4,7 @@ using PCL.Core.App;
 using PCL.Core.App.Localization;
 using PCL.Core.Logging;
 using PCL.Core.UI;
+using PCL.Core.Utils.OS;
 
 namespace PCL;
 
@@ -16,6 +17,9 @@ internal sealed class CrashDialogPresenter(CrashAnalysisContext context)
         bool isHandAnalyze,
         List<string>? extraFiles)
     {
+        if (!isHandAnalyze)
+            HardwareInfo.BeginHardwareInfoCollection();
+
         ModMain.frmMain.ShowWindowToTop();
 
         var resultText = _formatter.Format(context, isHandAnalyze);

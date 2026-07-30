@@ -8,7 +8,6 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Media.Effects;
 using PCL.Core.App;
 using PCL.Core.App.IoC;
 using PCL.Core.App.Localization;
@@ -170,14 +169,7 @@ public partial class FormMain
                 "M26,29 v-25 h6 a7,7 180 0 1 0,14 h-6 M83,6.5 a10,11.5 180 1 0 0,18 M48,2.5 v24.5 h13.5");
         // 加载窗口
 
-        ThemeManager.ThemeRefresh();
         ModSetup.ApplyAll();
-        Lifecycle.CurrentApplication.Resources["BlurSamplingRate"] = Config.Preference.Blur.SamplingRate * 0.01d;
-        Lifecycle.CurrentApplication.Resources["BlurType"] = Config.Preference.Blur.KernelType;
-        if (Config.Preference.Blur.IsEnabled)
-            Lifecycle.CurrentApplication.Resources["BlurRadius"] = Config.Preference.Blur.Radius * 1.0d;
-        else
-            Lifecycle.CurrentApplication.Resources["BlurRadius"] = 0.0d;
 
         // #If DEBUG Then
         // MinHeight = 50
@@ -272,7 +264,6 @@ public partial class FormMain
                     ModBase.Log(ex, "初始化加载池运行失败", ModBase.LogLevel.Feedback);
                 }
 
-                HardwareInfo.GetHardwareInfo();
             }
             catch (Exception ex)
             {

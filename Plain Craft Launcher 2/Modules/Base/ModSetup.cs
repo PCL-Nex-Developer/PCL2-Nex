@@ -118,7 +118,6 @@ public class ModSetup
 
         // UI - Launcher
         UiLauncherTransparent(Config.Preference.Theme.WindowOpacity);
-        UiLauncherTheme(Config.Preference.Theme.ThemeSelected);
         UiBackgroundColorful(Config.Preference.Background.BackgroundColorful);
         UiLockWindowSize(Config.Preference.LockWindowSize);
 
@@ -137,17 +136,8 @@ public class ModSetup
         UiCustomType(Config.Preference.Homepage.Type);
 
         // UI - Blur
-        if (Config.Preference.Blur.IsEnabled)
-        {
-            UiBlurValue(Config.Preference.Blur.Radius);
-            UiBlurSamplingRate(Config.Preference.Blur.SamplingRate);
-            UiBlurType(Config.Preference.Blur.KernelType);
-        }
-        else
-        {
-            UiBlurValue(0);
-        }
-
+        UiBlurSamplingRate(Config.Preference.Blur.SamplingRate);
+        UiBlurType(Config.Preference.Blur.KernelType);
         UiBlur(Config.Preference.Blur.IsEnabled);
 
         // UI - Title Bar
@@ -440,10 +430,8 @@ public class ModSetup
     // 高级材质
     public static void UiBlur(bool value)
     {
-        if (ModMain.frmSetupUI is null)
-            return;
-
-        ModMain.frmSetupUI.PanBlurValue.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
+        if (ModMain.frmSetupUI is not null)
+            ModMain.frmSetupUI.PanBlurValue.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
         UiBlurValue(value ? Config.Preference.Blur.Radius : 0);
     }
 

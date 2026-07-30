@@ -4,7 +4,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
-using PCL.Core.UI.Effects;
 
 // 该部分源码来自或修改于 https://github.com/OrgEleCho/EleCho.WpfSuite
 // 项目: EleCho.WpfSuite
@@ -23,6 +22,26 @@ public class BlurBorder : Border
     private static bool _IsZero(double value) => Math.Abs(value) < 10.0 * DoubleEpsilon;
 
     private readonly Stack<UIElement> _panelStack = new();
+    private readonly BlurEffect _blurEffect = new();
+    private readonly DrawingVisual _drawingVisual = new();
+    private UIElement? _layoutParent;
+    private Size _drawingVisualSize;
+
+    public BlurBorder()
+    {
+        _drawingVisual.Effect = _blurEffect;
+        Loaded += (_, _) => UpdateLayoutSubscription();
+        Unloaded += (_, _) =>
+        {
+            UpdateLayoutSubscription();
+            ClearDrawingVisual();
+        };
+        IsVisibleChanged += (_, _) =>
+        {
+            if (!IsVisible) ClearDrawingVisual();
+        };
+        UpdateBlurEffect();
+    }
 
     /// <summary>
     /// A geometry to clip the content of this border correctly
@@ -102,22 +121,30 @@ public class BlurBorder : Border
     /// <inheritdoc/>
     protected override void OnVisualParentChanged(DependencyObject oldParentObject)
     {
-        if (oldParentObject is UIElement oldParent)
-        {
-            oldParent.LayoutUpdated -= ParentLayoutUpdated;
-        }
+        base.OnVisualParentChanged(oldParentObject);
+        UpdateLayoutSubscription();
+    }
 
-        if (Parent is UIElement newParent)
-        {
-            newParent.LayoutUpdated += ParentLayoutUpdated;
-        }
+    private void UpdateLayoutSubscription()
+    {
+        var desiredParent = IsLoaded && BlurRadius > 0 ? Parent as UIElement : null;
+        if (ReferenceEquals(_layoutParent, desiredParent))
+            return;
+
+        if (_layoutParent is not null)
+            _layoutParent.LayoutUpdated -= ParentLayoutUpdated;
+
+        _layoutParent = desiredParent;
+        if (_layoutParent is not null)
+            _layoutParent.LayoutUpdated += ParentLayoutUpdated;
     }
 
     private void ParentLayoutUpdated(object? sender, EventArgs e)
     {
         // cannot use 'InvalidateVisual' here, because it will cause infinite loop
 
-        BackgroundPresenter.ForceRender(this);
+        if (BlurRadius > 0 && Opacity > 0 && IsVisible && RenderSize.Width > 0 && RenderSize.Height > 0)
+            BackgroundPresenter.ForceRender(this);
 
         // Debug.WriteLine("Parent layout updated, forcing render of BackgroundPresenter.");
     }
@@ -157,22 +184,23 @@ public class BlurBorder : Border
             || Opacity == 0
             || Visibility is Visibility.Collapsed or Visibility.Hidden)
         {
+            ClearDrawingVisual();
             base.OnRender(dc);
             return;
         }
         
-        DrawingVisual drawingVisual = new DrawingVisual()
+        if (_drawingVisualSize != RenderSize)
         {
-            Clip = new RectangleGeometry(new Rect(0, 0, RenderSize.Width, RenderSize.Height)),
-            Effect = CreateOptimizedBlurEffect()
-        };
+            _drawingVisualSize = RenderSize;
+            _drawingVisual.Clip = new RectangleGeometry(new Rect(RenderSize));
+        }
 
-        using (DrawingContext visualContext = drawingVisual.RenderOpen())
+        using (DrawingContext visualContext = _drawingVisual.RenderOpen())
         {
             BackgroundPresenter.DrawBackground(visualContext, this, _panelStack, MaxDepth, false);
         }
 
-        if (drawingVisual.Drawing is not null)
+        if (_drawingVisual.Drawing is not null)
         {
             var layoutClip = CalculateLayoutClip(RenderSize, BorderThickness, CornerRadius);
             if (layoutClip is not null)
@@ -180,7 +208,7 @@ public class BlurBorder : Border
                 dc.PushClip(layoutClip);
             }
 
-            BackgroundPresenter.DrawVisual(dc, drawingVisual, default);
+            BackgroundPresenter.DrawVisual(dc, _drawingVisual, default);
 
             if (layoutClip is not null)
             {
@@ -191,39 +219,26 @@ public class BlurBorder : Border
         base.OnRender(dc);
     }
 
+    private void ClearDrawingVisual()
+    {
+        using (_drawingVisual.RenderOpen()) { }
+        _drawingVisual.Clip = null;
+        _drawingVisualSize = default;
+        _panelStack.Clear();
+    }
+
     /// <summary>
     /// 创建优化的模糊效果实例
     /// </summary>
-    private Effect CreateOptimizedBlurEffect()
+    private void UpdateBlurEffect()
     {
-        // 根据模糊半径和采样率智能选择算法
-        if (BlurRadius <= 2.0 || BlurSamplingRate >= 0.95)
-        {
-            // 小半径或高采样率：使用原生 BlurEffect 获得最佳质量
-            return new BlurEffect
-            {
-                Radius = BlurRadius,
-                KernelType = BlurKernelType,
-                RenderingBias = BlurRenderingBias
-            };
-        }
-        else if (BlurRadius >= 50.0 && BlurSamplingRate <= 0.3)
-        {
-            // 大半径低采样率：使用极速优化版本
-            var ultraFastBlur = OptimizedBlurFactory.CreateRealTimePreview(BlurRadius);
-            ultraFastBlur.SamplingRate = Math.Max(0.1, BlurSamplingRate);
-            ultraFastBlur.RenderingBias = RenderingBias.Performance;
-            return ultraFastBlur.GetEffectInstance();
-        }
-        else
-        {
-            // 中等情况：使用我们的自适应优化算法
-            var adaptiveBlur = OptimizedBlurFactory.CreateAdaptive(BlurRadius);
-            adaptiveBlur.SamplingRate = BlurSamplingRate;
-            adaptiveBlur.RenderingBias = BlurRenderingBias;
-            adaptiveBlur.KernelType = BlurKernelType;
-            return adaptiveBlur.GetEffectInstance();
-        }
+        _blurEffect.Radius = BlurRadius;
+        _blurEffect.KernelType = BlurRadius >= 50.0 && BlurSamplingRate <= 0.3
+            ? KernelType.Box
+            : BlurKernelType;
+        _blurEffect.RenderingBias = BlurRadius >= 50.0 && BlurSamplingRate <= 0.3
+            ? RenderingBias.Performance
+            : BlurRenderingBias;
     }
 
     /// <summary>
@@ -272,9 +287,11 @@ public class BlurBorder : Border
 
     private static void OnRenderPropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        if (d is UIElement element)
+        if (d is BlurBorder border)
         {
-            BackgroundPresenter.ForceRender(element);
+            border.UpdateBlurEffect();
+            border.UpdateLayoutSubscription();
+            BackgroundPresenter.ForceRender(border);
         }
     }
 
