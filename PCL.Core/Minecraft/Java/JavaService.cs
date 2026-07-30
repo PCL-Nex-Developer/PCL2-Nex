@@ -1,6 +1,5 @@
 using PCL.Core.Minecraft.Java.Parser;
 using PCL.Core.Minecraft.Java.Scanner;
-using System.Threading.Tasks;
 using PCL.Core.App.IoC;
 
 namespace PCL.Core.Minecraft;
@@ -14,7 +13,7 @@ public sealed partial class JavaService
     public static JavaManager JavaManager => _javaManager!;
 
     [LifecycleStart]
-    private static async Task _StartAsync()
+    private static void _Start()
     {
         if (_javaManager is not null) return;
 
@@ -30,12 +29,7 @@ public sealed partial class JavaService
             new WhereCommandScanner()
         ]);
         _javaManager.ReadConfig();
-
-        Context.Info("Lookup for local Java...");
-        await _javaManager.ScanJavaAsync();
-
-        var logInfo = string.Join("\n\t", _javaManager.GetSortedJavaList());
-        Context.Info($"Finished to scan java: \n\t{logInfo}");
+        Context.Info($"Loaded {_javaManager.GetSortedJavaList().Count} cached Java installation(s)");
     }
 
     [LifecycleStop]

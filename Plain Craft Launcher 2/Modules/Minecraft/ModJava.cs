@@ -342,7 +342,7 @@ public static class ModJava
             }
             else if (newState == ModBase.LoadState.Finished)
             {
-                Javas.ScanJavaAsync().GetAwaiter().GetResult();
+                Javas.ScanJavaAsync(force: true).GetAwaiter().GetResult();
                 lastJavaBaseDir = null;
             }
         };

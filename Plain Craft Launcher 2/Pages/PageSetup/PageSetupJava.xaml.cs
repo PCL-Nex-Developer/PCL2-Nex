@@ -27,12 +27,13 @@ public partial class PageSetupJava
 
     private object Load_Input()
     {
-        return false;
+        return !JavaService.JavaManager.ExistAnyJava();
     }
 
     private void Load_GetJavaList(ModLoader.LoaderTask<bool, List<JavaEntry>> loader)
     {
-        if (loader.input) JavaService.JavaManager.ScanJavaAsync().GetAwaiter().GetResult();
+        if (loader.input)
+            JavaService.JavaManager.ScanJavaAsync(force: loader.isForceRestarting).GetAwaiter().GetResult();
         loader.output = ModJava.Javas.GetSortedJavaList();
     }
 
@@ -171,8 +172,13 @@ public partial class PageSetupJava
                     return;
                 }
 
-                target.IsEnabled = !target.IsEnabled;
-                UpdateEnableStyle(target.IsEnabled);
+                var updated = ModJava.Javas.ToggleEnabled(target.Installation.JavaExePath);
+                if (updated is null)
+                {
+                    HintService.Hint(Lang.Text("Setup.Launch.Java.Unavailable"));
+                    return;
+                }
+                UpdateEnableStyle(updated.IsEnabled);
                 ModJava.Javas.SaveConfig();
             }
             catch (Exception ex)
