@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -22,8 +23,23 @@ public abstract class AnimationBase : DependencyObject, IAnimation
     public abstract void Cancel();
     public abstract IAnimationFrame? ComputeNextFrame(IAnimatable target);
     
-    public void RaiseStarted() => Started?.Invoke(this, EventArgs.Empty);
-    public void RaiseCompleted() => Completed?.Invoke(this, EventArgs.Empty);
+    public void RaiseStarted() => RaiseHandlers(Started);
+    public void RaiseCompleted() => RaiseHandlers(Completed);
+
+    private void RaiseHandlers(EventHandler? handlers)
+    {
+        if (handlers is null) return;
+
+        List<Exception>? errors = null;
+        foreach (EventHandler handler in handlers.GetInvocationList())
+        {
+            try { handler(this, EventArgs.Empty); }
+            catch (Exception ex) { (errors ??= []).Add(ex); }
+        }
+
+        if (errors is not null)
+            throw new AggregateException(errors);
+    }
     
     public event EventHandler? Started;
     public event EventHandler? Completed;

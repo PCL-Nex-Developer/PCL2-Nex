@@ -15,6 +15,7 @@ public static partial class ModAnimation
     private static int aniCount;
     private static int aniFPSCounter;
     private static long aniFPSTimer;
+    private static readonly AutoResetEvent aniSignal = new(false);
 
     /// <summary>
     ///     当前的动画 FPS。
@@ -26,13 +27,13 @@ public static partial class ModAnimation
     /// </summary>
     public static void AniStart()
     {
+        if (aniRunning)
+            return;
+
         // 初始化计时器
         aniLastTick = TimeUtils.GetTimeTick();
         aniFPSTimer = aniLastTick;
         aniRunning = true; // 标记动画执行开始
-
-        var minFrameGap = 1000d / (Config.System.AnimationFpsLimit + 1) / 2;
-
 
         ModBase.RunInNewThread(() =>
         {
@@ -41,17 +42,25 @@ public static partial class ModAnimation
                 ModBase.Log("[Animation] 动画线程开始");
                 while (true)
                 {
-                    // 两帧之间的间隔时间
-                    var deltaTime =
-                        (long)Math.Round(ModBase.MathClamp(TimeUtils.GetTimeTick() - aniLastTick, 0, 100000));
-                    if (deltaTime < minFrameGap)
+                    if (aniGroups.IsEmpty)
                     {
-                        // 限制 FPS
-                        Thread.Sleep(1);
+                        aniSignal.WaitOne();
+                        aniLastTick = TimeUtils.GetTimeTick();
                         continue;
                     }
 
-                    aniLastTick = TimeUtils.GetTimeTick();
+                    // 两帧之间的间隔时间
+                    var currentTick = TimeUtils.GetTimeTick();
+                    var deltaTime = (long)Math.Round(ModBase.MathClamp(currentTick - aniLastTick, 0, 100000));
+                    var minFrameGap = 1000d / (Config.System.AnimationFpsLimit + 1);
+                    if (deltaTime < minFrameGap)
+                    {
+                        // 限制 FPS
+                        aniSignal.WaitOne(Math.Max(1, (int)Math.Ceiling(minFrameGap - deltaTime)));
+                        continue;
+                    }
+
+                    aniLastTick = currentTick;
                     // 记录 FPS
                     if (ModBase.modeDebug)
                     {
@@ -102,13 +111,11 @@ public static partial class ModAnimation
         {
             if (deltaTick / aniSpeed > 100d)
                 ModBase.Log("[Animation] 两个动画帧间隔 " + deltaTick + " ms", ModBase.LogLevel.Developer);
-            var i = -1;
             // 循环每个动画组
-            while (i + 1 < aniGroups.Count)
+            foreach (var pair in aniGroups.ToArray())
             {
-                i += 1;
                 // 初始化
-                var entry = aniGroups.Values.ElementAtOrDefault(i);
+                var entry = pair.Value;
                 if (entry.startTick > aniLastTick)
                     continue; // 跳过本刻之后开始的动画
                 var canRemoveAfter = true; // 是否应该去除“之后”标记
@@ -168,16 +175,8 @@ public static partial class ModAnimation
                 // 如果当前动画组都执行完毕则删除
                 if (!entry.data.Any())
                 {
-                    // 为了避免新添加的动画影响顺序，不能 RemoveAt(i)
-                    // 为了允许动画在执行中添加同名动画组，不能按名字移除
-                    for (int current = 0, loopTo = aniGroups.Count - 1; current <= loopTo; current++)
-                        if (aniGroups.ElementAt(current).Value.Uuid == entry.Uuid)
-                        {
-                            aniGroups.Remove(aniGroups.ElementAt(current).Key, out _);
-                            break;
-                        }
-
-                    i -= 1;
+                    // 仅移除快照中的原条目，避免误删执行中加入的同名动画。
+                    ((ICollection<KeyValuePair<string, AniGroupEntry>>)aniGroups).Remove(pair);
                 }
             }
         }
@@ -1472,7 +1471,8 @@ public static partial class ModAnimation
             name = newEntry.Uuid.ToString();
         else
             AniStop(name);
-        aniGroups.TryAdd(name, newEntry);
+        if (aniGroups.TryAdd(name, newEntry))
+            aniSignal.Set();
     }
 
     /// <summary>
