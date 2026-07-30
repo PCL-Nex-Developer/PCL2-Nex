@@ -40,14 +40,18 @@ public class JavaManager
     {
         try
         {
-            var items = _javaEntrys
-                .Select(x => new JavaStorageItem()
-                {
-                    Path = x.Value.Installation.JavaExePath,
-                    IsEnable = x.Value.IsEnabled,
-                    Source = x.Value.Source
-                })
-                .ToArray();
+            JavaStorageItem[] items;
+            lock (_javaEntrys)
+            {
+                items = _javaEntrys
+                    .Select(x => new JavaStorageItem()
+                    {
+                        Path = x.Value.Installation.JavaExePath,
+                        IsEnable = x.Value.IsEnabled,
+                        Source = x.Value.Source
+                    })
+                    .ToArray();
+            }
             States.Game.JavaList = JsonSerializer.Serialize(items, JsonCompat.SerializerOptions);
         }
         catch(Exception ex)
@@ -146,13 +150,17 @@ public class JavaManager
             }
         });
 
+        Dictionary<string, JavaEntry> existingEntries;
+        lock (_javaEntrys)
+            existingEntries = new Dictionary<string, JavaEntry>(_javaEntrys, StringComparer.OrdinalIgnoreCase);
+
         var scannedEntries = pathSet.Keys
             .Select(_parser.Parse)
             .Where(inst => inst is not null)
             .Select(inst => new JavaEntry
             {
                 Installation = inst!,
-                IsEnabled = _javaEntrys.TryGetValue(_NormalizePath(inst!.JavaExePath), out var existingJava)
+                IsEnabled = existingEntries.TryGetValue(_NormalizePath(inst!.JavaExePath), out var existingJava)
                     ? existingJava.IsEnabled
                     : _ShouldEnableByDefault(inst!),
                 Source = JavaSource.AutoScanned
@@ -163,7 +171,13 @@ public class JavaManager
         {
             foreach(var entry in scannedEntries)
             {
-                _javaEntrys[entry.Installation.JavaExePath] = entry;
+                var path = _NormalizePath(entry.Installation.JavaExePath);
+                if (_javaEntrys.TryGetValue(path, out var current))
+                {
+                    entry.IsEnabled = current.IsEnabled;
+                    entry.Source = current.Source;
+                }
+                _javaEntrys[path] = entry;
             }
         }
     }
@@ -181,7 +195,9 @@ public class JavaManager
 
     public List<JavaEntry> GetSortedJavaList()
     {
-        var ret = _javaEntrys.Values.ToList();
+        List<JavaEntry> ret;
+        lock (_javaEntrys)
+            ret = _javaEntrys.Values.ToList();
         ret.Sort((a, b) =>
         {
             var versionCmp = a.Installation.Version.CompareTo(b.Installation.Version);
@@ -202,12 +218,26 @@ public class JavaManager
 
     public bool ExistAnyJava()
     {
-        return _javaEntrys.Count != 0;
+        lock (_javaEntrys)
+            return _javaEntrys.Count != 0;
     }
 
     public bool Exist(string javaExePath)
     {
-        return _javaEntrys.ContainsKey(javaExePath);
+        lock (_javaEntrys)
+            return _javaEntrys.ContainsKey(_NormalizePath(javaExePath));
+    }
+
+    public JavaEntry? ToggleEnabled(string javaExePath)
+    {
+        var normalized = _NormalizePath(javaExePath);
+        lock (_javaEntrys)
+        {
+            if (!_javaEntrys.TryGetValue(normalized, out var entry))
+                return null;
+            entry.IsEnabled = !entry.IsEnabled;
+            return entry;
+        }
     }
 
     /// <summary>
@@ -283,14 +313,11 @@ public class JavaManager
         }
     }
 
-    public async Task<JavaEntry[]> SelectSuitableJavaAsync(Version minVersion, Version maxVersion)
+    public Task<JavaEntry[]> SelectSuitableJavaAsync(Version minVersion, Version maxVersion)
     {
-        if (_javaEntrys.Count == 0)
-            await ScanJavaAsync();
-
         lock (_javaEntrys)
         {
-            return _javaEntrys
+            return Task.FromResult(_javaEntrys
                 .Values.ToList()
                 .Where(j => j.Installation.IsStillAvailable && j.IsEnabled &&
                             IsVersionSuitable(j.Installation.Version, minVersion, maxVersion))
@@ -298,7 +325,7 @@ public class JavaManager
                 .ThenBy(static j => j.Installation.IsJre) // JDK 优先
                 .ThenBy(static j => j.Installation.Brand) // Java 发行版优选
                 .ThenByDescending(static j => j.Installation.Version) // 优选后小版本号较高的版本
-                .ToArray();
+                .ToArray());
         }
     }
 

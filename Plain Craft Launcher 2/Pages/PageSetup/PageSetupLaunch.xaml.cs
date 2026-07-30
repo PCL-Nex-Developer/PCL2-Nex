@@ -13,10 +13,13 @@ namespace PCL;
 public partial class PageSetupLaunch
 {
     private bool isLoad;
+    private readonly DispatcherTimer ramTimer = new() { Interval = TimeSpan.FromSeconds(1) };
 
     public PageSetupLaunch()
     {
         Loaded += PageSetupLaunch_Loaded;
+        Unloaded += (_, _) => ramTimer.Stop();
+        ramTimer.Tick += (_, _) => RefreshRam();
         InitializeComponent();
     }
 
@@ -25,6 +28,7 @@ public partial class PageSetupLaunch
         // 重复加载部分
         PanBack.ScrollToHome();
         RefreshRam(false);
+        ramTimer.Start();
         if (ModInstanceList.McMcInstanceSelected is null)
             BtnSwitch.Visibility = Visibility.Collapsed;
         else
@@ -39,10 +43,6 @@ public partial class PageSetupLaunch
         Reload();
         ModAnimation.AniControlEnabled -= 1;
 
-        // 内存自动刷新
-        var timer = new DispatcherTimer { Interval = new TimeSpan(0, 0, 0, 1) };
-        timer.Tick += (_, _) => RefreshRam();
-        timer.Start();
         RectRamGame.SizeChanged += (s, e) => RefreshRamText();
     }
 
@@ -465,7 +465,8 @@ public partial class PageSetupLaunch
         }
 
         // 若使用 32 位 Java，则限制为 1G
-        if (is32BitJava ?? !ModJava.IsGameSet64BitJava(useVersionJavaSetup ? version : null))
+        if (is32BitJava ?? (ModJava.Javas.ExistAnyJava() &&
+                           !ModJava.IsGameSet64BitJava(useVersionJavaSetup ? version : null)))
             ramGive = Math.Min(1d, ramGive);
         return ramGive;
     }

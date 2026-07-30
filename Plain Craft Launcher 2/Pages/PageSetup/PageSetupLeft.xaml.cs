@@ -162,7 +162,7 @@ public partial class PageSetupLeft
             }
             case (double)FormMain.PageSubType.SetupJava:
             {
-                if (ModMain.frmSetupJava is not null) ModMain.frmSetupJava.loader.Start(isForceRestart: true);
+                if (ModMain.frmSetupJava is not null) ModMain.frmSetupJava.loader.Start(true, true);
                 ItemJava.Checked = true;
                 break;
             }

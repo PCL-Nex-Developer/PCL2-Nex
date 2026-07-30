@@ -19,10 +19,13 @@ namespace PCL;
 public partial class PageInstanceSetup
 {
     private new bool isLoaded;
+    private readonly DispatcherTimer ramTimer = new() { Interval = TimeSpan.FromSeconds(1) };
 
     public PageInstanceSetup()
     {     
         Loaded += PageSetupSystem_Loaded;
+        Unloaded += (_, _) => ramTimer.Stop();
+        ramTimer.Tick += (_, _) => RefreshRam();
         InitializeComponent();
 
         ComboArgumentIndieV2.SelectionChanged += ComboArgumentIndieV2_SelectionChanged;
@@ -71,6 +74,7 @@ public partial class PageInstanceSetup
         // 重复加载部分
         PanBack.ScrollToHome();
         RefreshRam(false);
+        ramTimer.Start();
 
         // 由于各个实例不同，每次都需要重新加载
         ModAnimation.AniControlEnabled += 1;
@@ -82,10 +86,6 @@ public partial class PageInstanceSetup
             return;
         isLoaded = true;
 
-        // 内存自动刷新
-        var timer = new DispatcherTimer { Interval = new TimeSpan(0, 0, 0, 1) };
-        timer.Tick += (_, _) => RefreshRam();
-        timer.Start();
         RectRamGame.SizeChanged += (s, e) => RefreshRamText();
     }
 
@@ -527,7 +527,8 @@ public partial class PageInstanceSetup
         }
 
         // 若使用 32 位 Java，则限制为 1G
-        if (is32BitJava ?? !ModJava.IsGameSet64BitJava(PageInstanceLeft.McInstance))
+        if (is32BitJava ?? (ModJava.Javas.ExistAnyJava() &&
+                           !ModJava.IsGameSet64BitJava(PageInstanceLeft.McInstance)))
             ramGive = Math.Min(1d, ramGive);
         return ramGive;
     }
