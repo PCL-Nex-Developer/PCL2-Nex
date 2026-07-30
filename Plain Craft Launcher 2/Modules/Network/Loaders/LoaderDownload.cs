@@ -9,14 +9,23 @@ namespace PCL.Network.Loaders;
 public class LoaderDownload : ModLoader.LoaderBase
 {
     public ModBase.SafeList<PCL.Network.DownloadFile> files;
-    private int _fileRemain;
-    private readonly object _fileRemainLock = new();
     private CancellationTokenSource? _cancellationTokenSource;
+    private IReadOnlyList<PCL.Network.DownloadFile> _activeFiles = [];
+    private Task _activeRunTask = Task.CompletedTask;
+    private int _runId;
+    private bool _isCompleting;
     public int FailCount { get; set; }
 
     public override double Progress
     {
-        get => State >= ModBase.LoadState.Finished ? 1 : (files.Any() ? files.Average(file => file.Progress) : 0);
+        get
+        {
+            if (State >= ModBase.LoadState.Finished)
+                return 1;
+
+            var snapshot = files.ToList();
+            return snapshot.Count > 0 ? snapshot.Average(file => file.Progress) : 0;
+        }
         set => throw new Exception("文件下载不允许指定进度");
     }
 
@@ -30,92 +39,124 @@ public class LoaderDownload : ModLoader.LoaderBase
 
     public override void Start(object input = null, bool isForceRestart = false)
     {
-        if (input is List<PCL.Network.DownloadFile> inputFiles)
-            files = new ModBase.SafeList<PCL.Network.DownloadFile>(inputFiles);
-
+        CancellationTokenSource cancellationTokenSource;
+        List<PCL.Network.DownloadFile> fileSnapshot;
+        Task previousRunTask;
+        TaskCompletionSource runCompletion;
+        int runId;
         lock (lockState)
         {
             if (State == ModBase.LoadState.Loading)
                 return;
+
+            if (input is List<PCL.Network.DownloadFile> inputFiles)
+                files = new ModBase.SafeList<PCL.Network.DownloadFile>(inputFiles);
+
+            fileSnapshot = files.ToList();
+            cancellationTokenSource = new CancellationTokenSource();
+            previousRunTask = _activeRunTask;
+            runCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _activeRunTask = runCompletion.Task;
+            _cancellationTokenSource = cancellationTokenSource;
+            _activeFiles = fileSnapshot;
+            _isCompleting = false;
+            runId = ++_runId;
             State = ModBase.LoadState.Loading;
         }
 
-        _cancellationTokenSource = new CancellationTokenSource();
-        lock (_fileRemainLock)
-        {
-            _fileRemain = files.Count;
-        }
-
-        ModNet.NetManager.Start(this);
-
-        ModBase.RunInNewThread(() => Run(_cancellationTokenSource.Token), $"DL/{Uuid}");
+        ModBase.RunInNewThread(() => RunQueued(runId, fileSnapshot, cancellationTokenSource,
+            previousRunTask, runCompletion), $"DL/{Uuid}");
     }
 
-    private void Run(CancellationToken cancellationToken)
+    private void RunQueued(int runId, IReadOnlyList<PCL.Network.DownloadFile> fileSnapshot,
+        CancellationTokenSource cancellationTokenSource, Task previousRunTask, TaskCompletionSource runCompletion)
     {
+        var cancellationToken = cancellationTokenSource.Token;
         try
         {
-            if (!files.Any())
+            previousRunTask.GetAwaiter().GetResult();
+            lock (lockState)
             {
-                OnFinish();
+                if (runId != _runId || State != ModBase.LoadState.Loading)
+                    return;
+                ModNet.NetManager.Start(this);
+            }
+
+            if (fileSnapshot.Count == 0)
+            {
+                CompleteSuccessfully(runId);
                 return;
             }
 
             var exceptions = new ConcurrentQueue<Exception>();
-            using var semaphore = new SemaphoreSlim(GetMaxParallelFiles());
-            var tasks = files.Select(async file =>
+            var nextFileIndex = -1;
+            var workerCount = GetMaxParallelFiles(fileSnapshot.Count);
+            var tasks = Enumerable.Range(0, workerCount).Select(_ => ProcessFilesAsync()).ToArray();
+
+            async Task ProcessFilesAsync()
             {
-                var entered = false;
-                try
+                while (!cancellationToken.IsCancellationRequested)
                 {
-                    await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                    entered = true;
-                    await ProcessFileAsync(file, cancellationToken).ConfigureAwait(false);
+                    var index = Interlocked.Increment(ref nextFileIndex);
+                    if (index >= fileSnapshot.Count)
+                        return;
+
+                    var file = fileSnapshot[index];
+                    try
+                    {
+                        await ProcessFileAsync(file, fileSnapshot.Count, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        file.Errors.Add(ex);
+                        file.State = PCL.Network.NetState.Interrupted;
+                        file.Speed = 0;
+                        file.ActiveThreads = 0;
+                        exceptions.Enqueue(ex);
+                        cancellationTokenSource.Cancel();
+                        return;
+                    }
                 }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                }
-                catch (Exception ex)
-                {
-                    file.Errors.Add(ex);
-                    file.State = PCL.Network.NetState.Interrupted;
-                    exceptions.Enqueue(ex);
-                    _cancellationTokenSource?.Cancel();
-                }
-                finally
-                {
-                    if (entered)
-                        semaphore.Release();
-                }
-            }).ToList();
+            }
 
             Task.WhenAll(tasks).GetAwaiter().GetResult();
             if (!exceptions.IsEmpty)
-                OnFail(exceptions.ToList());
-        }
-        catch (OperationCanceledException)
-        {
-            Abort();
+                CompleteWithFailure(runId, fileSnapshot, exceptions.ToList());
+            else if (!cancellationToken.IsCancellationRequested)
+                CompleteSuccessfully(runId);
         }
         catch (Exception ex)
         {
-            OnFail(new List<Exception> { ex });
+            CompleteWithFailure(runId, fileSnapshot, [ex]);
+        }
+        finally
+        {
+            lock (lockState)
+            {
+                if (ReferenceEquals(_cancellationTokenSource, cancellationTokenSource))
+                    _cancellationTokenSource = null;
+            }
+            cancellationTokenSource.Dispose();
+            runCompletion.TrySetResult();
         }
     }
 
-    private int GetMaxParallelFiles()
+    private static int GetMaxParallelFiles(int fileCount)
     {
-        return Math.Max(1, Math.Min(files.Count, Math.Clamp(ModNet.NetTaskThreadLimit, 1, 64)));
+        return Math.Max(1, Math.Min(fileCount, Math.Clamp(ModNet.NetTaskThreadLimit, 1, 64)));
     }
 
-    private async Task ProcessFileAsync(PCL.Network.DownloadFile file, CancellationToken cancellationToken)
+    private async Task ProcessFileAsync(PCL.Network.DownloadFile file, int fileCount,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!file.Loaders.Contains(this))
             file.Loaders.Add(this);
 
-        if (State >= ModBase.LoadState.Finished)
-            return;
         Directory.CreateDirectory(Path.GetDirectoryName(file.LocalPath) ?? throw new IOException("下载路径无效"));
         if (file.Check?.canUseExistsFile == true && file.Check.Check(file.LocalPath) is null)
         {
@@ -126,12 +167,11 @@ public class LoaderDownload : ModLoader.LoaderBase
             file.DownloadedBytes = file.TotalSize;
             file.Speed = 0;
             file.ActiveThreads = 0;
-            OnFileFinish(file);
             return;
         }
 
         file.State = PCL.Network.NetState.Connecting;
-        var enableParallelChunks = files.Count <= 1;
+        var enableParallelChunks = fileCount <= 1;
         for (var retry = 0; retry < 4; retry++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -148,7 +188,8 @@ public class LoaderDownload : ModLoader.LoaderBase
             catch (Exception ex) when (retry < 3)
             {
                 ModBase.Log(ex, $"[Download] 重试 {retry + 1}/3：{file.LocalPath}", ModBase.LogLevel.Debug);
-                Thread.Sleep(RandomUtils.NextInt(300, 500 + retry * 300));
+                await Task.Delay(RandomUtils.NextInt(300, 500 + retry * 300), cancellationToken)
+                    .ConfigureAwait(false);
             }
         }
         try { file.TotalSize = new FileInfo(file.LocalPath).Length; }
@@ -158,78 +199,144 @@ public class LoaderDownload : ModLoader.LoaderBase
         file.Speed = 0;
         file.ActiveThreads = 0;
         file.State = PCL.Network.NetState.Finished;
-        OnFileFinish(file);
     }
 
     public void OnFileFinish(PCL.Network.DownloadFile file)
     {
-        lock (_fileRemainLock)
+        int runId;
+        IReadOnlyList<PCL.Network.DownloadFile> fileSnapshot;
+        lock (lockState)
         {
-            _fileRemain -= 1;
-            if (_fileRemain > 0)
+            runId = _runId;
+            fileSnapshot = _activeFiles;
+            if (fileSnapshot.Any(activeFile => activeFile.State != PCL.Network.NetState.Finished))
                 return;
         }
 
-        OnFinish();
+        CompleteSuccessfully(runId);
     }
 
     public void OnFinish()
     {
-        RaisePreviewFinish();
+        int runId;
         lock (lockState)
-        {
-            if (State > ModBase.LoadState.Loading)
-                return;
-            State = ModBase.LoadState.Finished;
-        }
+            runId = _runId;
 
-        ModNet.NetManager.Finish(this);
+        CompleteSuccessfully(runId);
     }
 
     public void OnFileFail(PCL.Network.DownloadFile file)
     {
-        OnFail(file.Errors.Any() ? file.Errors : new List<Exception> { new Exception($"文件下载失败：{file.LocalPath}") });
+        OnFail(file.Errors.Any()
+            ? file.Errors
+            : [new Exception($"文件下载失败：{file.LocalPath}")]);
     }
 
     public void OnFail(List<Exception> exList)
     {
+        int runId;
+        IReadOnlyList<PCL.Network.DownloadFile> fileSnapshot;
         lock (lockState)
         {
-            if (State > ModBase.LoadState.Loading)
-                return;
-            Error = exList.FirstOrDefault() ?? new Exception("未知下载错误");
-            State = ModBase.LoadState.Failed;
+            runId = _runId;
+            fileSnapshot = _activeFiles;
         }
 
-        FailCount += exList.Count;
-        foreach (var file in files.Where(file => file.State < PCL.Network.NetState.Finished))
+        CompleteWithFailure(runId, fileSnapshot, exList);
+    }
+
+    private void CompleteSuccessfully(int runId)
+    {
+        lock (lockState)
+        {
+            if (runId != _runId || State != ModBase.LoadState.Loading || _isCompleting)
+                return;
+            _isCompleting = true;
+        }
+
+        try
+        {
+            RaisePreviewFinish();
+        }
+        catch (Exception ex)
+        {
+            CompleteClaimedFailure(runId, [ex]);
+            return;
+        }
+
+        lock (lockState)
+        {
+            if (runId != _runId || State != ModBase.LoadState.Loading || !_isCompleting)
+                return;
+
+            ModNet.NetManager.Finish(this);
+            State = ModBase.LoadState.Finished;
+            _isCompleting = false;
+        }
+    }
+
+    private void CompleteWithFailure(int runId, IReadOnlyList<PCL.Network.DownloadFile> fileSnapshot,
+        IReadOnlyList<Exception> exceptions)
+    {
+        lock (lockState)
+        {
+            if (runId != _runId || State != ModBase.LoadState.Loading || _isCompleting)
+                return;
+
+            _isCompleting = true;
+            CompleteFailureCore(fileSnapshot, exceptions);
+            _isCompleting = false;
+        }
+    }
+
+    private void CompleteClaimedFailure(int runId, IReadOnlyList<Exception> exceptions)
+    {
+        lock (lockState)
+        {
+            if (runId != _runId || State != ModBase.LoadState.Loading || !_isCompleting)
+                return;
+
+            CompleteFailureCore(_activeFiles, exceptions);
+            _isCompleting = false;
+        }
+    }
+
+    private void CompleteFailureCore(IReadOnlyList<PCL.Network.DownloadFile> fileSnapshot,
+        IReadOnlyList<Exception> exceptions)
+    {
+        Error = exceptions.FirstOrDefault() ?? new Exception("未知下载错误");
+        FailCount += exceptions.Count;
+        foreach (var file in fileSnapshot.Where(file => file.State != PCL.Network.NetState.Finished))
         {
             file.State = PCL.Network.NetState.Interrupted;
             file.Speed = 0;
             file.ActiveThreads = 0;
-            file.Errors.AddRange(exList);
+            foreach (var exception in exceptions)
+                if (!file.Errors.Contains(exception))
+                    file.Errors.Add(exception);
         }
 
         ModNet.NetManager.Finish(this);
+        State = ModBase.LoadState.Failed;
     }
 
     public override void Abort()
     {
         lock (lockState)
         {
-            if (State >= ModBase.LoadState.Finished)
+            if (State >= ModBase.LoadState.Finished || _isCompleting)
                 return;
+
+            _cancellationTokenSource?.Cancel();
+            foreach (var file in _activeFiles.Where(file => file.State != PCL.Network.NetState.Finished))
+            {
+                file.State = PCL.Network.NetState.Interrupted;
+                file.Speed = 0;
+                file.ActiveThreads = 0;
+            }
+
+            ModNet.NetManager.Finish(this);
             State = ModBase.LoadState.Aborted;
         }
-
-        _cancellationTokenSource?.Cancel();
-        foreach (var file in files.Where(file => file.State < PCL.Network.NetState.Finished))
-        {
-            file.State = PCL.Network.NetState.Interrupted;
-            file.Speed = 0;
-            file.ActiveThreads = 0;
-        }
-
-        ModNet.NetManager.Finish(this);
     }
 }

@@ -39,17 +39,20 @@ public static class ModLoader
         try
         {
             TaskbarItemProgressState newState;
-            var newProgress = LoaderTaskbarProgressGet();
+            var tasks = loaderTaskbar.ToList();
+            var allStopped = tasks.All(l => l.State != ModBase.LoadState.Loading);
             // 若单个任务已中止，或全部任务已完成，则刷新并移除
-            foreach (var Task in loaderTaskbar)
-                if (loaderTaskbar.All(l => l.State != ModBase.LoadState.Loading) ||
-                    Task.State == ModBase.LoadState.Waiting || Task.State == ModBase.LoadState.Aborted)
+            foreach (var task in tasks)
+                if ((allStopped && task.State != ModBase.LoadState.Loading) ||
+                    task.State == ModBase.LoadState.Waiting || task.State == ModBase.LoadState.Aborted)
                 {
-                    ModMain.frmSpeedLeft?.TaskRefresh(Task);
-                    loaderTaskbar.Remove(Task);
-                    ModBase.Log($"[Taskbar] {Task.name} 已移出任务列表");
+                    ModMain.frmSpeedLeft?.TaskRefresh(task);
+                    loaderTaskbar.Remove(task);
+                    ModBase.Log($"[Taskbar] {task.name} 已移出任务列表");
                 }
 
+            var activeTasks = loaderTaskbar.ToList();
+            var newProgress = LoaderTaskbarProgressGet(activeTasks);
             // 更新平滑后的进度
             if (newProgress <= 0d || newProgress >= 1d || loaderTaskbarProgress > newProgress)
                 loaderTaskbarProgress = newProgress;
@@ -57,7 +60,7 @@ public static class ModLoader
                 loaderTaskbarProgress = loaderTaskbarProgress * 0.9d + newProgress * 0.1d;
             ModBase.RunInUi(() => ModMain.frmMain.BtnExtraDownload.Progress = loaderTaskbarProgress);
             // 更新任务栏信息
-            if (!loaderTaskbar.Any() || loaderTaskbarProgress == 1d)
+            if (activeTasks.Count == 0 || loaderTaskbarProgress == 1d)
             {
                 newState = TaskbarItemProgressState.None;
             }
@@ -86,13 +89,18 @@ public static class ModLoader
 
     public static double LoaderTaskbarProgressGet()
     {
+        return LoaderTaskbarProgressGet(loaderTaskbar.ToList());
+    }
+
+    private static double LoaderTaskbarProgressGet(IReadOnlyCollection<LoaderBase> tasks)
+    {
         try
         {
-            if (!loaderTaskbar.Any())
+            if (tasks.Count == 0)
                 return 1d;
 
             return ModBase.MathClamp(
-                loaderTaskbar.Select(l => l.Progress).Average(),
+                tasks.Average(l => l.Progress),
                 0,
                 1
             );
