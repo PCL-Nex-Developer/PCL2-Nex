@@ -187,6 +187,9 @@ public static class ModWatcher
         private readonly bool realTime;
 
         private readonly object waitingLogLock = new();
+        private int gameExitRaised;
+        private int outputStreamCloseCount;
+        private long processExitDetectedAt;
         public uint countDebug;
         public uint countError;
         public uint countFatal;
@@ -258,10 +261,10 @@ public static class ModWatcher
 
             // 初始化进程与日志读取
             gameProcess = loader.input;
-            gameProcess.BeginOutputReadLine();
-            gameProcess.BeginErrorReadLine();
             gameProcess.OutputDataReceived += LogReceived;
             gameProcess.ErrorDataReceived += LogReceived;
+            gameProcess.BeginOutputReadLine();
+            gameProcess.BeginErrorReadLine();
 
             // 初始化时钟
             // 设置窗口标题
@@ -275,20 +278,22 @@ public static class ModWatcher
                     {
                         TimerWindow();
                         TimerLog();
-                        if (!string.IsNullOrWhiteSpace(windowTitle))
+                        if (!string.IsNullOrWhiteSpace(windowTitle) && State == MinecraftState.Running &&
+                            windowHandle != nint.Zero && !gameProcess.HasExited)
                             for (var i = 1; i <= 3; i++)
                             {
-                                if (State == MinecraftState.Running && !gameProcess.HasExited)
-                                {
-                                    var realTitle = windowTitle.Replace("{date}", Lang.Date(DateTime.Now, "d"))
-                                        .Replace("{time}", Lang.Date(DateTime.Now, "T"));
-                                    SetWindowText(windowHandle, realTitle);
-                                }
+                                if (State != MinecraftState.Running || gameProcess.HasExited)
+                                    break;
 
-                                Thread.Sleep(64);
+                                var realTitle = windowTitle.Replace("{date}", Lang.Date(DateTime.Now, "d"))
+                                    .Replace("{time}", Lang.Date(DateTime.Now, "T"));
+                                SetWindowText(windowHandle, realTitle);
+
+                                if (i < 3)
+                                    Thread.Sleep(64);
                             }
 
-                        Thread.Sleep(10);
+                        Thread.Sleep(50);
                     }
 
                     WatcherLog(Lang.Text("Watcher.Exited"));
@@ -326,6 +331,9 @@ public static class ModWatcher
 
         private void LogReceived(object sender, DataReceivedEventArgs e)
         {
+            if (e.Data is null)
+                Interlocked.Increment(ref outputStreamCloseCount);
+
             lock (waitingLogLock)
             {
                 waitingLog.Add(e.Data);
@@ -381,7 +389,20 @@ public static class ModWatcher
                 }
             }
 
-            LogOutput?.Invoke(this, new LogOutputEventArgs(line, color));
+            var handlers = LogOutput;
+            if (handlers is null)
+                return;
+
+            var args = new LogOutputEventArgs(line, color);
+            foreach (LogOutputEventHandler handler in handlers.GetInvocationList())
+                try
+                {
+                    handler(this, args);
+                }
+                catch (Exception ex)
+                {
+                    ModBase.Log(ex, "Minecraft 日志事件处理失败", ModBase.LogLevel.Feedback);
+                }
         }
 
         /// <summary>
@@ -393,61 +414,88 @@ public static class ModWatcher
         {
             try
             {
-                // 输出文本
-                var copyed = new List<string>();
-                lock (waitingLogLock)
-                {
-                    if (!waitingLog.Any())
-                        return;
-                    copyed = waitingLog;
-                    waitingLog = new List<string>(1000);
-                }
+                DrainWaitingLogs();
 
-                foreach (var Str in copyed)
-                    GameLog(Str);
                 if (State == MinecraftState.Loading)
                     ProgressUpdate();
-                // 游戏退出检查
-                if (gameProcess.HasExited)
-                {
-                    WatcherLog(Lang.Text("Watcher.ProcessExited", gameProcess.ExitCode));
-                    // 实时日志输出
-                    if (realTime)
-                    {
-                        var arglevel = GameLogLevel.Info;
-                        LogRealTime(Lang.Text("Watcher.ProcessExited", gameProcess.ExitCode), ref arglevel);
-                    }
+                if (!gameProcess.HasExited)
+                    return;
 
-                    GameExit?.Invoke();
-                    // If Process.ExitCode = 1 Then
-                    // '返回值为 1，考虑是任务管理器结束
-                    // WatcherLog("Minecraft 返回值为 1，考虑为任务管理器结束") '并不，崩了照样是 1
-                    // State = MinecraftState.Ended
-                    // Else
-                    if (State == MinecraftState.Loading)
-                    {
-                        // 窗口未出现
-                        WatcherLog(Lang.Text("Watcher.Crash.Suspected"));
-                        Crashed();
-                    }
-                    else if (gameProcess.ExitCode != 0 && State == MinecraftState.Running &&
-                             version.releaseTime.Year >= 2012)
-                    {
-                        // 返回值不为 0 且未结束
-                        WatcherLog(Lang.Text("Watcher.Crash.AbnormalExit"));
-                        Crashed();
-                    }
-                    else if (State != MinecraftState.Crashed)
-                    {
-                        // 正常关闭
-                        State = MinecraftState.Ended;
-                    }
+                if (processExitDetectedAt == 0)
+                    processExitDetectedAt = Environment.TickCount64;
+                if (Volatile.Read(ref outputStreamCloseCount) < 2 &&
+                    Environment.TickCount64 - processExitDetectedAt < 500)
+                    return;
+
+                DrainWaitingLogs();
+                WatcherLog(Lang.Text("Watcher.ProcessExited", gameProcess.ExitCode));
+                if (realTime)
+                {
+                    var arglevel = GameLogLevel.Info;
+                    LogRealTime(Lang.Text("Watcher.ProcessExited", gameProcess.ExitCode), ref arglevel);
                 }
+
+                if (State == MinecraftState.Loading)
+                {
+                    WatcherLog(Lang.Text("Watcher.Crash.Suspected"));
+                    Crashed();
+                }
+                else if (gameProcess.ExitCode != 0 && State == MinecraftState.Running &&
+                         version.releaseTime.Year >= 2012)
+                {
+                    WatcherLog(Lang.Text("Watcher.Crash.AbnormalExit"));
+                    Crashed();
+                }
+                else if (State is not (MinecraftState.Crashed or MinecraftState.Canceled))
+                {
+                    State = MinecraftState.Ended;
+                }
+
+                RaiseGameExit();
             }
             catch (Exception ex)
             {
                 ModBase.Log(ex, "输出 Minecraft 日志失败", ModBase.LogLevel.Feedback);
             }
+        }
+
+        private void DrainWaitingLogs()
+        {
+            List<string>? pendingLogs = null;
+            lock (waitingLogLock)
+            {
+                if (waitingLog.Count > 0)
+                {
+                    pendingLogs = waitingLog;
+                    waitingLog = new List<string>(1000);
+                }
+            }
+
+            if (pendingLogs is null)
+                return;
+
+            foreach (var line in pendingLogs)
+                GameLog(line);
+        }
+
+        private void RaiseGameExit()
+        {
+            if (Interlocked.Exchange(ref gameExitRaised, 1) != 0)
+                return;
+
+            var handlers = GameExit;
+            if (handlers is null)
+                return;
+
+            foreach (GameExitEventHandler handler in handlers.GetInvocationList())
+                try
+                {
+                    handler();
+                }
+                catch (Exception ex)
+                {
+                    ModBase.Log(ex, "Minecraft 退出事件处理失败", ModBase.LogLevel.Feedback);
+                }
         }
 
         private void GameLog(string text)
@@ -496,7 +544,7 @@ public static class ModWatcher
             // 输出日志
             // Log(Text)
             // 关闭与崩溃检测
-            if (!text.Contains("[CHAT]"))
+            if (State != MinecraftState.Canceled && !text.Contains("[CHAT]"))
             {
                 if (text.Contains("Someone is closing me!") ||
                     text.Contains("Restarting Minecraft with command")) // #1258
@@ -683,7 +731,7 @@ public static class ModWatcher
         // 崩溃处理
         private void Crashed()
         {
-            if (State is MinecraftState.Crashed or MinecraftState.Ended)
+            if (State is MinecraftState.Crashed or MinecraftState.Ended or MinecraftState.Canceled)
                 return;
             State = MinecraftState.Crashed;
             // 崩溃分析
@@ -773,7 +821,7 @@ public static class ModWatcher
                         LogRealTime(Lang.Text("Watcher.ProcessExited", gameProcess.ExitCode), ref arglevel);
                     }
 
-                    GameExit?.Invoke();
+                    RaiseGameExit();
                 }
                 catch (Exception ex)
                 {

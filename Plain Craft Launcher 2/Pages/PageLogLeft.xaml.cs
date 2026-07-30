@@ -180,6 +180,7 @@ public partial class PageLogLeft
             var item = shownLogs[i];
             if (item.Key != uuid)
                 continue;
+            item.Value.LogOutput -= OnLogOutput;
             shownLogs.RemoveAt(i);
             if (currentUuid == item.Key)
             {
