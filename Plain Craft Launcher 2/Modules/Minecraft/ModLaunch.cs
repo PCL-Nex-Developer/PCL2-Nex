@@ -3633,7 +3633,8 @@ public static class ModLaunch
         ;
         // 基础
         text = text.Replace("{pcl_version}", replacer(Basics.VersionName));
-        text = text.Replace("{identify}", replacer(Identify.LauncherId));
+        if (text.Contains("{identify}", StringComparison.Ordinal))
+            text = text.Replace("{identify}", replacer(Identify.LauncherId));
         text = text.Replace("{path}", replacer(Basics.CurrentDirectory));
         text = text.Replace("{path_with_name}", replacer(Basics.ExecutablePath));
         text = text.Replace("{path_temp}", replacer(ModBase.pathTemp));

@@ -193,6 +193,8 @@ internal sealed class CrashReportExporter
         StringBuilder builder,
         string launcherLog)
     {
+        var hardware = HardwareInfo.GetSnapshot(250);
+
         builder.AppendLine(Lang.Text("Crash.Report.Environment.EnvironmentSection"));
 
         builder.AppendLine(
@@ -205,18 +207,18 @@ internal sealed class CrashReportExporter
         builder.AppendLine(
             Lang.Text(
                 "Crash.Report.Environment.Cpu",
-                HardwareInfo.CPUName));
+                hardware.CPUName));
 
         builder.AppendLine(
             Lang.Text(
                 "Crash.Report.Environment.MemoryAllocation",
                 _ExtractLauncherValue(launcherLog, "分配的内存："),
-                Lang.Number(HardwareInfo.SystemMemorySize / 1024d, "N2"),
-                Lang.Number(HardwareInfo.SystemMemorySize, "N0")));
+                Lang.Number(hardware.SystemMemorySize / 1024d, "N2"),
+                Lang.Number(hardware.SystemMemorySize, "N0")));
 
-        for (var i = 0; i < HardwareInfo.GPUs.Count; i++)
+        for (var i = 0; i < hardware.GPUs.Count; i++)
         {
-            var gpu = HardwareInfo.GPUs[i];
+            var gpu = hardware.GPUs[i];
 
             builder.AppendLine(
                 Lang.Text(

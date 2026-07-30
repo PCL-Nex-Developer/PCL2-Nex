@@ -9,8 +9,11 @@ namespace PCL.Core.Utils.Secret;
 
 public class Identify
 {
-    public static byte[] RawId { get => field ??= _GetRawId(); } = null!;
-    public static string LauncherId { get => field ??= _getLauncherId(); } = null!;
+    private static readonly Lazy<byte[]> _rawId = new(_GetRawId);
+    private static readonly Lazy<string> _launcherId = new(_GetLauncherId);
+
+    public static byte[] RawId => _rawId.Value;
+    public static string LauncherId => _launcherId.Value;
 
     private static byte[] _GetRawId()
     {
@@ -47,7 +50,7 @@ public class Identify
         return string.Empty;
     }
 
-    private static string _getLauncherId()
+    private static string _GetLauncherId()
     {
         try
         {
@@ -61,7 +64,6 @@ public class Identify
             ctx.CopyTo(bufferSpan.Slice(prefix.Length, ctx.Length));
             suffix.CopyTo(bufferSpan.Slice(prefix.Length + ctx.Length, suffix.Length));
 
-            Array.Clear(ctx);
             var sample = SHA512Provider.Instance.ComputeHash(bufferSpan).ToHexString();
             bufferSpan.Clear();
 
