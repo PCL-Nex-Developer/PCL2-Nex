@@ -1,10 +1,12 @@
 using System.Collections;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using PCL.Core.App;
+using PCL.Core.App.IoC;
 using PCL.Core.Utils;
 using PCL.Network;
 
@@ -14,8 +16,18 @@ public static partial class ModAnimation
 {
     private static int aniCount;
     private static int aniFPSCounter;
-    private static long aniFPSTimer;
-    private static readonly AutoResetEvent aniSignal = new(false);
+    private static long aniFPSWindowStamp;
+    private static long aniLastFrameStamp;
+    private static int aniRenderingSubscribed;
+    private static int aniResetFrameTime;
+    private static int aniConfiguredFps;
+    private static TimeSpan aniRenderingStartTime;
+    private static TimeSpan aniLastRenderingTime;
+    private static long aniLastRenderingFrame = -1;
+    private static TimeSpan aniCompositionStartTime;
+    private static int aniCompositionFrameCount;
+    private static bool aniCompositionRateLogged;
+    private static double aniCompositionFps;
 
     /// <summary>
     ///     当前的动画 FPS。
@@ -30,94 +42,207 @@ public static partial class ModAnimation
         if (aniRunning)
             return;
 
-        // 初始化计时器
+        aniRunning = true;
         aniLastTick = TimeUtils.GetTimeTick();
-        aniFPSTimer = aniLastTick;
-        aniRunning = true; // 标记动画执行开始
+        aniFPSWindowStamp = Stopwatch.GetTimestamp();
+        aniLastFrameStamp = aniFPSWindowStamp;
+        ModBase.Log("[Animation] WPF 垂直同步动画时钟已启用");
+        EnsureRenderingSubscription();
+    }
 
-        ModBase.RunInNewThread(() =>
+    private static void EnsureRenderingSubscription()
+    {
+        if (!aniRunning || aniGroups.IsEmpty || Lifecycle.HasShutdownStarted)
+            return;
+
+        var app = Application.Current;
+        if (app is null || app.Dispatcher.HasShutdownStarted || app.Dispatcher.HasShutdownFinished)
+            return;
+
+        void Subscribe()
         {
-            try
+            if (!aniRunning || aniGroups.IsEmpty || Lifecycle.HasShutdownStarted)
+                return;
+            if (Interlocked.Exchange(ref aniRenderingSubscribed, 1) != 0)
+                return;
+
+            ResetRenderingClock();
+            CompositionTarget.Rendering += AniRendering;
+        }
+
+        try
+        {
+            if (app.Dispatcher.CheckAccess())
+                Subscribe();
+            else
+                app.Dispatcher.BeginInvoke(Subscribe);
+        }
+        catch (TaskCanceledException) when (Lifecycle.HasShutdownStarted)
+        {
+        }
+    }
+
+    private static void ResetRenderingClock()
+    {
+        var now = Stopwatch.GetTimestamp();
+        aniLastFrameStamp = now;
+        ResetFpsMeasurement(now);
+        aniRenderingStartTime = TimeSpan.MinValue;
+        aniLastRenderingTime = TimeSpan.MinValue;
+        aniLastRenderingFrame = -1;
+        aniConfiguredFps = 0;
+        aniCompositionStartTime = TimeSpan.MinValue;
+        aniCompositionFrameCount = 0;
+        aniCompositionFps = 0;
+    }
+
+    private static void ResetFpsMeasurement(long now)
+    {
+        aniFPS = 0;
+        aniFPSCounter = 0;
+        aniFPSWindowStamp = now;
+    }
+
+    private static void AniRendering(object? sender, EventArgs e)
+    {
+        if (e is not RenderingEventArgs renderingArgs)
+            return;
+
+        if (aniGroups.IsEmpty || Lifecycle.HasShutdownStarted)
+        {
+            CompositionTarget.Rendering -= AniRendering;
+            Interlocked.Exchange(ref aniRenderingSubscribed, 0);
+            if (!aniGroups.IsEmpty)
+                EnsureRenderingSubscription();
+            return;
+        }
+
+        var renderingTime = renderingArgs.RenderingTime;
+        if (renderingTime == aniLastRenderingTime)
+            return;
+        var previousRenderingTime = aniLastRenderingTime;
+        aniLastRenderingTime = renderingTime;
+
+        if (previousRenderingTime != TimeSpan.MinValue && renderingTime > previousRenderingTime)
+        {
+            var instantaneousFps = 1d / (renderingTime - previousRenderingTime).TotalSeconds;
+            if (aniCompositionFps <= 0 || instantaneousFps < aniCompositionFps)
+                aniCompositionFps = instantaneousFps;
+        }
+
+        if (aniCompositionStartTime == TimeSpan.MinValue)
+            aniCompositionStartTime = renderingTime;
+        aniCompositionFrameCount++;
+        if (aniCompositionFrameCount >= 20)
+        {
+            var sampleDuration = renderingTime - aniCompositionStartTime;
+            if (sampleDuration > TimeSpan.Zero)
             {
-                ModBase.Log("[Animation] 动画线程开始");
-                while (true)
+                var compositionFps = (aniCompositionFrameCount - 1) / sampleDuration.TotalSeconds;
+                var previousExpectedFps = aniCompositionFps > 0
+                    ? Math.Min(Config.System.AnimationFpsLimit + 1, aniCompositionFps)
+                    : 0;
+                aniCompositionFps = aniCompositionFps <= 0
+                    ? compositionFps
+                    : aniCompositionFps * 0.5 + compositionFps * 0.5;
+                var currentExpectedFps = Math.Min(Config.System.AnimationFpsLimit + 1, aniCompositionFps);
+                if (currentExpectedFps > previousExpectedFps + 2)
+                    ResetFpsMeasurement(Stopwatch.GetTimestamp());
+                if (!aniCompositionRateLogged)
                 {
-                    if (aniGroups.IsEmpty)
-                    {
-                        aniSignal.WaitOne();
-                        aniLastTick = TimeUtils.GetTimeTick();
-                        continue;
-                    }
-
-                    // 两帧之间的间隔时间
-                    var currentTick = TimeUtils.GetTimeTick();
-                    var deltaTime = (long)Math.Round(ModBase.MathClamp(currentTick - aniLastTick, 0, 100000));
-                    var minFrameGap = 1000d / (Config.System.AnimationFpsLimit + 1);
-                    if (deltaTime < minFrameGap)
-                    {
-                        // 限制 FPS
-                        aniSignal.WaitOne(Math.Max(1, (int)Math.Ceiling(minFrameGap - deltaTime)));
-                        continue;
-                    }
-
-                    aniLastTick = currentTick;
-                    // 记录 FPS
-                    if (ModBase.modeDebug)
-                    {
-                        if (ModBase.MathClamp(aniLastTick - aniFPSTimer, 0d, 100000d) >= 500d)
-                        {
-                            aniFPS = aniFPSCounter;
-                            aniFPSCounter = 0;
-                            aniFPSTimer = aniLastTick;
-                        }
-
-                        aniFPSCounter += 2;
-                    }
-
-                    // 执行动画
-                    ModBase.RunInUiWait(() =>
-                    {
-                        aniCount = 0;
-                        AniTimer((int)Math.Round(deltaTime * aniSpeed));
-                        // #If DEBUG Then
-                        // FrmMain.Title = "F " & AniFPS & ", A " & AniCount & ", R " & NetManage.FileRemain
-                        // #Else
-                        // If ModeDebug Then FrmMain.Title = "FPS " & AniFPS & ", 动画 " & AniCount & ", 下载中 " & NetManage.FileRemain
-                        // #End If
-                        if (RandomUtils.NextInt(0, 64 * (ModBase.modeDebug ? 5 : 30)) == 0 &&
-                            ((aniFPS < 62 && aniFPS > 0) || aniCount > 4 || ModNet.NetManager.FileRemain != 0))
-                            ModBase.Log("[Report] FPS " + aniFPS + ", 动画 " + aniCount + ", 下载中 " +
-                                        ModNet.NetManager.FileRemain + "（" +
-                                        ModBase.GetString(ModNet.NetManager.Speed) + "/s）");
-                    });
+                    ModBase.Log($"[Animation] WPF 垂直同步刷新率约 {compositionFps:N1} Hz，动画上限 {Config.System.AnimationFpsLimit + 1} FPS");
+                    aniCompositionRateLogged = true;
                 }
+                aniCompositionStartTime = renderingTime;
+                aniCompositionFrameCount = 1;
             }
-            catch (OperationCanceledException)
-            {
-            }
-            catch (Exception ex)
-            {
-                ModBase.Log(ex, "动画帧执行失败", ModBase.LogLevel.Critical);
-            }
-        }, "Animation", ThreadPriority.AboveNormal);
+        }
+
+        var configuredFps = Config.System.AnimationFpsLimit + 1;
+        if (configuredFps != aniConfiguredFps || aniRenderingStartTime == TimeSpan.MinValue)
+        {
+            if (aniConfiguredFps > 0 && configuredFps > aniConfiguredFps)
+                ResetFpsMeasurement(Stopwatch.GetTimestamp());
+            aniConfiguredFps = configuredFps;
+            aniRenderingStartTime = renderingTime;
+            aniLastRenderingFrame = -1;
+        }
+
+        var elapsedTicks = renderingTime.Ticks - aniRenderingStartTime.Ticks;
+        var frame = (elapsedTicks + TimeSpan.TicksPerMillisecond / 2) * configuredFps /
+                    TimeSpan.TicksPerSecond;
+        if (frame <= aniLastRenderingFrame)
+            return;
+        aniLastRenderingFrame = frame;
+
+        var now = Stopwatch.GetTimestamp();
+        var deltaTime = Stopwatch.GetElapsedTime(aniLastFrameStamp, now).TotalMilliseconds;
+        aniLastFrameStamp = now;
+        if (Interlocked.Exchange(ref aniResetFrameTime, 0) != 0)
+            deltaTime = 0;
+
+        aniLastTick = TimeUtils.GetTimeTick();
+        aniCount = 0;
+        AniTimer(deltaTime, now);
+        StopRenderingIfIdle();
+
+        aniFPSCounter++;
+        var fpsElapsed = Stopwatch.GetElapsedTime(aniFPSWindowStamp, now);
+        if (fpsElapsed >= TimeSpan.FromMilliseconds(500))
+        {
+            aniFPS = (int)Math.Round(aniFPSCounter / fpsElapsed.TotalSeconds);
+            aniFPSCounter = 0;
+            aniFPSWindowStamp = now;
+        }
+
+        var expectedFps = aniCompositionFps > 0 ? Math.Min(configuredFps, aniCompositionFps) : 0;
+        if (RandomUtils.NextInt(0, 64 * (ModBase.modeDebug ? 5 : 30)) == 0 &&
+            ((expectedFps > 0 && aniFPS < expectedFps - 2 && aniFPS > 0) ||
+             aniCount > 4 || ModNet.NetManager.FileRemain != 0))
+            ModBase.Log("[Report] FPS " + aniFPS + ", 动画 " + aniCount + ", 下载中 " +
+                        ModNet.NetManager.FileRemain + "（" +
+                        ModBase.GetString(ModNet.NetManager.Speed) + "/s）");
+    }
+
+    private static void StopRenderingIfIdle()
+    {
+        if (!aniGroups.IsEmpty)
+            return;
+
+        CompositionTarget.Rendering -= AniRendering;
+        Interlocked.Exchange(ref aniRenderingSubscribed, 0);
+        if (!aniGroups.IsEmpty)
+            EnsureRenderingSubscription();
     }
 
     /// <summary>
     ///     动画定时器事件。
     /// </summary>
-    public static void AniTimer(int deltaTick)
+    private static void AniTimer(double deltaMilliseconds, long frameStamp)
     {
         try
         {
-            if (deltaTick / aniSpeed > 100d)
-                ModBase.Log("[Animation] 两个动画帧间隔 " + deltaTick + " ms", ModBase.LogLevel.Developer);
+            if (deltaMilliseconds > 100d)
+                ModBase.Log("[Animation] 两个动画帧间隔 " + deltaMilliseconds + " ms", ModBase.LogLevel.Developer);
             // 循环每个动画组
             foreach (var pair in aniGroups.ToArray())
             {
+                if (!aniGroups.TryGetValue(pair.Key, out var currentEntry) ||
+                    !ReferenceEquals(currentEntry, pair.Value))
+                    continue;
+
                 // 初始化
                 var entry = pair.Value;
                 if (entry.startTick > aniLastTick)
                     continue; // 跳过本刻之后开始的动画
+                var elapsedMilliseconds = entry.hasRendered
+                    ? deltaMilliseconds
+                    : Stopwatch.GetElapsedTime(entry.startStamp, frameStamp).TotalMilliseconds;
+                entry.hasRendered = true;
+                var animationTime = ModBase.MathClamp(elapsedMilliseconds * aniSpeed + entry.timeRemainder,
+                    0, 100000);
+                var deltaTick = (int)Math.Floor(animationTime);
+                entry.timeRemainder = animationTime - deltaTick;
                 var canRemoveAfter = true; // 是否应该去除“之后”标记
                 var ii = 0;
 
@@ -433,6 +558,9 @@ public static partial class ModAnimation
     {
         public List<AniData> data;
         public long startTick;
+        public long startStamp;
+        public bool hasRendered;
+        public double timeRemainder;
         public int Uuid = ModBase.GetUuid();
     }
 
@@ -1463,16 +1591,23 @@ public static partial class ModAnimation
     public static void AniStart(IList aniGroup, string name = "", bool refreshTime = false)
     {
         if (refreshTime)
-            aniLastTick = TimeUtils.GetTimeTick(); // 避免处理动画时已经造成了极大的延迟，导致动画突然结束
+        {
+            aniLastTick = TimeUtils.GetTimeTick();
+            Interlocked.Exchange(ref aniResetFrameTime, 1);
+        }
         // 添加到正在执行的动画组
         var newEntry = new AniGroupEntry
-            { data = ModBase.GetFullList<AniData>(aniGroup), startTick = TimeUtils.GetTimeTick() };
+        {
+            data = ModBase.GetFullList<AniData>(aniGroup),
+            startTick = TimeUtils.GetTimeTick(),
+            startStamp = Stopwatch.GetTimestamp()
+        };
         if (string.IsNullOrEmpty(name))
             name = newEntry.Uuid.ToString();
         else
             AniStop(name);
         if (aniGroups.TryAdd(name, newEntry))
-            aniSignal.Set();
+            EnsureRenderingSubscription();
     }
 
     /// <summary>

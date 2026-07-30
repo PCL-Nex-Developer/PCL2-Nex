@@ -1830,7 +1830,8 @@
     <sys:String x:Key="Setup.Misc.System.Announcement.Disabled.Warning.Message">若选择此项，即使在将来出现严重问题时，你也无法获取相关通知。&#x0a;例如，如果发现某个版本游戏存在严重 Bug，你可能就会因为无法得到通知而导致无法预知的后果。&#x0a;&#x0a;一般选择 仅在有重要通知时显示公告 就可以让你尽量不受打扰了。&#x0a;除非你在制作服务器整合包，或时常手动更新启动器，否则极度不推荐选择此项！</sys:String>
     <sys:String x:Key="Setup.Misc.System.Announcement.Disabled.Warning.Confirm">我知道我在做什么</sys:String>
     <sys:String x:Key="Setup.Misc.System.MaxFps">最高动画帧率</sys:String>
-    <sys:String x:Key="Setup.Misc.System.MaxFps.ToolTip">如果你禁用了硬件加速，那么建议你调低最高动画帧率以防止过多的资源占用</sys:String>
+    <sys:String x:Key="Setup.Misc.System.MaxFps.ToolTip">动画始终与 WPF 合成帧同步；如果禁用了硬件加速，建议调低最高动画帧率以减少资源占用</sys:String>
+    <sys:String x:Key="Setup.Misc.System.MaxFps.VSync">垂直同步（最高 60 FPS）</sys:String>
     <sys:String x:Key="Setup.Misc.System.MaxLogLines">实时日志行数</sys:String>
     <sys:String x:Key="Setup.Misc.System.MaxLogLines.ToolTip">实时日志功能中最大显示行数，超过该值会自动删除旧的日志。</sys:String>
     <sys:String x:Key="Setup.Misc.System.DisableHardwareAcceleration">禁用硬件加速</sys:String>

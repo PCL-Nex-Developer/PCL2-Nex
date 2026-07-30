@@ -1830,7 +1830,8 @@
     <sys:String x:Key="Setup.Misc.System.Announcement.Disabled.Warning.Message">If you choose this option, you will not receive relevant notifications even when serious issues occur in the future.&#x0a;For example, if a critical bug is found in a certain game version, you may miss the notification and face unpredictable consequences.&#x0a;&#x0a;In general, choosing &quot;Show announcements only when important&quot; should keep you mostly undisturbed.&#x0a;Unless you are creating a server modpack or frequently update the launcher manually, this option is strongly discouraged!</sys:String>
     <sys:String x:Key="Setup.Misc.System.Announcement.Disabled.Warning.Confirm">I know what I am doing</sys:String>
     <sys:String x:Key="Setup.Misc.System.MaxFps">Maximum animation FPS</sys:String>
-    <sys:String x:Key="Setup.Misc.System.MaxFps.ToolTip">If you have disabled hardware acceleration, it is recommended to lower the maximum animation FPS to prevent excessive resource usage.</sys:String>
+    <sys:String x:Key="Setup.Misc.System.MaxFps.ToolTip">Animations are synchronized to WPF composition frames. Lower the cap to reduce resource usage when hardware acceleration is disabled.</sys:String>
+    <sys:String x:Key="Setup.Misc.System.MaxFps.VSync">VSync (60 FPS cap)</sys:String>
     <sys:String x:Key="Setup.Misc.System.MaxLogLines">Real-time log lines</sys:String>
     <sys:String x:Key="Setup.Misc.System.MaxLogLines.ToolTip">Maximum number of lines displayed in the real-time log feature. Old logs are automatically deleted when exceeded.</sys:String>
     <sys:String x:Key="Setup.Misc.System.DisableHardwareAcceleration">Disable hardware acceleration</sys:String>
