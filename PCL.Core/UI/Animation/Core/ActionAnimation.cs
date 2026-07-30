@@ -37,7 +37,7 @@ public class ActionAnimation : AnimationBase
         // 延迟
         await Task.Delay(Delay);
         
-        Interlocked.Exchange(ref _called, 0);
+        Interlocked.Exchange(ref clone._called, 0);
         _ = AnimationService.PushAnimationAsync(clone, target);
         return await _tcs.Task.ContinueWith<IAnimation>(_ => clone);
     }
@@ -51,16 +51,24 @@ public class ActionAnimation : AnimationBase
         var clone = (ActionAnimation)MemberwiseClone();
         clone.Status = AnimationStatus.Running;
         
-        _ = Task.Run(async () =>
+        if (Delay <= TimeSpan.Zero)
         {
-            // 延迟
-            await Task.Delay(Delay);
-            
-            Interlocked.Exchange(ref _called, 0);
+            Interlocked.Exchange(ref clone._called, 0);
             AnimationService.PushAnimationFireAndForget(clone, target);
-        });
+        }
+        else
+        {
+            _ = PushDelayedAsync(clone, target);
+        }
         
         return clone;
+    }
+
+    private static async Task PushDelayedAsync(ActionAnimation animation, IAnimatable target)
+    {
+        await Task.Delay(animation.Delay);
+        Interlocked.Exchange(ref animation._called, 0);
+        AnimationService.PushAnimationFireAndForget(animation, target);
     }
 
     public override void Cancel()

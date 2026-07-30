@@ -60,16 +60,22 @@ public class FromToAnimationBase<T> : AnimationBase, IFromToAnimation
         _RunCore(target);
         var clone = (FromToAnimationBase<T>)MemberwiseClone();
 
-        _ = Task.Run(async () =>
+        if (Delay <= TimeSpan.Zero)
         {
-            // 延迟
-            await Task.Delay(Delay);
-
-            // 将该动画推送到动画服务
             AnimationService.PushAnimationFireAndForget(clone, target);
-        });
+        }
+        else
+        {
+            _ = PushDelayedAsync(clone, target);
+        }
         
         return clone;
+    }
+
+    private static async Task PushDelayedAsync(FromToAnimationBase<T> animation, IAnimatable target)
+    {
+        await Task.Delay(animation.Delay);
+        AnimationService.PushAnimationFireAndForget(animation, target);
     }
 
     private void _RunCore(IAnimatable target)
@@ -90,7 +96,8 @@ public class FromToAnimationBase<T> : AnimationBase, IFromToAnimation
         }
 
         // 计算总帧数
-        TotalFrames = (int)Math.Round(Duration.TotalSeconds * AnimationService.Fps / AnimationService.Scale);
+        TotalFrames = Math.Max(1,
+            (int)Math.Round(Duration.TotalSeconds * AnimationService.Fps / AnimationService.Scale));
 
         // 进行初始赋值
         // target.SetValue(

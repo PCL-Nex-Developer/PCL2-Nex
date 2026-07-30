@@ -17,6 +17,7 @@ public sealed class AsyncCountResetEvent : IDisposable
 {
     private readonly Queue<TaskCompletionSource<bool>> _waiters = new();
     private readonly object _lock = new();
+    private readonly int _maxPermits;
 
     /// <summary>
     /// 当前剩余的配额数。如果 &gt; 0，新的等待者会立即通过。
@@ -27,6 +28,12 @@ public sealed class AsyncCountResetEvent : IDisposable
     /// 标记当前对象是否已释放。
     /// </summary>
     private bool _disposed;
+
+    public AsyncCountResetEvent(int maxPermits = int.MaxValue)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxPermits);
+        _maxPermits = maxPermits;
+    }
 
     /// <summary>
     /// 析构函数。
@@ -82,8 +89,17 @@ public sealed class AsyncCountResetEvent : IDisposable
                 count--;
             }
 
-            // 如果没有等待者，就累积到配额里
-            _permits += count;
+            // 如果没有等待者，仅保留有限配额，避免繁忙后补算大量过期帧。
+            _permits += Math.Min(count, _maxPermits - _permits);
+        }
+    }
+
+    public void Reset()
+    {
+        lock (_lock)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, nameof(AsyncCountResetEvent));
+            _permits = 0;
         }
     }
 

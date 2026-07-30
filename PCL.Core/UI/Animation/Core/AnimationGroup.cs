@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Markup;
+using PCL.Core.Logging;
 using PCL.Core.UI.Animation.Animatable;
 using PCL.Core.Utils;
 
@@ -51,7 +52,8 @@ public abstract class AnimationGroup : AnimationBase
         {
             foreach (var child in ChildrenCore)
             {
-                child.Cancel();
+                try { child.Cancel(); }
+                catch (Exception ex) { LogWrapper.Warn(ex, "Animation", "取消子动画时出错"); }
             }
             // 清理运行实例，断开引用
             ChildrenCore.Clear();

@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 
 namespace PCL.Core.UI.Animation.Clock;
@@ -8,6 +9,7 @@ public sealed partial class WinMMClock(int fps = 60) : IClock, IDisposable
     private uint _timerId;
     private long _frameIndex;
     private TimeProc? _callback;
+    private readonly object _syncRoot = new();
     
     public event EventHandler<long>? Tick;
 
@@ -22,43 +24,49 @@ public sealed partial class WinMMClock(int fps = 60) : IClock, IDisposable
     
     public void Start()
     {
-        if (IsRunning) return;
-        IsRunning = true;
-        
-        _frameIndex = 0;
-
-        // 计算帧间隔（毫秒）
-        var delay = (uint)Math.Max(1, 1000.0 / Fps);
-
-        // 定义回调函数
-        _callback = (_, _, _, _, _) =>
+        lock (_syncRoot)
         {
-            _frameIndex++;
-            Tick?.Invoke(this, _frameIndex);
-        };
-        
-        // 设置定时器
-        _timerId = _TimeSetEvent(
-            delay, 
-            0, 
-            _callback, 
-            IntPtr.Zero,
-            TimePeriodic | TimeCallbackFunction
-        );
+            if (IsRunning) return;
+
+            _frameIndex = 0;
+            var delay = (uint)Math.Max(1, 1000.0 / Fps);
+            _callback = (_, _, _, _, _) =>
+            {
+                _frameIndex++;
+                Tick?.Invoke(this, _frameIndex);
+            };
+
+            _timerId = _TimeSetEvent(
+                delay,
+                0,
+                _callback,
+                IntPtr.Zero,
+                TimePeriodic | TimeCallbackFunction | TimeKillSynchronous);
+            if (_timerId == 0)
+            {
+                _callback = null;
+                throw new Win32Exception("无法创建多媒体动画计时器");
+            }
+
+            IsRunning = true;
+        }
     }
 
     public void Stop()
     {
-        if (!IsRunning) return;
-        IsRunning = false;
-
-        // 停止定时器
-        if (_timerId != 0)
+        lock (_syncRoot)
         {
-            _TimeKillEvent(_timerId);
-            _timerId = 0;
+            if (!IsRunning) return;
+
+            // TIME_KILL_SYNCHRONOUS ensures the delegate stays valid until callbacks finish.
+            if (_timerId != 0)
+            {
+                _TimeKillEvent(_timerId);
+                _timerId = 0;
+            }
+            IsRunning = false;
+            _callback = null;
         }
-        _callback = null;
     }
     
     public void Dispose()
@@ -77,4 +85,5 @@ public sealed partial class WinMMClock(int fps = 60) : IClock, IDisposable
     
     private const uint TimePeriodic = 0x0001;
     private const uint TimeCallbackFunction = 0x0000;
+    private const uint TimeKillSynchronous = 0x0100;
 }
