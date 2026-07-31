@@ -1388,13 +1388,13 @@
 
     <!-- Setup.Ui.Theme / Font -->
 
-    <sys:String x:Key="Setup.Ui.Theme.Title">Theme</sys:String>
-    <sys:String x:Key="Setup.Ui.Theme.Light">Light</sys:String>
-    <sys:String x:Key="Setup.Ui.Theme.Dark">Dark</sys:String>
-    <sys:String x:Key="Setup.Ui.Theme.FollowSystem">Follow system</sys:String>
-    <sys:String x:Key="Setup.Ui.Theme.LightColor">Light theme color</sys:String>
-    <sys:String x:Key="Setup.Ui.Theme.DarkColor">Dark theme color</sys:String>
-    <sys:String x:Key="Setup.Ui.Theme.DarkColor.ToolTip">Default theme color in dark mode</sys:String>
+    
+    
+    
+    
+    
+    
+    
     <sys:String x:Key="Setup.Ui.Font.Title">Font</sys:String>
     <sys:String x:Key="Setup.Ui.Font.Global">Global</sys:String>
     <sys:String x:Key="Setup.Ui.Font.Global.ToolTip">Global default font</sys:String>
@@ -1792,24 +1792,24 @@
     <sys:String x:Key="Setup.Update.Auto.NotifyOnly.ToolTip">The launcher will automatically check for available updates, then prompt you to download and install.</sys:String>
     <sys:String x:Key="Setup.Update.Auto.Disabled">Do not automatically check for updates (not recommended)</sys:String>
     <sys:String x:Key="Setup.Update.Auto.Disabled.ToolTip">Disable automatic update checking. This may prevent you from receiving updates in a timely manner.</sys:String>
-    <sys:String x:Key="Setup.Update.Install">Download and install</sys:String>
+    
     <sys:String x:Key="Setup.Update.RestartInstall">Restart to install</sys:String>
-    <sys:String x:Key="Setup.Update.Checking">Checking for updates...</sys:String>
-    <sys:String x:Key="Setup.Update.Latest">Already up to date</sys:String>
-    <sys:String x:Key="Setup.Update.CheckFailed">Failed to check for updates</sys:String>
-    <sys:String x:Key="Setup.Update.CheckAgain">Check again</sys:String>
-    <sys:String x:Key="Setup.Update.Changelog.Title">About this update</sys:String>
-    <sys:String x:Key="Setup.Update.Changelog.View">Full changelog</sys:String>
-    <sys:String x:Key="Setup.Update.Changelog.MoreInfo">More information about this update...</sys:String>
-    <sys:String x:Key="Setup.Update.Changelog.Empty">The developers seem to have forgotten to provide an update summary... Maybe click below to view the full changelog?</sys:String>
-    <sys:String x:Key="Setup.Update.Changelog.Unavailable">No changelog available...</sys:String>
-    <sys:String x:Key="Setup.Update.Changelog.Placeholder">PCL Nex 2.14.0 brings a refreshing new design, several Pigeon smart features, and a delightful cross-instance workflow to boost your productivity.</sys:String>
-    <sys:String x:Key="Setup.Update.DotNetMissing.Title">Launcher update - missing runtime</sys:String>
-    <sys:String x:Key="Setup.Update.DotNetMissing.Message">A launcher update (version {0}) was found, but the new version requires .NET 10 to be installed on your computer.&#x0a;You need to install .NET 10 before continuing the update.&#x0a;&#x0a;Click the button below to open the webpage, then select {1} under &quot;.NET Desktop Runtime&quot; to download.</sys:String>
-    <sys:String x:Key="Setup.Update.DotNetMissing.DownloadRuntime">Download .NET 10 Runtime</sys:String>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     <sys:String x:Key="Setup.Update.OtherOptions.Title">Other update options - upgrade to AquaCL</sys:String>
     <sys:String x:Key="Setup.Update.OtherOptions.Placeholder">AquaCL 3 is the first major update of PCL Nex. It brings a refreshing new design, uses the latest development technologies, completely rebuilds the core experience, and adds support for macOS, Linux, and other platforms.</sys:String>
-    <sys:String x:Key="Setup.Update.Error.NetworkFailed">Unable to retrieve latest version information. Please check your network connection.</sys:String>
+    
 
     <!-- Setup.Misc.System / Network -->
 
@@ -4033,14 +4033,14 @@
     <sys:String x:Key="Speed.Error.OperationFailed">A task manager operation failed. See the details below.</sys:String>
     <sys:String x:Key="SystemDialog.Browser.OpenFailed.Message">PCL Nex could not open this link. The link was copied to the clipboard and can be opened manually.&#xA;&#xA;Link: {0}</sys:String>
     <sys:String x:Key="SystemDialog.Browser.OpenFailed.Title">Failed to open link</sys:String>
-    <sys:String x:Key="SystemDialog.Error.Detail.WithException">{0}&#xA;&#xA;Details:&#xA;{1}</sys:String>
-    <sys:String x:Key="SystemDialog.Error.Message.WithLogExportGuidance">{0}&#xA;&#xA;When asking for help, do not close launcher. Export the logs now (Settings → View logs → Export logs), then send the exported log archive. A screenshot of this window alone is usually not enough to diagnose the problem.</sys:String>
-    <sys:String x:Key="SystemDialog.Error.OperationFailed.Message">An error occurred while performing this operation.&#xA;&#xA;Operation:&#xA;{0}&#xA;&#xA;Details:&#xA;{1}</sys:String>
-    <sys:String x:Key="SystemDialog.Error.OperationFailed.RuntimeMessage">An error occurred while performing this operation.&#xA;&#xA;Operation:&#xA;{0}&#xA;&#xA;Details:&#xA;{1}&#xA;&#xA;A low-level system operation failed. Please try reinstalling .NET 10.</sys:String>
-    <sys:String x:Key="SystemDialog.Error.Title">Error</sys:String>
-    <sys:String x:Key="SystemDialog.Error.Unexpected.Message">An unexpected error occurred.</sys:String>
-    <sys:String x:Key="SystemDialog.Error.Unexpected.Title">Unexpected error</sys:String>
-    <sys:String x:Key="SystemDialog.Error.UserVisible.Message">An error occurred.&#xA;&#xA;Details:&#xA;{0}</sys:String>
+    
+    
+    
+    
+    
+    
+    
+    
     <sys:String x:Key="SystemDialog.Fatal.Message.WithFeedbackGuidance">{0}&#xA;&#xA;If you think this is a launcher issue, please submit feedback so it can be investigated.&#xA;Export logs: Settings → View logs → Export all logs</sys:String>
     <sys:String x:Key="SystemDialog.Fatal.Title">Fatal error</sys:String>
     <sys:String x:Key="SystemDialog.File.AllFilesFilter">All files|*.*</sys:String>
