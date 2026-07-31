@@ -1,4 +1,5 @@
 using System.IO;
+using System.Net.Http;
 using Downloader;
 using PCL.Core.IO.Net;
 using PCL.Core.IO.Net.Http;
@@ -78,19 +79,21 @@ public static class FileDownloader
         CleanupTempFiles(localPath);
 
         var perFileThreadLimit = enableParallelChunks ? Math.Max(1, ModNet.NetTaskThreadLimit) : 1;
+        // 限制最大分块数，防止大文件下载时内存爆炸
+        var chunkCount = Math.Min(perFileThreadLimit, 4);
         var configuration = new DownloadConfiguration
         {
-            ChunkCount = perFileThreadLimit,
-            ParallelCount = perFileThreadLimit,
-            ParallelDownload = perFileThreadLimit > 1,
+            ChunkCount = chunkCount,
+            ParallelCount = chunkCount,
+            ParallelDownload = chunkCount > 1,
             MaximumBytesPerSecond = ModNet.NetTaskSpeedLimitHigh > 0 ? ModNet.NetTaskSpeedLimitHigh : 0,
             MaxTryAgainOnFailure = 2,
             BlockTimeout = 60000,
             DownloadFileExtension = ModNet.netDownloadEnd,
             EnableAutoResumeDownload = false,
-            RequestConfiguration = DownloadRequestFactory.Create(url, useBrowserUserAgent, customUserAgent),
-            CustomHttpClientFactory = () => NetworkService.GetClient(),
+            CustomHttpClientFactory = () => GetHttpClient(url),
             MinimumSizeOfChunking = 1024 * 1024L,
+            MaximumMemoryBufferBytes = 256L * 1024 * 1024,
         };
 
         using var downloader = new DownloadService(configuration);
@@ -206,5 +209,16 @@ public static class FileDownloader
                 Thread.Sleep(100);
             }
         }
+    }
+
+    private static HttpClient GetHttpClient(string url)
+    {
+        if (Uri.TryCreate(url, UriKind.Absolute, out var parsedUri)
+            && parsedUri.Host is "edge.forgecdn.net" or "mediafilez.forgecdn.net" or "forgecdn.net" or "api.curseforge.com")
+        {
+            return NetworkService.GetClient(NetworkService.CurseForgeApi);
+        }
+        
+        return NetworkService.GetClient();
     }
 }

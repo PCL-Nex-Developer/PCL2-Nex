@@ -1448,10 +1448,9 @@ public static class ModDownloadLib
                 Directory.CreateDirectory(versionFolder);
                 var versionJson = new JsonObject();
                 versionJson.Add("id", versionName);
-                versionJson.Add("time",
-                    DateTime.ParseExact(downloadInfo.ReleaseTime, "yyyy/MM/dd HH:mm", CultureInfo.InvariantCulture));
-                versionJson.Add("releaseTime",
-                    DateTime.ParseExact(downloadInfo.ReleaseTime, "yyyy/MM/dd HH:mm", CultureInfo.InvariantCulture));
+                var releaseDate = DateTime.Parse(downloadInfo.ReleaseTime, Lang.Culture);
+                versionJson.Add("time", releaseDate);
+                versionJson.Add("releaseTime", releaseDate);
                 versionJson.Add("type", "release");
                 versionJson.Add("arguments",
                     (JsonNode)ModBase.GetJson("{\"game\":[\"--tweakClass\",\"" + downloadInfo.jsonToken["tweakClass"] +
@@ -3160,172 +3159,6 @@ public static class ModDownloadLib
 
     #endregion
 
-    #region Quilt 下载
-
-    public static void McDownloadQuiltLoaderSave(JsonObject downloadInfo)
-    {
-        try
-        {
-            var url = downloadInfo["url"].ToString();
-            var fileName = ModBase.GetFileNameFromPath(url);
-            var version = ModBase.GetFileNameFromPath(downloadInfo["version"].ToString());
-            var target = SystemDialogs.SelectSaveFile(Lang.Text("Download.Version.SelectSaveLocation"), fileName, Lang.Text("Download.Version.Installer.Quilt.Filter"));
-            if (!target.Contains(@"\"))
-                return;
-
-            // 重复任务检查
-            foreach (var OngoingLoader in ModLoader.loaderTaskbar)
-            {
-                if ((OngoingLoader.name ?? "") !=
-                    (Lang.Text("Minecraft.Download.Stage.QuiltInstallerDownload", version) ?? ""))
-                    continue;
-                HintService.Hint(Lang.Text("Minecraft.Download.Error.InstanceDownloading"), HintType.Error);
-                return;
-            }
-
-            // 构造步骤加载器
-            var loaders = new List<ModLoader.LoaderBase>();
-            // 下载
-            // TODO: BMCLAPI 不支持 Quilt Installer 下载
-            var address = new List<string>();
-            address.Add(url);
-            loaders.Add(new LoaderDownload(Lang.Text("Minecraft.Download.Stage.DownloadMainFile"),
-                    new List<DownloadFile> { new(address.ToArray(), target, new ModBase.FileChecker(1024 * 64)) })
-                { ProgressWeight = 15d });
-            // 启动
-            var loader =
-                new ModLoader.LoaderCombo<JsonObject>(
-                        Lang.Text("Minecraft.Download.Stage.QuiltInstallerDownload", version), loaders)
-                { OnStateChanged = LoaderStateChangedHintOnly };
-            loader.Start(downloadInfo);
-            ModLoader.LoaderTaskbarAdd(loader);
-            ModMain.frmMain.BtnExtraDownload.ShowRefresh();
-            ModMain.frmMain.BtnExtraDownload.Ribble();
-        }
-
-        catch (Exception ex)
-        {
-            ModBase.Log(ex, "开始 Quilt 安装器下载失败", ModBase.LogLevel.Feedback);
-        }
-    }
-
-    /// <summary>
-    ///     获取下载某个 Quilt 实例的加载器列表。
-    /// </summary>
-    private static List<ModLoader.LoaderBase> McDownloadQuiltLoader(string quiltVersion, string minecraftName,
-        string mcFolder = null, bool fixLibrary = true)
-    {
-        // 参数初始化
-        mcFolder = mcFolder ?? ModFolder.mcFolderSelected;
-        var isCustomFolder = (mcFolder ?? "") != (ModFolder.mcFolderSelected ?? "");
-        var id = "quilt-loader-" + quiltVersion + "-" + minecraftName;
-        var versionFolder = Path.Combine(mcFolder, "versions", id);
-        var loaders = new List<ModLoader.LoaderBase>();
-
-        // 下载 Json
-        minecraftName = minecraftName.Replace("∞", "infinite"); // 放在 ID 后面避免影响实例文件夹名称
-        loaders.Add(new ModLoader.LoaderTask<string, List<DownloadFile>>(
-            Lang.Text("Minecraft.Download.Stage.ObtainQuiltMainFileUrl"), task =>
-        {
-            // 启动依赖实例的下载
-            if (fixLibrary)
-                McDownloadClient(NetPreDownloadBehaviour.ExitWhileExistsOrDownloading, minecraftName);
-            task.Progress = 0.5d;
-            // 构造文件请求
-            task.output = new List<DownloadFile>
-            {
-                new(
-                    new[]
-                    {
-                        "https://meta.quiltmc.org/v3/versions/loader/" + minecraftName + "/" + quiltVersion +
-                        "/profile/json"
-                    }, Path.Combine(versionFolder, id + ".json"), new ModBase.FileChecker(isJson: true))
-            };
-            // 新建 mods 文件夹
-            Directory.CreateDirectory($@"{mcFolder ?? ModFolder.mcFolderSelected}mods\");
-        })
-        {
-            ProgressWeight = 0.5d
-        });
-        loaders.Add(new LoaderDownload(Lang.Text("Minecraft.Download.Stage.DownloadLoaderMainFile", "Quilt"),
-            new List<DownloadFile>()) { ProgressWeight = 2.5d });
-
-        // 下载支持库
-        if (fixLibrary)
-        {
-            loaders.Add(new ModLoader.LoaderTask<string, List<DownloadFile>>(
-                    Lang.Text("Minecraft.Download.Stage.AnalyzeQuiltLibraries"),
-                    task => task.output =
-                        ModLibrary.McLibNetFilesFromInstance(new McInstance(versionFolder)))
-                { ProgressWeight = 1d, show = false });
-            loaders.Add(new LoaderDownload(Lang.Text("Minecraft.Download.Stage.DownloadLoaderLibraries", "Quilt"),
-                    new List<DownloadFile>())
-                { ProgressWeight = 8d });
-        }
-
-        return loaders;
-    }
-
-    #endregion
-
-    #region Quilt 下载菜单
-
-    public static MyListItem QuiltDownloadListItem(JsonObject entry, MyListItem.ClickEventHandler onClick)
-    {
-        // 建立控件
-        var newItem = new MyListItem
-        {
-            Title = entry["version"].ToString(),
-            SnapsToDevicePixels = true,
-            Height = 42d,
-            Type = MyListItem.CheckType.Clickable,
-            Tag = entry,
-            Info = entry["maven"].ToString().Contains("installer") ? Lang.Text("Download.Version.Type.Installer") :
-                entry["version"].ToString().Contains("beta") || entry["version"].ToString().Contains("pre") ? Lang.Text("Download.Version.Type.Preview") :
-                Lang.Text("Download.Version.Type.Stable"),
-            Logo = ModBase.pathImage + "Blocks/Quilt.png"
-        };
-        newItem.Click += onClick;
-        newItem.ContentHandler = QuiltContMenuBuild;
-        // 结束
-        return newItem;
-    }
-
-    private static void QuiltContMenuBuild(object sender, EventArgs e)
-    {
-        var btnInfo = new MyIconButton { LogoScale = 1.05d, SvgIcon = "lucide/info", ToolTip = Lang.Text("Download.Version.Changelog") };
-        ToolTipService.SetPlacement(btnInfo, PlacementMode.Center);
-        ToolTipService.SetVerticalOffset(btnInfo, 30d);
-        ToolTipService.SetHorizontalOffset(btnInfo, 2d);
-        btnInfo.Click += (a, b) => QuiltLog_Click(a, (dynamic)b);
-        ((dynamic)sender).Buttons = new[] { btnInfo };
-    }
-
-    private static void QuiltLog_Click(object sender, RoutedEventArgs e)
-    {
-        ModBase.OpenWebsite("https://quiltmc.org/en/blog/1/");
-    }
-
-    public static MyListItem QSLDownloadListItem(ModComp.CompFile entry, MyListItem.ClickEventHandler onClick)
-    {
-        // 建立控件
-        var newItem = new MyListItem
-        {
-            Title = entry.DisplayName.Split("]")[1].Replace(" build ", ".").Split("+")[0].Trim(),
-            SnapsToDevicePixels = true,
-            Height = 42d,
-            Type = MyListItem.CheckType.Clickable,
-            Tag = entry,
-            Info = entry.StatusDescription + Lang.Text("Download.Version.ReleaseDate", Lang.Date(entry.ReleaseDate, "g")),
-            Logo = ModBase.pathImage + "Blocks/Quilt.png"
-        };
-        newItem.Click += onClick;
-        // 结束
-        return newItem;
-    }
-
-    #endregion
-
     #region LabyMod 下载
 
     public static void McDownloadLabyModProductionLoaderSave()
@@ -3726,16 +3559,6 @@ public static class ModDownloadLib
         public string optiFineVersion;
 
         /// <summary>
-        ///     欲下载的 Quilted Fabric API (QFAPI) / Quilt Standard Libraries (QSL) 信息。
-        /// </summary>
-        public ModComp.CompFile qsl = null;
-
-        /// <summary>
-        ///     欲下载的 Quilt Loader 版本名。
-        /// </summary>
-        public string quiltVersion = null;
-
-        /// <summary>
         ///     必填。安装目标文件夹。
         /// </summary>
         public string targetInstanceFolder;
@@ -3961,9 +3784,6 @@ public static class ModDownloadLib
         if (request.legacyFabricVersion is not null)
             legacyFabricFolder = Path.Combine(tempMcFolder, "versions", "legacy-fabric-loader-" + request.legacyFabricVersion + "-" +
                                  request.minecraftName);
-        string quiltFolder = null;
-        if (request.quiltVersion is not null)
-            quiltFolder = Path.Combine(tempMcFolder, "versions", "quilt-loader-" + request.quiltVersion + "-" + request.minecraftName);
         string labyModFolder = null;
         if (request.labyModCommitRef is not null)
             labyModFolder = Path.Combine(tempMcFolder, "versions", "labymod-" + request.labyModCommitRef + "-" +
@@ -3976,7 +3796,7 @@ public static class ModDownloadLib
         var modable = request.fabricVersion is not null || request.legacyFabricVersion is not null ||
                       request.forgeEntry is not null || request.neoForgeEntry is not null ||
                       request.liteLoaderEntry is not null;
-        var modsTempFolder = Path.Combine(tempMcFolder, "mods");
+        var modsTempFolder = Path.Combine(tempMcFolder, "mods") + @"\";
         var optiFineAsMod = request.optiFineEntry is not null && modable; // 选择了 OptiFine 与任意 Mod 加载器
         if (optiFineAsMod)
         {
@@ -4000,8 +3820,6 @@ public static class ModDownloadLib
             ModBase.Log("[Download] Fabric 缓存：" + fabricFolder);
         if (legacyFabricFolder is not null)
             ModBase.Log("[Download] LegacyFabric 缓存：" + legacyFabricFolder);
-        if (quiltFolder is not null)
-            ModBase.Log("[Download] Quilt 缓存：" + quiltFolder);
         if (labyModFolder is not null)
             ModBase.Log("[Download] LabyMod 缓存：" + labyModFolder);
         if (liteLoaderFolder is not null)
@@ -4031,12 +3849,6 @@ public static class ModDownloadLib
             loaderList.Add(new LoaderDownload(Lang.Text("Minecraft.Download.Stage.DownloadLegacyFabricApi"),
                     new List<DownloadFile> { request.legacyFabricApi.ToNetFile(modsTempFolder) })
                 { ProgressWeight = 3d, block = false });
-        // Quilted Fabric API (QFAPI) / Quilt Standard Libraries (QSL)
-        if (request.qsl is not null)
-            loaderList.Add(
-                new LoaderDownload(Lang.Text("Minecraft.Download.Stage.DownloadQfapiQsl"),
-                        new List<DownloadFile> { request.qsl.ToNetFile(modsTempFolder) })
-                    { ProgressWeight = 3d, block = false });
         // OptiFabric
         if (request.optiFabric is not null)
             loaderList.Add(new LoaderDownload(Lang.Text("Minecraft.Download.Stage.DownloadOptiFabric"),
@@ -4067,7 +3879,7 @@ public static class ModDownloadLib
             show = false,
             ProgressWeight = 39d,
             block = request.forgeVersion is null && request.neoForgeVersion is null && request.optiFineEntry is null &&
-                    request.fabricVersion is null && request.liteLoaderEntry is null && request.quiltVersion is null &&
+                    request.fabricVersion is null && request.liteLoaderEntry is null &&
                     request.cleanroomEntry is null && request.legacyFabricVersion is null
         };
         loaderList.Add(clientLoader);
@@ -4164,12 +3976,6 @@ public static class ModDownloadLib
                 ProgressWeight = 2d,
                 block = true
             });
-        // Quilt
-        if (request.quiltVersion is not null)
-            loaderList.Add(new ModLoader.LoaderCombo<string>(
-                    Lang.Text("Minecraft.Download.Stage.LoaderDownloadCombo", "Quilt", request.quiltVersion),
-                    McDownloadQuiltLoader(request.quiltVersion, request.minecraftName, tempMcFolder, false))
-                { show = false, ProgressWeight = 2d, block = true });
 
         LabyModSkip: ;
 
@@ -4180,7 +3986,7 @@ public static class ModDownloadLib
             // 合并 JSON
             MergeJson(instanceFolder, instanceFolder, optiFineFolder, optiFineAsMod, forgeFolder, request.forgeVersion,
                 neoForgeFolder, request.neoForgeVersion, cleanroomFolder, request.cleanroomVersion, fabricFolder,
-                quiltFolder, labyModFolder, request.labyModChannel, liteLoaderFolder, request.mmcPackInfo,
+                labyModFolder, request.labyModChannel, liteLoaderFolder, request.mmcPackInfo,
                 legacyFabricFolder);
             task.Progress = 0.2d;
             // 迁移文件
@@ -4212,7 +4018,7 @@ public static class ModDownloadLib
                                   (request.forgeVersion is not null &&
                                    Convert.ToDouble(request.forgeVersion.BeforeFirst(".")) >= 20d) ||
                                   request.neoForgeVersion is not null || request.fabricVersion is not null ||
-                                  request.quiltVersion is not null || request.cleanroomVersion is not null ||
+                                  request.cleanroomVersion is not null ||
                                   request.liteLoaderEntry is not null || request.labyModCommitRef is not null))
         {
             var loadersLib = new List<ModLoader.LoaderBase>();
@@ -4263,7 +4069,7 @@ public static class ModDownloadLib
     private static void MergeJson(string outputFolder, string minecraftFolder, string optiFineFolder = null,
         bool optiFineAsMod = false, string forgeFolder = null, string forgeVersion = null, string neoForgeFolder = null,
         string neoForgeVersion = null, string cleanroomFolder = null, string cleanroomVersion = null,
-        string fabricFolder = null, string quiltFolder = null, string labyModFolder = null,
+        string fabricFolder = null, string labyModFolder = null,
         string labyModChannel = null, string liteLoaderFolder = null, ModModpack.MMCPackInfo mMCPackInfo = null,
         string legacyFabricFolder = null)
     {
@@ -4275,7 +4081,6 @@ public static class ModDownloadLib
                     (liteLoaderFolder is not null ? "，LiteLoader：" + liteLoaderFolder : "") +
                     (fabricFolder is not null ? "，Fabric：" + fabricFolder : "") +
                     (legacyFabricFolder is not null ? "，LegacyFabric：" + legacyFabricFolder : "") +
-                    (quiltFolder is not null ? "，Quilt：" + quiltFolder : "") +
                     (labyModFolder is not null ? "，LabyMod：" + labyModFolder : ""));
         Directory.CreateDirectory(outputFolder);
 
@@ -4286,7 +4091,6 @@ public static class ModDownloadLib
         var hasCleanroom = cleanroomFolder is not null;
         var hasLiteLoader = liteLoaderFolder is not null;
         var hasFabric = fabricFolder is not null;
-        var hasQuilt = quiltFolder is not null;
         var hasLabyMod = labyModFolder is not null;
         string outputName;
         string minecraftName;
@@ -4297,7 +4101,6 @@ public static class ModDownloadLib
         string liteLoaderName;
         string fabricName;
         string legacyFabricName;
-        string quiltName;
         string labyModName;
         string outputJsonPath;
         string minecraftJsonPath;
@@ -4307,7 +4110,6 @@ public static class ModDownloadLib
         string cleanroomJsonPath = null;
         string liteLoaderJsonPath = null;
         string fabricJsonPath = null;
-        string quiltJsonPath = null;
         string labyModJsonPath = null;
         string legacyFabricJsonPath = null;
         string outputJar;
@@ -4383,14 +4185,6 @@ public static class ModDownloadLib
             legacyFabricJsonPath = Path.Combine(legacyFabricFolder, legacyFabricName + ".json");
         }
 
-        if (hasQuilt)
-        {
-            if (!quiltFolder.EndsWithF(@"\"))
-                quiltFolder += @"\";
-            quiltName = ModBase.GetFolderNameFromPath(quiltFolder);
-            quiltJsonPath = Path.Combine(quiltFolder, quiltName + ".json");
-        }
-
         if (hasLabyMod)
         {
             if (!labyModFolder.EndsWithF(@"\"))
@@ -4410,7 +4204,6 @@ public static class ModDownloadLib
         JsonObject cleanroomJson = null;
         JsonObject liteLoaderJson = null;
         JsonObject fabricJson = null;
-        JsonObject quiltJson = null;
         JsonObject labyModJson = null;
 
         #region 读取文件并检查文件是否合规
@@ -4485,15 +4278,6 @@ public static class ModDownloadLib
                 throw new Exception(Lang.Text("Minecraft.Download.Error.JsonInvalid", "Legacy Fabric", fabricJsonPath,
                     legacyFabricJsonText.Substring(0, Math.Min(legacyFabricJsonText.Length, 1000))));
             legacyFabricJson = (JsonObject)ModBase.GetJson(legacyFabricJsonText);
-        }
-
-        if (hasQuilt)
-        {
-            var quiltJsonText = ModBase.ReadFile(quiltJsonPath);
-            if (!quiltJsonText.StartsWithF("{"))
-                throw new Exception(Lang.Text("Minecraft.Download.Error.JsonInvalid", "Quilt", quiltJsonPath,
-                    quiltJsonText.Substring(0, Math.Min(quiltJsonText.Length, 1000))));
-            quiltJson = (JsonObject)ModBase.GetJson(quiltJsonText);
         }
 
         if (hasLabyMod)
@@ -4617,15 +4401,6 @@ public static class ModDownloadLib
                 legacyFabricJson.Remove("releaseTime");
                 legacyFabricJson.Remove("time");
                 outputJson.Merge(legacyFabricJson);
-            }
-
-        if (hasQuilt)
-            if (mMCPackInfo is null || !mMCPackInfo.isQuiltOverrided)
-            {
-                // 合并 Quilt
-                quiltJson.Remove("releaseTime");
-                quiltJson.Remove("time");
-                outputJson.Merge(quiltJson);
             }
 
         if (hasLabyMod)

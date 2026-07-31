@@ -34,8 +34,8 @@ PCL Nex 是基于 PCL 开源代码二次开发的社区版本，包含主线暂�
 
 | 操作系统 | 支持情况 | 环境要求 |
 |---|---|---|
-| Windows 10 1809 (17763) 或更高版本 | ✅ 完整支持 | [.NET 8 Desktop Runtime](https://get.dot.net/8) |
-| Windows 8 至 Windows 10 1809 (17763) 或更低版本 | ⚠️ 理论可运行，酌情提供社区支持 | [.NET 8 Desktop Runtime](https://get.dot.net/8) |
+| Windows 10 1809 (17763) 或更高版本 | ✅ 完整支持 | [.NET 10 Desktop Runtime](https://get.dot.net/10) |
+| Windows 8 至 Windows 10 1809 (17763) 或更低版本 | ⚠️ 理论可运行，酌情提供社区支持 | [.NET 10 Desktop Runtime](https://get.dot.net/10) |
 | Windows 7 或更低版本 | ❌ 不支持 | / |
 | macOS / Linux / 其他操作系统 | ⚠️ 仅支持跨平台开发（交叉编译） | [.NET 10 SDK](https://get.dot.net/10) |
 
