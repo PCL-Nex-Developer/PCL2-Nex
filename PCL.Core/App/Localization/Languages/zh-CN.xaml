@@ -157,6 +157,8 @@
 
     <sys:String x:Key="Main.UpdateLog.Empty">欢迎使用呀~</sys:String>
     <sys:String x:Key="Main.UpdateLog.Title">PCL Nex 已更新至 {0}</sys:String>
+    <sys:String x:Key="Main.HomepageReset.Title">主页预设已重置</sys:String>
+    <sys:String x:Key="Main.HomepageReset.Content">由于启动器更新，已重置主页预设。请重新前往 设置 - 个性化 选择预设</sys:String>
     <sys:String x:Key="Main.UpdateLog.FullChangelog">完整更新日志</sys:String>
     <sys:String x:Key="Main.DebugMode.Hint">[调试模式] PCL 正以调试模式运行，这可能会导致性能下降，若无必要请不要开启！</sys:String>
     <sys:String x:Key="Main.SpecialVersion.DebugHint">当前运行的 PCL Nex为 Debug 版本。&#x0a;该版本仅适合开发者调试运行，可能会有严重的性能下降以及各种奇怪的网络问题。&#x0a;&#x0a;非开发者用户使用该版本造成的一切问题均不被社区支持，相关 issue 可能会被直接关闭。&#x0a;除非您是开发者，否则请立即删除该版本，并下载最新稳定版使用。</sys:String>
@@ -1508,6 +1510,10 @@
     <sys:String x:Key="Setup.Ui.Homepage.Preset.Magazine">杂志主页（作者：CreeperIsASpy）</sys:String>
     <sys:String x:Key="Setup.Ui.Homepage.Preset.GitHub">PCL GitHub 仪表盘（作者：Deep-Dark-Forest）</sys:String>
     <sys:String x:Key="Setup.Ui.Homepage.Preset.McUpdateSummary">Minecraft 更新摘要（作者：pynickle，部分由 AI 生成）</sys:String>
+    <sys:String x:Key="Setup.Ui.Homepage.Preset.NewsToday">今日新闻热点（作者：EYicheng）</sys:String>
+    <sys:String x:Key="Setup.Ui.Homepage.Preset.MinecraftKnowledge">Minecraft 芝士站（作者：awaEric233）</sys:String>
+    <sys:String x:Key="Setup.Ui.Homepage.Preset.ModpackRecommendation">整合包推荐引擎（作者：CHMYGZ）</sys:String>
+    <sys:String x:Key="Setup.Ui.Homepage.Preset.Bangumi">Bangumi 番剧主页（作者：wzyaeu）</sys:String>
     <sys:String x:Key="Setup.Ui.Homepage.Preset.PclAnnouncement">PCL Nex 公告栏</sys:String>
     <sys:String x:Key="Setup.Ui.Homepage.Preset.McOfficialFeed">Minecraft 官方信息流</sys:String>
     <sys:String x:Key="Setup.Ui.Homepage.HintReferToModSetup">内容见 ModSetup</sys:String>
