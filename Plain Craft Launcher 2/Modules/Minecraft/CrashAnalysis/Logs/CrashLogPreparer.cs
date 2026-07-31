@@ -43,6 +43,12 @@ internal sealed class CrashLogPreparer(CrashAnalysisContext context)
             .Where(item => item.Kind is not null)
             .ToList();
 
+        context.DirectOpenFile = analyzable
+            .OrderBy(item => _IsGeneratedLog(item.File))
+            .ThenByDescending(item => _GetLastWriteTime(item.File))
+            .Select(item => item.File)
+            .FirstOrDefault();
+
         var extraFiles = classifiedFiles
             .Where(item => item.Kind is null)
             .Select(item => item.File)
@@ -121,9 +127,6 @@ internal sealed class CrashLogPreparer(CrashAnalysisContext context)
                 LogWrapper.Info("Crash", $"{name} 分类为 Ignore");
                 continue;
             }
-
-            if (kind is not null && context.DirectOpenFile is null)
-                context.DirectOpenFile = file;
 
             result.Add(new ClassifiedCrashLog(file, kind));
             LogWrapper.Info("Crash", $"{name} 分类为 {kind?.ToString() ?? "Extra"}");
@@ -345,6 +348,9 @@ internal sealed class CrashLogPreparer(CrashAnalysisContext context)
             return new DateTime(1900, 1, 1);
         }
     }
+
+    private bool _IsGeneratedLog(CrashLogEntry file) =>
+        file.FullPath.StartsWith(context.TempFolder, StringComparison.OrdinalIgnoreCase);
 
     private static string _GetHeadTailLines(
         IReadOnlyList<string> raw,
