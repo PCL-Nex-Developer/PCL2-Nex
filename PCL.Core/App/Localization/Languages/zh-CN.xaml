@@ -684,6 +684,7 @@
     <sys:String x:Key="Minecraft.Launch.Login.Microsoft.ChangeBirthDate.SupportMessage">请在打开的网页中修改账号的出生日期（至少改为 18 岁以上）。&#x0a;在修改成功后等待一分钟，然后再回到 PCL，就可以正常登录了！</sys:String>
     <sys:String x:Key="Minecraft.Launch.Login.Microsoft.TooManyRequests">登录尝试太过频繁，请等待几分钟后再试！</sys:String>
     <sys:String x:Key="Minecraft.Launch.Login.Microsoft.AbnormalIp">当前 IP 的登录尝试异常。&#x0a;如果你使用了 VPN 或加速器，请把它们关掉或更换节点后再试！</sys:String>
+    <sys:String x:Key="Minecraft.Launch.Login.Microsoft.ServiceUnavailable">Mojang 服务器出现问题，请稍后再试！&#x0a;你的网络是正常的，启动器也是正常的，是 Mojang 出问题了……</sys:String>
     <sys:String x:Key="Minecraft.Launch.Login.Microsoft.NotPurchased">暂时无法获取到此账户信息，此账户可能没有购买 Minecraft Java Edition 或者账户的 Xbox Game Pass 已过期</sys:String>
     <sys:String x:Key="Minecraft.Launch.Login.Microsoft.PurchaseMinecraft">购买 Minecraft</sys:String>
     <sys:String x:Key="Minecraft.Launch.Login.Microsoft.CreateProfile.Message">请先创建 Minecraft 玩家档案，然后再重新登录。</sys:String>

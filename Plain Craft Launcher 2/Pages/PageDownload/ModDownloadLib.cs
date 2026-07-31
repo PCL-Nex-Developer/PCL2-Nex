@@ -693,32 +693,59 @@ public static class ModDownloadLib
 
     private static void McDownloadOptiFineInstall(string baseMcFolderHome, string target, ModLoader.LoaderTask<List<DownloadFile>, bool> task, bool useJavaWrapper)
     {
+        // 从 Installer.class 主版本推断所需 Java（上游 c6d04579，修复 OptiFine 26.x）
+        var minJava = new Version(21, 0);
+        var downloadMajor = 21;
+        try
+        {
+            using var installer = ZipFile.OpenRead(target);
+            var entry = installer.GetEntry("optifine/Installer.class");
+            if (entry is null)
+                throw new FileNotFoundException("未找到 optifine/Installer.class");
+            using var stream = entry.Open();
+            using var reader = new BinaryReader(stream);
+            var header = reader.ReadBytes(8);
+            if (header.Length < 8)
+                throw new IOException("Installer.class 长度不足");
+            if (header[0] != 0xCA || header[1] != 0xFE || header[2] != 0xBA || header[3] != 0xBE)
+                throw new InvalidDataException("Installer.class 文件头无效");
+            var classVersion = header[6] * 0x100 + header[7];
+            if (classVersion < 49)
+                throw new InvalidDataException("Installer.class 版本过低");
+            if (classVersion > 100)
+                throw new InvalidDataException("Installer.class 版本过高");
+            var major = classVersion - 44;
+            minJava = new Version(major, 0);
+            downloadMajor = major;
+            ModBase.Log($"[Download] OptiFine 安装器 class 版本：{classVersion}，需要 Java >= {major}");
+        }
+        catch (Exception ex)
+        {
+            ModBase.Log(ex, "读取 OptiFine 安装器 Java 版本失败", ModBase.LogLevel.Debug);
+        }
+
         // 选择 Java
         JavaEntry java;
         lock (ModJava.javaLock)
         {
-            java = ModJava.JavaSelect(Lang.Text("Minecraft.Download.Error.InstallationCanceled"),
-                new Version(1, 8, 0, 0));
+            java = ModJava.JavaSelect(Lang.Text("Minecraft.Download.Error.InstallationCanceled"), minJava);
             if (java is null)
             {
                 if (!ModJava.JavaDownloadConfirm(Lang.Text("Minecraft.Download.Error.JavaVersionRequired")))
                     throw new Exception(Lang.Text("Minecraft.Download.Error.JavaNotFoundInstallCanceled"));
-                // 开始自动下载
                 var javaLoader = ModJava.GetJavaDownloadLoader();
                 try
                 {
-                    javaLoader.Start(17, true);
+                    javaLoader.Start(downloadMajor, true);
                     while (javaLoader.State == ModBase.LoadState.Loading && !task.IsAborted)
                         Thread.Sleep(10);
                 }
                 finally
                 {
-                    javaLoader.Abort(); // 确保取消时中止 Java 下载
+                    javaLoader.Abort();
                 }
 
-                // 检查下载结果
-                java = ModJava.JavaSelect(Lang.Text("Minecraft.Download.Error.InstallationCanceled"),
-                    new Version(1, 8, 0, 0));
+                java = ModJava.JavaSelect(Lang.Text("Minecraft.Download.Error.InstallationCanceled"), minJava);
                 if (task.IsAborted)
                     return;
                 if (java is null)

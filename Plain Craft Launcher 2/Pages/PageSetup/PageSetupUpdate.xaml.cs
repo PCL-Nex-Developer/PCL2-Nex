@@ -218,7 +218,8 @@ public partial class PageSetupUpdate
         if (isCancelled)
         {
             ModAnimation.AniControlEnabled += 1;
-            ComboSystemUpdateChannel.SelectedItem = e.RemovedItems[0];
+            if (e.RemovedItems.Count > 0)
+                ComboSystemUpdateChannel.SelectedItem = e.RemovedItems[0];
             ModAnimation.AniControlEnabled -= 1;
         }
         else
