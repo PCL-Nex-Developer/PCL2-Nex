@@ -1900,6 +1900,7 @@ public partial class FormMain
                         if (ModMain.frmInstanceSavesLeft is null)
                             ModMain.frmInstanceSavesLeft = new PageInstanceSavesLeft();
                         PageInstanceSavesLeft.currentSave = stack.additional.Value.SavePath;
+                        subType = ModMain.frmInstanceSavesLeft.pageID;
                         PageChangeAnim(ModMain.frmInstanceSavesLeft,
                             (FrameworkElement)ModMain.frmInstanceSavesLeft.PageGet(subType));
                         break;
