@@ -1448,10 +1448,9 @@ public static class ModDownloadLib
                 Directory.CreateDirectory(versionFolder);
                 var versionJson = new JsonObject();
                 versionJson.Add("id", versionName);
-                versionJson.Add("time",
-                    DateTime.ParseExact(downloadInfo.ReleaseTime, "yyyy/MM/dd HH:mm", CultureInfo.InvariantCulture));
-                versionJson.Add("releaseTime",
-                    DateTime.ParseExact(downloadInfo.ReleaseTime, "yyyy/MM/dd HH:mm", CultureInfo.InvariantCulture));
+                var releaseDate = DateTime.Parse(downloadInfo.ReleaseTime, Lang.Culture);
+                versionJson.Add("time", releaseDate);
+                versionJson.Add("releaseTime", releaseDate);
                 versionJson.Add("type", "release");
                 versionJson.Add("arguments",
                     (JsonNode)ModBase.GetJson("{\"game\":[\"--tweakClass\",\"" + downloadInfo.jsonToken["tweakClass"] +
