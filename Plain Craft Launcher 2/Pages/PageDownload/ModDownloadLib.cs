@@ -591,13 +591,19 @@ public static class ModDownloadLib
 
     #region OptiFine 下载
 
+    private static bool McDownloadOptiFineUsesInstaller(string minecraftVersion)
+    {
+        return minecraftVersion.Contains("w", StringComparison.OrdinalIgnoreCase) ||
+               McVersionClassifier.VersionToDrop(minecraftVersion, true) >= 140;
+    }
+
     public static void McDownloadOptiFine(ModDownload.DlOptiFineListEntry downloadInfo)
     {
         try
         {
             var id = downloadInfo.NameVersion;
             var versionFolder = Path.Combine(ModFolder.mcFolderSelected, "versions", id);
-            var isNewVersion = ModBase.Val(downloadInfo.Inherit.Split(".")[1]) >= 14d;
+            var isNewVersion = McDownloadOptiFineUsesInstaller(downloadInfo.Inherit);
             var target = isNewVersion
                 ? Path.Combine(ModBase.pathTemp, "Cache", "Code", downloadInfo.NameVersion + "_" + ModBase.GetUuid())
                 : Path.Combine(ModFolder.mcFolderSelected, "libraries", "optifine", "OptiFine",
@@ -858,7 +864,7 @@ public static class ModDownloadLib
         var isCustomFolder = (mcFolder ?? "") != (ModFolder.mcFolderSelected ?? "");
         var id = downloadInfo.NameVersion;
         var versionFolder = Path.Combine(mcFolder, "versions", id);
-        var isNewVersion = downloadInfo.Inherit.Contains("w") || ModBase.Val(downloadInfo.Inherit.Split(".")[1]) >= 14d;
+        var isNewVersion = McDownloadOptiFineUsesInstaller(downloadInfo.Inherit);
         var target = isNewVersion
             ? $"{ModMain.RequestTaskTempFolder()}OptiFine.jar"
             : $@"{mcFolder}libraries\optifine\OptiFine\{downloadInfo.NameFile.Replace("OptiFine_", "").Replace(".jar", "").Replace("preview_", "")}\{downloadInfo.NameFile.Replace("OptiFine_", "OptiFine-").Replace("preview_", "")}";

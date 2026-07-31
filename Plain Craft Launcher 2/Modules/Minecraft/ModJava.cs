@@ -40,7 +40,10 @@ public static class ModJava
         // 版本范围验证函数（安全处理 null 边界）
         bool IsVersionSuitable(Version ver)
         {
-            return (minVersion is null || ver >= minVersion) && (maxVersion is null || ver <= maxVersion);
+            return JavaManager.IsVersionSuitable(
+                ver,
+                minVersion ?? new Version(0, 0, 0),
+                maxVersion ?? new Version(999, 999, 999));
         }
 
         // ===== 优先级 1：实例专属 Java 偏好 =====
