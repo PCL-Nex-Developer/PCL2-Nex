@@ -586,7 +586,7 @@ public partial class PageInstanceExport : IRefreshable
             TextExportName.Text = ini.GetOrDefault("Name", "");
             TextExportVersion.Text = ini.GetOrDefault("Version", "");
             CheckOptionsPcl.Checked =
-                Convert.ToBoolean(ini.GetOrDefault("IncludeLauncher", true.ToString()));
+                Convert.ToBoolean(ini.GetOrDefault("IncludeLauncher", false.ToString()));
             CheckOptionsPclCustom.Checked =
                 Convert.ToBoolean(ini.GetOrDefault("IncludeLauncherCustom", true.ToString()));
             CheckAdvancedModrinth.Checked =
