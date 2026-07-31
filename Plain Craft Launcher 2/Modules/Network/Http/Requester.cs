@@ -147,14 +147,16 @@ public static class Requester
     public static DownloadService CreateDownloadService(string url, bool useBrowserUserAgent = false)
     {
         var requestUrl = GitHubAccelerator.RewriteByConfig(RequestSigning.SecretCdnSign(url));
+        var chunkCount = Math.Min(Math.Max(1, ModNet.NetTaskThreadLimit), 4);
         return new DownloadService(new DownloadConfiguration
         {
-            ChunkCount = Math.Max(1, ModNet.NetTaskThreadLimit),
-            ParallelCount = Math.Max(1, ModNet.NetTaskThreadLimit),
-            ParallelDownload = ModNet.NetTaskThreadLimit > 1,
+            ChunkCount = chunkCount,
+            ParallelCount = chunkCount,
+            ParallelDownload = chunkCount > 1,
             MaximumBytesPerSecond = ModNet.NetTaskSpeedLimitHigh > 0 ? ModNet.NetTaskSpeedLimitHigh : 0,
             DownloadFileExtension = ModNet.netDownloadEnd,
             EnableAutoResumeDownload = false,
+            MaximumMemoryBufferBytes = 256L * 1024 * 1024,
             RequestConfiguration = DownloadRequestFactory.Create(requestUrl, useBrowserUserAgent)
         });
     }

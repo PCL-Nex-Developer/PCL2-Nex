@@ -320,8 +320,7 @@ public partial class MySkin
                 ModBase.WriteIni(ModBase.pathTemp + @"Cache\Skin\IndexMs.ini", ModProfile.selectedProfile.Uuid,
                     skinAddress);
                 ModBase.Log($"[Skin] 已写入皮肤地址缓存 {ModProfile.selectedProfile.Uuid} -> {skinAddress}");
-                foreach (var SkinLoader in new[] { PageLaunchLeft.skinMs, PageLaunchLeft.skinLegacy })
-                    SkinLoader.WaitForExit(isForceRestart: true);
+                PageLaunchLeft.skinMs.WaitForExit(isForceRestart: true);
                 HintService.Hint(Lang.Text("Launch.Skin.ChangeSuccess"), HintType.Success);
             }
             catch (Exception ex)
