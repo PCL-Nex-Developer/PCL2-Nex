@@ -1657,6 +1657,8 @@
     <sys:String x:Key="Setup.Launch.Advanced.DisableLwjglUnsafeAgent.ToolTip">Minecraft 26.1 uses LWJGL 3.4.1, which uses the FFM API to access native memory on JDK 25+. Due to JDK optimization limitations, this may cause severe performance issues in some cases.&#x0a;PCL uses LWJGL Unsafe Agent to fix this issue and avoid possible performance problems.&#x0a;There is generally no need to disable this option, but if you encounter additional issues, you can try temporarily disabling it for troubleshooting.&#x0a;&#x0a;This feature only takes effect when the LWJGL version is 3.4.1.</sys:String>
     <sys:String x:Key="Setup.Launch.Advanced.DisableCrashAnalysis">Disable automatic crash analysis</sys:String>
     <sys:String x:Key="Setup.Launch.Advanced.DisableCrashAnalysis.ToolTip">When enabled, the crash analysis page will no longer automatically appear when the game crashes.</sys:String>
+    <sys:String x:Key="Setup.Launch.Advanced.LockMemory">Lock memory allocation (-Xms = -Xmx)</sys:String>
+    <sys:String x:Key="Setup.Launch.Advanced.LockMemory.ToolTip">When enabled, the launcher additionally appends -Xms equal to the maximum heap (-Xmx), fixing the heap size. This implicitly disables heap memory uncommit, reducing latency jitter caused by the OS unmapping and remapping memory pages, and helps ZGC's collection prediction. The trade-off is that the game holds close to the maximum allocated memory for its entire runtime.</sys:String>
     <sys:String x:Key="Setup.Launch.Advanced.MoreInInstanceSetup">You can find more advanced launch options in instance settings.</sys:String>
 
     <!-- Setup.Launch.Misc -->
