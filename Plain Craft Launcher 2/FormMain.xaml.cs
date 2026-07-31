@@ -294,6 +294,14 @@ public partial class FormMain
         // 输出更新日志
         if (lastVersion is null) return;
         ShowUpdateLog();
+
+        // 重置自定义主页配置（预设序号因增删项发生变化；对应 CE versionCode < 521）
+        if (lastVersion < LauncherBaseVersion.Parse("2026.07.9") &&
+            Config.Preference.Homepage.SelectedPreset >= 3)
+        {
+            Config.Preference.Homepage.SelectedPreset = 0;
+            ModMain.MyMsgBox(Lang.Text("Main.HomepageReset.Content"), Lang.Text("Main.HomepageReset.Title"));
+        }
     }
 
     private void DowngradeSub(LauncherBaseVersion lastVersion)

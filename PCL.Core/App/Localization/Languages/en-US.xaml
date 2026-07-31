@@ -157,6 +157,8 @@
 
     <sys:String x:Key="Main.UpdateLog.Empty">Welcome!</sys:String>
     <sys:String x:Key="Main.UpdateLog.Title">PCL Nex has been updated to {0}</sys:String>
+    <sys:String x:Key="Main.HomepageReset.Title">Homepage preset setting has been reset</sys:String>
+    <sys:String x:Key="Main.HomepageReset.Content">The homepage preset setting has been reset due to the launcher update.&#xA;Please go to Settings - Personalization and select the preset again.</sys:String>
     <sys:String x:Key="Main.UpdateLog.FullChangelog">Full changelog</sys:String>
     <sys:String x:Key="Main.DebugMode.Hint">[Debug mode] PCL is running in debug mode, which may cause performance degradation. Please do NOT enable it unless necessary!</sys:String>
     <sys:String x:Key="Main.SpecialVersion.DebugHint">The current PCL Nex build is a Debug build.&#x0a;This build is only intended for developer debugging and may have serious performance issues or various unexpected network problems.&#x0a;&#x0a;Problems caused by non-developer users running this build are not supported by the community, and related issues may be closed directly.&#x0a;Unless you are a developer, please delete this build immediately and use the latest stable version instead.</sys:String>
@@ -1508,6 +1510,10 @@
     <sys:String x:Key="Setup.Ui.Homepage.Preset.Magazine">Magazine Homepage (Author: CreeperIsASpy)</sys:String>
     <sys:String x:Key="Setup.Ui.Homepage.Preset.GitHub">PCL GitHub Dashboard (Author: Deep-Dark-Forest)</sys:String>
     <sys:String x:Key="Setup.Ui.Homepage.Preset.McUpdateSummary">Minecraft Update Summary (Author: pynickle, partially AI-generated)</sys:String>
+    <sys:String x:Key="Setup.Ui.Homepage.Preset.NewsToday">News Today (Author: EYicheng)</sys:String>
+    <sys:String x:Key="Setup.Ui.Homepage.Preset.MinecraftKnowledge">Minecraft Knowledge (Author: awaEric233)</sys:String>
+    <sys:String x:Key="Setup.Ui.Homepage.Preset.ModpackRecommendation">Modpack Recommendation Engine (Author: CHMYGZ)</sys:String>
+    <sys:String x:Key="Setup.Ui.Homepage.Preset.Bangumi">Bangumi Anime (Author: wzyaeu)</sys:String>
     <sys:String x:Key="Setup.Ui.Homepage.Preset.PclAnnouncement">PCL Nex Announcements</sys:String>
     <sys:String x:Key="Setup.Ui.Homepage.Preset.McOfficialFeed">Minecraft Official Feed</sys:String>
     <sys:String x:Key="Setup.Ui.Homepage.HintReferToModSetup">See ModSetup</sys:String>
