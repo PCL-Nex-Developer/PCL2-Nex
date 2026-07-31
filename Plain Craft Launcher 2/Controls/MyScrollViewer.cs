@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using PCL.Core.UI.Controls;
 
 namespace PCL;
@@ -36,6 +37,9 @@ public class MyScrollViewer : ScrollViewer
                 case TextBox { AcceptsReturn: true }:
                 case ComboBoxItem:
                 case CheckBox:
+                    return;
+                case Visual visual when PresentationSource.FromVisual(visual)?.RootVisual?.GetType().FullName
+                    == "System.Windows.Controls.Primitives.PopupRoot":
                     return;
             }
         }

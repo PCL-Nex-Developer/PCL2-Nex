@@ -193,6 +193,8 @@ public class JavaManager
                  !isUsable);
     }
 
+    private const int PreferredJavaMajor = 21;
+
     public List<JavaEntry> GetSortedJavaList()
     {
         List<JavaEntry> ret;
@@ -200,11 +202,13 @@ public class JavaManager
             ret = _javaEntrys.Values.ToList();
         ret.Sort((a, b) =>
         {
-            var versionCmp = a.Installation.Version.CompareTo(b.Installation.Version);
+            var distCmp = Math.Abs(a.Installation.MajorVersion - PreferredJavaMajor)
+                .CompareTo(Math.Abs(b.Installation.MajorVersion - PreferredJavaMajor));
+            if (distCmp != 0) return distCmp;
+            var versionCmp = b.Installation.Version.CompareTo(a.Installation.Version);
             if (versionCmp != 0) return versionCmp;
             return a.Installation.Brand - b.Installation.Brand;
         });
-        ret.Reverse();
         return ret;
     }
 
@@ -321,10 +325,10 @@ public class JavaManager
                 .Values.ToList()
                 .Where(j => j.Installation.IsStillAvailable && j.IsEnabled &&
                             IsVersionSuitable(j.Installation.Version, minVersion, maxVersion))
-                .OrderBy(static j => j.Installation.MajorVersion) // 确保首要选择的大版本正确
-                .ThenBy(static j => j.Installation.IsJre) // JDK 优先
-                .ThenBy(static j => j.Installation.Brand) // Java 发行版优选
-                .ThenByDescending(static j => j.Installation.Version) // 优选后小版本号较高的版本
+                .OrderBy(static j => Math.Abs(j.Installation.MajorVersion - PreferredJavaMajor))
+                .ThenBy(static j => j.Installation.IsJre)
+                .ThenBy(static j => j.Installation.Brand)
+                .ThenByDescending(static j => j.Installation.Version)
                 .ToArray());
         }
     }
