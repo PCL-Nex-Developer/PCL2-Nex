@@ -314,6 +314,7 @@
     <sys:String x:Key="Launch.Account.Profile.Created">档案新建成功！</sys:String>
     <sys:String x:Key="Launch.Account.Profile.SelectHint">选择一个档案以启动游戏</sys:String>
     <sys:String x:Key="Launch.Account.Profile.CreateAndSelectHint">新建并选择一个档案以启动游戏</sys:String>
+    <sys:String x:Key="Launch.Account.Profile.RequireMicrosoftHint">需要先进行一次正版验证才能使用其他验证方式</sys:String>
     <sys:String x:Key="Launch.Account.Profile.Create">新建档案</sys:String>
     <sys:String x:Key="Launch.Account.Profile.ImportExport">导入 / 导出</sys:String>
     <sys:String x:Key="Launch.Account.Profile.ChangeUuid">更改 UUID</sys:String>
