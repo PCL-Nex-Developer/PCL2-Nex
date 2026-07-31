@@ -1398,7 +1398,6 @@ public partial class FormMain
         DownloadNeoForge = 12,
         DownloadCleanroom = 13,
         DownloadFabric = 14,
-        DownloadQuilt = 15,
         DownloadLiteLoader = 16,
         DownloadLabyMod = 17,
         DownloadLegacyFabric = 18,
