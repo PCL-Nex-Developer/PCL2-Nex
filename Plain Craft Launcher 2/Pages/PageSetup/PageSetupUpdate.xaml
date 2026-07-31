@@ -139,7 +139,7 @@
                                Height="50" Width="50" HorizontalAlignment="Left" VerticalAlignment="Center" />
                         <TextBlock x:Name="TextOptionalUpdateName" Text="AquaCL 3.0.1" FontWeight="Bold" FontSize="20"
                                    Grid.Row="0" Grid.Column="2" HorizontalAlignment="Left" VerticalAlignment="Bottom" />
-                        <TextBlock x:Name="TextOptionalUpdateDesc" Text="20.0 MB" FontSize="14" Grid.Row="2"
+                        <TextBlock x:Name="TextOptionalUpdateDesc" Text="20.0 MiB" FontSize="14" Grid.Row="2"
                                    Grid.Column="2" HorizontalAlignment="Left" VerticalAlignment="Top" />
                         <local:MyButton x:Name="BtnOptionalUpdate" Text="{DynamicResource Setup.Update.Install}" ColorType="Highlight" Grid.Row="0"
                                         Grid.RowSpan="2" Grid.Column="3" HorizontalAlignment="Stretch"
