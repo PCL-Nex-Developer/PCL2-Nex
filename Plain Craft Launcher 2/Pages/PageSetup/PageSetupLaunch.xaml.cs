@@ -507,7 +507,8 @@ public partial class PageSetupLaunch
                     Lang.Text("Setup.Launch.Visibility.CloseImmediately.Warning.Message"),
                     Lang.Text("Setup.Launch.Visibility.CloseImmediately.Warning.Title"),
                     Lang.Text("Setup.Launch.Visibility.CloseImmediately.Warning.Continue"),
-                    Lang.Text("Common.Action.Cancel")) == 2)
+                    Lang.Text("Common.Action.Cancel")) == 2 &&
+                sizeChangedEventArgs.RemovedItems.Count > 0)
                 ComboArgumentVisibie.SelectedItem = sizeChangedEventArgs.RemovedItems[0];
     }
 
@@ -555,7 +556,9 @@ public partial class PageSetupLaunch
                     Lang.Text("Setup.Launch.Advanced.Renderer.Warning.Confirm"),
                     Lang.Text("Common.Action.Cancel"), isWarn: true) == 2)
             {
-                ComboAdvanceRenderer.SelectedItem = ((SelectionChangedEventArgs)e).RemovedItems[0];
+                var args = (SelectionChangedEventArgs)e;
+                if (args.RemovedItems.Count > 0)
+                    ComboAdvanceRenderer.SelectedItem = args.RemovedItems[0];
             }
             else
             {

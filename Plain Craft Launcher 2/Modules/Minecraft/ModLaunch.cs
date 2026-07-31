@@ -531,8 +531,8 @@ public static class ModLaunch
 
         public override int GetHashCode()
         {
-            return (int)Math.Round(ModBase.GetHash(OAuthRefreshToken + AccessToken + Uuid + UserName + ProfileJson) %
-                                   (decimal)int.MaxValue);
+            // 上游 c6d04579：登录过程中 AccessToken/Uuid/ProfileJson 会变，不能参与身份哈希
+            return (int)Math.Round(ModBase.GetHash(OAuthRefreshToken + UserName) % (decimal)int.MaxValue);
         }
     }
 
@@ -1203,6 +1203,12 @@ public static class ModLaunch
             {
                 ModBase.Log(ex, "正版验证 Step 4 汇报 403");
                 throw new Exception(Lang.Text("Minecraft.Launch.Login.Microsoft.AbnormalIp"));
+            }
+
+            if (ex.StatusCode == HttpStatusCode.ServiceUnavailable)
+            {
+                ModBase.Log(ex, "正版验证 Step 4 汇报 503");
+                throw new Exception(Lang.Text("Minecraft.Launch.Login.Microsoft.ServiceUnavailable"));
             }
 
             ModProfile.ProfileLog("正版验证 Step 4/6 获取 MC AccessToken 失败：" + ex);

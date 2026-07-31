@@ -266,7 +266,8 @@ public partial class PageSetupLauncherMisc
                 Lang.Text("Common.Dialog.Warning"),
                 Lang.Text("Setup.Misc.System.Announcement.Disabled.Warning.Confirm"),
                 Lang.Text("Common.Action.Cancel"), isWarn: true) ==
-            2) ComboSystemActivity.SelectedItem = e.RemovedItems[0];
+            2 && e.RemovedItems.Count > 0)
+            ComboSystemActivity.SelectedItem = e.RemovedItems[0];
     }
 
     private void CheckDebugMode_OnChange(object sender, bool user)

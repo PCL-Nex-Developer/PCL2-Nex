@@ -951,7 +951,8 @@ public partial class PageInstanceSetup
                 Lang.Text("Common.Dialog.Warning"), Lang.Text("Setup.Launch.Advanced.Renderer.Warning.Confirm"), Lang.Text("Common.Action.Cancel"), isWarn: true) == 2)
         {
             isReverting = true;
-            ComboArgumentIndieV2.SelectedItem = e.RemovedItems[0];
+            if (e.RemovedItems.Count > 0)
+                ComboArgumentIndieV2.SelectedItem = e.RemovedItems[0];
             isReverting = false;
         }
         else
@@ -997,7 +998,8 @@ public partial class PageInstanceSetup
                     Lang.Text("Common.Dialog.Warning"),
                     Lang.Text("Setup.Launch.Advanced.Renderer.Warning.Confirm"), Lang.Text("Common.Action.Cancel"), isWarn: true) == 2)
             {
-                ComboAdvanceRenderer.SelectedItem = args.RemovedItems[0];
+                if (args.RemovedItems.Count > 0)
+                    ComboAdvanceRenderer.SelectedItem = args.RemovedItems[0];
             }
             else
             {
