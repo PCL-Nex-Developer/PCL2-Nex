@@ -314,6 +314,7 @@
     <sys:String x:Key="Launch.Account.Profile.Created">Profile created!</sys:String>
     <sys:String x:Key="Launch.Account.Profile.SelectHint">Select a profile before launching the game</sys:String>
     <sys:String x:Key="Launch.Account.Profile.CreateAndSelectHint">Create and select a profile before launching the game</sys:String>
+    <sys:String x:Key="Launch.Account.Profile.RequireMicrosoftHint">A Microsoft profile is required to create profiles using other login types</sys:String>
     <sys:String x:Key="Launch.Account.Profile.Create">New profile</sys:String>
     <sys:String x:Key="Launch.Account.Profile.ImportExport">Import / Export</sys:String>
     <sys:String x:Key="Launch.Account.Profile.ChangeUuid">Change UUID</sys:String>
