@@ -291,20 +291,7 @@ namespace PCL;
         /// </summary>
         public static int VersionToDrop(string? version, bool allowSnapshot = false)
         {
-            if (!allowSnapshot && version.Contains("-"))
-                return 0;
-            if (version is null)
-                return 0;
-            var segments = version.BeforeFirst("-").Split(".");
-            if (segments.Length < 2)
-                return 0;
-            var major = (int)Math.Round(ModBase.Val(segments[0]));
-            var minor = (int)Math.Round(ModBase.Val(segments[1]));
-            if (major == 1) return minor * 10;
-
-            if (major < 25) return 0;
-
-            return major * 10 + minor;
+            return McVersionClassifier.VersionToDrop(version, allowSnapshot);
         }
 
         /// <summary>

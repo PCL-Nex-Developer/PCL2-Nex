@@ -11,6 +11,7 @@ using System.Windows;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
 using PCL.Core.Minecraft;
+using PCL.Core.Minecraft.Java;
 using PCL.Core.Minecraft.Launch.Utils;
 using PCL.Core.Utils;
 using PCL.Core.Utils.OS;
@@ -1791,67 +1792,69 @@ public static class ModLaunch
         var minVer = new Version(0, 0, 0, 0);
         var maxVer = new Version(999, 999, 999, 999);
 
-        // MC 大版本检测
-        if ((!ModInstanceList.McMcInstanceSelected.Info.Valid &&
-             ModInstanceList.McMcInstanceSelected.releaseTime >= new DateTime(2024, 4, 2)) ||
-            (ModInstanceList.McMcInstanceSelected.Info.Valid &&
-             ModInstanceList.McMcInstanceSelected.Info.vanilla >= new Version(20, 0, 5)))
+        void RequireAtLeast(Version version)
         {
-            // 1.20.5+ (24w14a+)：至少 Java 21
-            if (ModBase.modeDebug)
-                ModBase.Log("[Launch] [Debug] MC 1.20.5+ (24w14a+) 要求至少 Java 21");
-            minVer = new Version(21, 0, 0, 0);
-        }
-        else if ((!ModInstanceList.McMcInstanceSelected.Info.Valid &&
-                  ModInstanceList.McMcInstanceSelected.releaseTime >= new DateTime(2021, 11, 16)) ||
-                 (ModInstanceList.McMcInstanceSelected.Info.Valid &&
-                  ModInstanceList.McMcInstanceSelected.Info.vanilla.Major >= 18))
-        {
-            // 1.18 pre2+：至少 Java 17
-            if (ModBase.modeDebug)
-                ModBase.Log("[Launch] [Debug] MC 1.18 pre2+ 要求至少 Java 17");
-            minVer = new Version(17, 0, 0, 0);
-        }
-        else if ((!ModInstanceList.McMcInstanceSelected.Info.Valid &&
-                  ModInstanceList.McMcInstanceSelected.releaseTime >= new DateTime(2021, 5, 11)) ||
-                 (ModInstanceList.McMcInstanceSelected.Info.Valid &&
-                  ModInstanceList.McMcInstanceSelected.Info.vanilla.Major >= 17))
-        {
-            // 1.17+ (21w19a+)：至少 Java 16
-            if (ModBase.modeDebug)
-                ModBase.Log("[Launch] [Debug] MC 1.17+ (21w19a+) 要求至少 Java 16");
-            minVer = new Version(16, 0, 0, 0);
-        }
-        else if (ModInstanceList.McMcInstanceSelected.releaseTime.Year >= 2017) // Minecraft 1.12 与 1.11 的分界线正好是 2017 年，太棒了
-        {
-            // 1.12+：至少 Java 8
-            if (ModBase.modeDebug)
-                ModBase.Log("[Launch] [Debug] MC 1.12+ 要求至少 Java 8");
-            minVer = new Version(1, 8, 0, 0);
-        }
-        else if (ModInstanceList.McMcInstanceSelected.releaseTime <= new DateTime(2013, 5, 1) &&
-                 ModInstanceList.McMcInstanceSelected.releaseTime.Year >= 2001) // 避免某些版本写个 1960 年
-        {
-            // 1.5.2-：最高 Java 8
-            if (ModBase.modeDebug)
-                ModBase.Log("[Launch] [Debug] MC 1.5.2- 要求最高 Java 12");
-            maxVer = new Version(1, 8, 999, 999);
+            if (JavaManager.NormalizeVersion(version) > JavaManager.NormalizeVersion(minVer))
+                minVer = version;
         }
 
-        // 原版 26+：获取 Mojang 要求的 Java 版本
-        string recommendedComponent = null;
-        var recommendedCode =
-            ModInstanceList.McMcInstanceSelected.JsonObject?["javaVersion"]?["majorVersion"]?.ToObject<int>() ??
-            ModInstanceList.McMcInstanceSelected.JsonVersion?["java_version"]?.ToObject<int>() ?? 0;
-        if (recommendedCode >= 22)
+        void RequireAtMost(Version version)
         {
-            McLaunchLog("Mojang 要求至少使用 Java " + recommendedCode);
-            minVer = new Version(1, recommendedCode, 0, 0);
-            recommendedComponent =
-                ModInstanceList.McMcInstanceSelected.JsonObject?["javaVersion"]?["component"]?.ToString() ??
-                ModInstanceList.McMcInstanceSelected.JsonVersion?["java_component"]?.ToString();
-            if (string.IsNullOrEmpty(recommendedComponent))
-                recommendedComponent = null;
+            if (JavaManager.NormalizeVersion(version) < JavaManager.NormalizeVersion(maxVer))
+                maxVer = version;
+        }
+
+        // 优先使用版本 JSON 中由 Mojang 声明的 Java 需求。
+        var javaRequirement =
+            JavaRuntimeRequirement.FromVersionJson(ModInstanceList.McMcInstanceSelected.JsonObject) ??
+            JavaRuntimeRequirement.FromVersionJson(ModInstanceList.McMcInstanceSelected.JsonVersion);
+        var recommendedComponent = javaRequirement?.Component;
+        if (javaRequirement is not null)
+        {
+            minVer = javaRequirement.MinimumVersion;
+            McLaunchLog($"版本 JSON 要求至少使用 Java {javaRequirement.MajorVersion}" +
+                        (recommendedComponent is null ? "" : $"（{recommendedComponent}）"));
+        }
+        else
+        {
+            if (ModBase.modeDebug)
+                ModBase.Log("[Launch] [Debug] 版本 JSON 未声明 Java 需求，使用旧版兼容规则");
+
+            if ((!ModInstanceList.McMcInstanceSelected.Info.Valid &&
+                 ModInstanceList.McMcInstanceSelected.releaseTime >= new DateTime(2024, 4, 2)) ||
+                (ModInstanceList.McMcInstanceSelected.Info.Valid &&
+                 ModInstanceList.McMcInstanceSelected.Info.vanilla >= new Version(20, 0, 5)))
+            {
+                // 1.20.5+ (24w14a+)：至少 Java 21
+                minVer = new Version(21, 0, 0, 0);
+            }
+            else if ((!ModInstanceList.McMcInstanceSelected.Info.Valid &&
+                      ModInstanceList.McMcInstanceSelected.releaseTime >= new DateTime(2021, 11, 16)) ||
+                     (ModInstanceList.McMcInstanceSelected.Info.Valid &&
+                      ModInstanceList.McMcInstanceSelected.Info.vanilla.Major >= 18))
+            {
+                // 1.18 pre2+：至少 Java 17
+                minVer = new Version(17, 0, 0, 0);
+            }
+            else if ((!ModInstanceList.McMcInstanceSelected.Info.Valid &&
+                      ModInstanceList.McMcInstanceSelected.releaseTime >= new DateTime(2021, 5, 11)) ||
+                     (ModInstanceList.McMcInstanceSelected.Info.Valid &&
+                      ModInstanceList.McMcInstanceSelected.Info.vanilla.Major >= 17))
+            {
+                // 1.17+ (21w19a+)：至少 Java 16
+                minVer = new Version(16, 0, 0, 0);
+            }
+            else if (ModInstanceList.McMcInstanceSelected.releaseTime.Year >= 2017) // Minecraft 1.12 与 1.11 的分界线正好是 2017 年
+            {
+                // 1.12+：至少 Java 8
+                minVer = new Version(1, 8, 0, 0);
+            }
+            else if (ModInstanceList.McMcInstanceSelected.releaseTime <= new DateTime(2013, 5, 1) &&
+                     ModInstanceList.McMcInstanceSelected.releaseTime.Year >= 2001) // 避免某些版本写个 1960 年
+            {
+                // 1.5.2-：最高 Java 8
+                maxVer = new Version(1, 8, 999, 999);
+            }
         }
 
         // OptiFine 检测
@@ -1860,19 +1863,19 @@ public static class ModLaunch
             if (ModInstanceList.McMcInstanceSelected.Info.vanilla.Major < 7)
             {
                 // <1.7：至多 Java 8
-                maxVer = new Version(1, 8, 999, 999);
+                RequireAtMost(new Version(1, 8, 999, 999));
             }
             else if (ModInstanceList.McMcInstanceSelected.Info.vanilla.Major >= 8 &&
                      ModInstanceList.McMcInstanceSelected.Info.vanilla.Major < 12)
             {
                 // 1.8 - 1.11：必须恰好 Java 8
-                minVer = new Version(1, 8, 0, 0);
-                maxVer = new Version(1, 8, 999, 999);
+                RequireAtLeast(new Version(1, 8, 0, 0));
+                RequireAtMost(new Version(1, 8, 999, 999));
             }
             else if (ModInstanceList.McMcInstanceSelected.Info.vanilla.Major == 12)
             {
                 // 1.12：最高 Java 8
-                maxVer = new Version(1, 8, 999, 999);
+                RequireAtMost(new Version(1, 8, 999, 999));
             }
         }
 
@@ -1883,39 +1886,39 @@ public static class ModLaunch
                 ModInstanceList.McMcInstanceSelected.Info.vanilla <= new Version(7, 0, 2))
             {
                 // 1.6.1 - 1.7.2：必须 Java 7
-                minVer = new Version(1, 7, 0, 0) > minVer ? new Version(1, 7, 0, 0) : minVer;
-                maxVer = new Version(1, 7, 999, 999) < maxVer ? new Version(1, 7, 999, 999) : maxVer;
+                RequireAtLeast(new Version(1, 7, 0, 0));
+                RequireAtMost(new Version(1, 7, 999, 999));
             }
             else if (ModInstanceList.McMcInstanceSelected.Info.vanilla.Major <= 12 ||
                      !ModInstanceList.McMcInstanceSelected.Info.Valid) // 非标准版本
             {
                 // <=1.12：Java 8
-                maxVer = new Version(1, 8, 999, 999);
+                RequireAtMost(new Version(1, 8, 999, 999));
             }
             else if (ModInstanceList.McMcInstanceSelected.Info.vanilla.Major <= 14)
             {
                 // 1.13 - 1.14：Java 8 - 10
-                minVer = new Version(1, 8, 0, 0) > minVer ? new Version(1, 8, 0, 0) : minVer;
-                maxVer = new Version(1, 10, 999, 999) < maxVer ? new Version(1, 10, 999, 999) : maxVer;
+                RequireAtLeast(new Version(1, 8, 0, 0));
+                RequireAtMost(new Version(1, 10, 999, 999));
             }
             else if (ModInstanceList.McMcInstanceSelected.Info.vanilla.Major == 15)
             {
                 // 1.15：Java 8 - 15
-                minVer = new Version(1, 8, 0, 0) > minVer ? new Version(1, 8, 0, 0) : minVer;
-                maxVer = new Version(1, 15, 999, 999) < maxVer ? new Version(1, 15, 999, 999) : maxVer;
+                RequireAtLeast(new Version(1, 8, 0, 0));
+                RequireAtMost(new Version(1, 15, 999, 999));
             }
             else if (McVersionComparer.CompareVersionGe(ModInstanceList.McMcInstanceSelected.Info.Forge, "34.0.0") &&
                      McVersionComparer.CompareVersionGe("36.2.25", ModInstanceList.McMcInstanceSelected.Info.Forge))
             {
                 // 1.16，Forge 34.X ~ 36.2.25：最高 Java 8u321
-                maxVer = new Version(1, 8, 0, 320) < maxVer ? new Version(1, 8, 0, 321) : maxVer;
+                RequireAtMost(new Version(1, 8, 0, 321));
             }
             else if (ModInstanceList.McMcInstanceSelected.Info.vanilla.Major >= 18 &&
                      ModInstanceList.McMcInstanceSelected.Info.vanilla.Major < 19 &&
                      ModInstanceList.McMcInstanceSelected.Info.HasOptiFine) // #305
             {
                 // 1.18：若安装了 OptiFine，最高 Java 18
-                maxVer = new Version(1, 18, 999, 999) < maxVer ? new Version(1, 18, 999, 999) : maxVer;
+                RequireAtMost(new Version(1, 18, 999, 999));
             }
         }
 
@@ -1927,12 +1930,12 @@ public static class ModLaunch
             if (cleanroomVersion < new Version(0, 5, 0, 0))
             {
                 if (ModBase.modeDebug) ModBase.Log("[Launch] [Debug] Cleanroom 版本低于 0.5，要求至少 Java 21");
-                minVer = new Version(21, 0, 0, 0) > minVer ? new Version(21, 0, 0, 0) : minVer;
+                RequireAtLeast(new Version(21, 0, 0, 0));
             }
             else
             {
                 if (ModBase.modeDebug) ModBase.Log("[Launch] [Debug] Cleanroom 版本高于 0.5，要求至少 Java 25");
-                minVer = new Version(25, 0, 0, 0) > minVer ? new Version(25, 0, 0, 0) : minVer;
+                RequireAtLeast(new Version(25, 0, 0, 0));
             }
         }
 
@@ -1942,10 +1945,10 @@ public static class ModLaunch
             if (ModInstanceList.McMcInstanceSelected.Info.vanilla.Major >= 15 &&
                 ModInstanceList.McMcInstanceSelected.Info.vanilla.Major <= 16)
                 // 1.15 - 1.16：Java 8+
-                minVer = new Version(1, 8, 0, 0) > minVer ? new Version(1, 8, 0, 0) : minVer;
+                RequireAtLeast(new Version(1, 8, 0, 0));
             else if (ModInstanceList.McMcInstanceSelected.Info.vanilla.Major >= 18)
                 // 1.18+：Java 17+
-                minVer = new Version(1, 17, 0, 0) > minVer ? new Version(1, 17, 0, 0) : minVer;
+                RequireAtLeast(new Version(1, 17, 0, 0));
         }
 
         // LiteLoader 检测
@@ -1954,7 +1957,7 @@ public static class ModLaunch
             // 最高 Java 8
             if (ModBase.modeDebug)
                 ModBase.Log("[Launch] [Debug] LiteLoader 要求最高 Java 8");
-            maxVer = new Version(8, 999, 999, 999) < maxVer ? new Version(8, 999, 999, 999) : maxVer;
+            RequireAtMost(new Version(8, 999, 999, 999));
         }
 
         // LabyMod 检测
@@ -1962,27 +1965,15 @@ public static class ModLaunch
         {
             if (ModBase.modeDebug)
                 ModBase.Log("[Launch] [Debug] LabyMod 要求至少 Java 21");
-            minVer = new Version(21, 0, 0, 0) > minVer ? new Version(21, 0, 0, 0) : minVer;
+            RequireAtLeast(new Version(21, 0, 0, 0));
             maxVer = new Version(999, 999, 999, 999);
         }
 
-        // JSON 中要求的版本
-        if (ModInstanceList.McMcInstanceSelected.JsonObject["javaVersion"] is not null)
+        if (javaRequirement is not null &&
+            JavaManager.NormalizeVersion(maxVer) < JavaManager.NormalizeVersion(minVer))
         {
-            var majorVersion = ModBase.Val(ModInstanceList.McMcInstanceSelected.JsonObject["javaVersion"]["majorVersion"]);
-            if (ModBase.modeDebug)
-                ModBase.Log("[Launch] [Debug] JSON 中参数要求至少 Java " + majorVersion);
-            if (majorVersion <= 8d)
-                minVer = new Version(1, (int)Math.Round(majorVersion), 0, 0) > minVer
-                    ? new Version(1, (int)Math.Round(majorVersion), 0, 0)
-                    : minVer;
-            else
-                minVer = new Version((int)Math.Round(majorVersion), 0, 0, 0) > minVer
-                    ? new Version((int)Math.Round(majorVersion), 0, 0, 0)
-                    : minVer;
-
-            if (maxVer < minVer)
-                maxVer = new Version(999, 999, 999, 999);
+            ModBase.Log($"[Launch] 加载器 Java 上限 {maxVer} 低于版本 JSON 要求 {minVer}，忽略该上限");
+            maxVer = new Version(999, 999, 999, 999);
         }
 
         lock (ModJava.javaLock)
@@ -2003,11 +1994,13 @@ public static class ModLaunch
                 return; // 中断加载会导致 JavaSelect 异常地返回空值，误判找不到 Java
             McLaunchLog("无合适的 Java，需要确认是否自动下载");
             string javaCode;
-            if (minVer >= new Version(1, 9))
+            var normalizedMinVer = JavaManager.NormalizeVersion(minVer);
+            var normalizedMaxVer = JavaManager.NormalizeVersion(maxVer);
+            if (normalizedMinVer.Major >= 9)
             {
-                javaCode = minVer.Major.ToString();
+                javaCode = normalizedMinVer.Major.ToString();
             }
-            else if (maxVer < new Version(1, 8))
+            else if (normalizedMaxVer.Major < 8)
             {
                 if (ModInstanceList.McMcInstanceSelected.Info.HasForge)
                     ModMain.MyMsgBox(
@@ -2044,7 +2037,10 @@ public static class ModLaunch
             var javaLoader = ModJava.GetJavaDownloadLoader();
             try
             {
-                javaLoader.Start(recommendedComponent ?? javaCode, true); // 在 Java 22+ 时优先使用 Mojang 提供的 Component 字段
+                var downloadTarget = javaRequirement?.MajorVersion == JavaManager.NormalizeVersion(minVer).Major
+                    ? recommendedComponent ?? javaCode
+                    : javaCode;
+                javaLoader.Start(downloadTarget, true);
                 while (javaLoader.State == ModBase.LoadState.Loading && !task.IsAborted)
                 {
                     task.Progress = javaLoader.Progress;

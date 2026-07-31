@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Text.Json.Nodes;
 using PCL.Core.App.Localization;
 using PCL.Core.Utils;
@@ -15,6 +16,32 @@ public enum McVersionCategory
 
 public static class McVersionClassifier
 {
+    public static int VersionToDrop(string? version, bool allowSnapshot = false)
+    {
+        if (string.IsNullOrWhiteSpace(version) || (!allowSnapshot && version.Contains('-')))
+            return 0;
+
+        var segments = version.Split('-', 2)[0].Split('.');
+        if (segments.Length < 2 ||
+            !_TryParseLeadingInteger(segments[0], out var major) ||
+            !_TryParseLeadingInteger(segments[1], out var minor))
+            return 0;
+
+        if (major == 1) return minor * 10;
+        return major >= 25 ? major * 10 + minor : 0;
+    }
+
+    private static bool _TryParseLeadingInteger(string segment, out int value)
+    {
+        value = 0;
+        var length = 0;
+        while (length < segment.Length && char.IsDigit(segment[length]))
+            length++;
+
+        return length > 0 && int.TryParse(segment.AsSpan(0, length), NumberStyles.None,
+            CultureInfo.InvariantCulture, out value);
+    }
+
     public static string GetCategoryDisplayName(McVersionCategory cat)
     {
         return cat switch
