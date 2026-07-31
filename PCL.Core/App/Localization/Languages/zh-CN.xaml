@@ -1805,8 +1805,8 @@
     <sys:String x:Key="Setup.Update.Changelog.Unavailable">没有可用的更新日志...</sys:String>
     <sys:String x:Key="Setup.Update.Changelog.Placeholder">PCL Nex 2.14.0 带来了让人眼前一亮的新设计和 Pigeon 智能的多项功能，同时还带来了令人愉快的跨实例工作方式，助你提高工作效率。</sys:String>
     <sys:String x:Key="Setup.Update.DotNetMissing.Title">启动器更新 - 缺少运行环境</sys:String>
-    <sys:String x:Key="Setup.Update.DotNetMissing.Message">发现了启动器更新（版本 {0}），但是新版本要求你的电脑安装 .NET 8 才可以运行。&#x0a;你需要先安装 .NET 8 才可以继续更新。&#x0a;&#x0a;点击下方按钮打开网页，然后选择 ⌈.NET 桌面运行时⌋ 中的 {1} 选项下载。</sys:String>
-    <sys:String x:Key="Setup.Update.DotNetMissing.DownloadRuntime">下载 .NET 8 运行时</sys:String>
+    <sys:String x:Key="Setup.Update.DotNetMissing.Message">发现了启动器更新（版本 {0}），但是新版本要求你的电脑安装 .NET 10 才可以运行。&#x0a;你需要先安装 .NET 10 才可以继续更新。&#x0a;&#x0a;点击下方按钮打开网页，然后选择 ⌈.NET 桌面运行时⌋ 中的 {1} 选项下载。</sys:String>
+    <sys:String x:Key="Setup.Update.DotNetMissing.DownloadRuntime">下载 .NET 10 运行时</sys:String>
     <sys:String x:Key="Setup.Update.OtherOptions.Title">其他更新选项 - 升级到 AquaCL</sys:String>
     <sys:String x:Key="Setup.Update.OtherOptions.Placeholder">AquaCL 3 是 PCL Nex 的第一个主要更新，带来了让人眼前一亮的新设计，使用了最新开发技术，完全重构了基础体验，并更支持 macOS、Linux 等其他平台。</sys:String>
     <sys:String x:Key="Setup.Update.Error.NetworkFailed">无法获取最新版本信息，请检查网络连接</sys:String>
@@ -4001,6 +4001,31 @@
     <sys:String x:Key="Setup.Ui.Theme.Color.CrashBlue">死机蓝</sys:String>
     <sys:String x:Key="Setup.Ui.Theme.Color.Hmcl">HMCL</sys:String>
     <sys:String x:Key="Setup.Ui.Theme.Color.SkyBlue">天空蓝</sys:String>
+    <sys:String x:Key="Setup.Ui.Theme.Dark">深色</sys:String>
+    <sys:String x:Key="Setup.Ui.Theme.DarkColor">深色配色</sys:String>
+    <sys:String x:Key="Setup.Ui.Theme.DarkColor.ToolTip">在深色模式下默认的主题配色</sys:String>
+    <sys:String x:Key="Setup.Ui.Theme.FollowSystem">跟随系统</sys:String>
+    <sys:String x:Key="Setup.Ui.Theme.Light">浅色</sys:String>
+    <sys:String x:Key="Setup.Ui.Theme.LightColor">浅色配色</sys:String>
+    <sys:String x:Key="Setup.Ui.Theme.Title">主题</sys:String>
+
+    <!-- Setup.Update -->
+
+    <sys:String x:Key="Setup.Update.Changelog.Empty">开发者似乎忘记提供更新摘要了...也许你可以点击下方看看完整更新日志？</sys:String>
+    <sys:String x:Key="Setup.Update.Changelog.MoreInfo">有关此更新的更多信息...</sys:String>
+    <sys:String x:Key="Setup.Update.Changelog.Placeholder">PCL CE 2.14.0 带来了让人眼前一亮的新设计和 Pigeon 智能的多项功能，同时还带来了令人愉快的跨实例工作方式，助你提高工作效率。</sys:String>
+    <sys:String x:Key="Setup.Update.Changelog.Title">关于此更新</sys:String>
+    <sys:String x:Key="Setup.Update.Changelog.Unavailable">没有可用的更新日志...</sys:String>
+    <sys:String x:Key="Setup.Update.Changelog.View">查看更新日志</sys:String>
+    <sys:String x:Key="Setup.Update.CheckAgain">再次检查</sys:String>
+    <sys:String x:Key="Setup.Update.CheckFailed">检查更新时出错</sys:String>
+    <sys:String x:Key="Setup.Update.Checking">正在检查更新...</sys:String>
+    <sys:String x:Key="Setup.Update.DotNetMissing.DownloadRuntime">下载 .NET 10 运行时</sys:String>
+    <sys:String x:Key="Setup.Update.DotNetMissing.Message">发现了启动器更新（版本 {0}），但是新版本要求你的电脑安装 .NET 10 才可以运行。&#xA;你需要先安装 .NET 10 才可以继续更新。&#xA;&#xA;点击下方按钮打开网页，然后选择 ⌈.NET 桌面运行时⌋ 中的 {1} 选项下载。</sys:String>
+    <sys:String x:Key="Setup.Update.DotNetMissing.Title">启动器更新 - 缺少运行环境</sys:String>
+    <sys:String x:Key="Setup.Update.Error.NetworkFailed">无法获取最新版本信息，请检查网络连接</sys:String>
+    <sys:String x:Key="Setup.Update.Install">下载并安装</sys:String>
+    <sys:String x:Key="Setup.Update.Latest">已是最新版本</sys:String>
     <sys:String x:Key="Setup.Update.MirrorChyanCdk.Get">获取 CDK</sys:String>
     <sys:String x:Key="Setup.Update.MirrorChyanCdk.Label">Mirror 酱 CDK</sys:String>
     <sys:String x:Key="Setup.Update.MirrorChyanCdk.ToolTip">Mirror 酱 (mirrorchyan.com) 是一个付费的第三方应用分发平台，用于提供国内有偿高速下载源。&#xA;这是一项可选服务，不填入 CDK 不影响正常使用与更新。&#xA;如果你有 Mirror 酱的 CDK，可以提供给 PCL Nex，启动器会优先使用他们的高速下载源下载软件更新，也能缓解社区公益更新服务器的一些压力……</sys:String>
@@ -4023,7 +4048,20 @@
     <sys:String x:Key="SystemDialog.Folder.OpenFailed.Message">无法打开文件资源管理器。请尝试关闭安全软件（例如 360 安全卫士）。&#xA;&#xA;路径：{0}</sys:String>
     <sys:String x:Key="SystemDialog.Folder.SelectTitle">选择文件夹</sys:String>
     <sys:String x:Key="SystemDialog.Startup.DotNetRuntimeOutdated.Message">你的 .NET 桌面运行时已过期或损坏。请重新安装 .NET 10。</sys:String>
-    <sys:String x:Key="SystemDialog.Startup.InitializationTitle">PCL Nex 初始化失败</sys:String>
+    <sys:String x:Key="SystemDialog.Startup.InitializationTitle">PCL CE 初始化失败</sys:String>
+
+    <!-- SystemDialog.Error -->
+
+    <sys:String x:Key="SystemDialog.Error.Detail.WithException">{0}&#xA;&#xA;详细信息：&#xA;{1}</sys:String>
+    <sys:String x:Key="SystemDialog.Error.Message.WithLogExportGuidance">{0}&#xA;&#xA;若要寻求帮助，请不要关闭启动器。请立即导出日志（设置 → 查看日志 → 导出日志），并发送导出的日志压缩包；仅发送此窗口的截图通常无法帮助定位问题。</sys:String>
+    <sys:String x:Key="SystemDialog.Error.OperationFailed.Message">执行操作时发生错误。&#xA;&#xA;操作信息：&#xA;{0}&#xA;&#xA;详细信息：&#xA;{1}</sys:String>
+    <sys:String x:Key="SystemDialog.Error.OperationFailed.RuntimeMessage">执行操作时发生错误。&#xA;&#xA;操作信息：&#xA;{0}&#xA;&#xA;详细信息：&#xA;{1}&#xA;&#xA;与系统底层交互失败。请尝试重新安装 .NET 10。</sys:String>
+    <sys:String x:Key="SystemDialog.Error.Title">错误</sys:String>
+    <sys:String x:Key="SystemDialog.Error.Unexpected.Message">发生意外错误。</sys:String>
+    <sys:String x:Key="SystemDialog.Error.Unexpected.Title">发生意外错误</sys:String>
+    <sys:String x:Key="SystemDialog.Error.UserVisible.Message">发生错误。&#xA;&#xA;详细信息：&#xA;{0}</sys:String>
+
+    <!-- Tools -->
     <sys:String x:Key="Tools.Error.OperationFailed">工具页操作失败。请查看错误详情。</sys:String>
     <sys:String x:Key="Tools.GameLink.EasyTierVersion">联机双方目前使用的启动器版本不同，这可能会导致一些连接问题&#xA;强烈建议双方升级到最新版本后再继续联机</sys:String>
     <sys:String x:Key="Tools.GameLink.Error.NetworkTestFailed">获取网络测试结果失败。请查看错误详情。</sys:String>
