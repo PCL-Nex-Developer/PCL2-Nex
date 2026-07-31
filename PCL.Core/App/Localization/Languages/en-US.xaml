@@ -1805,8 +1805,8 @@
     <sys:String x:Key="Setup.Update.Changelog.Unavailable">No changelog available...</sys:String>
     <sys:String x:Key="Setup.Update.Changelog.Placeholder">PCL Nex 2.14.0 brings a refreshing new design, several Pigeon smart features, and a delightful cross-instance workflow to boost your productivity.</sys:String>
     <sys:String x:Key="Setup.Update.DotNetMissing.Title">Launcher update - missing runtime</sys:String>
-    <sys:String x:Key="Setup.Update.DotNetMissing.Message">A launcher update (version {0}) was found, but the new version requires .NET 8 to be installed on your computer.&#x0a;You need to install .NET 8 before continuing the update.&#x0a;&#x0a;Click the button below to open the webpage, then select {1} under &quot;.NET Desktop Runtime&quot; to download.</sys:String>
-    <sys:String x:Key="Setup.Update.DotNetMissing.DownloadRuntime">Download .NET 8 Runtime</sys:String>
+    <sys:String x:Key="Setup.Update.DotNetMissing.Message">A launcher update (version {0}) was found, but the new version requires .NET 10 to be installed on your computer.&#x0a;You need to install .NET 10 before continuing the update.&#x0a;&#x0a;Click the button below to open the webpage, then select {1} under &quot;.NET Desktop Runtime&quot; to download.</sys:String>
+    <sys:String x:Key="Setup.Update.DotNetMissing.DownloadRuntime">Download .NET 10 Runtime</sys:String>
     <sys:String x:Key="Setup.Update.OtherOptions.Title">Other update options - upgrade to AquaCL</sys:String>
     <sys:String x:Key="Setup.Update.OtherOptions.Placeholder">AquaCL 3 is the first major update of PCL Nex. It brings a refreshing new design, uses the latest development technologies, completely rebuilds the core experience, and adds support for macOS, Linux, and other platforms.</sys:String>
     <sys:String x:Key="Setup.Update.Error.NetworkFailed">Unable to retrieve latest version information. Please check your network connection.</sys:String>
@@ -4002,6 +4002,31 @@
     <sys:String x:Key="Setup.Ui.Theme.Color.CrashBlue">Crash Blue</sys:String>
     <sys:String x:Key="Setup.Ui.Theme.Color.Hmcl">HMCL</sys:String>
     <sys:String x:Key="Setup.Ui.Theme.Color.SkyBlue">Sky Blue</sys:String>
+    <sys:String x:Key="Setup.Ui.Theme.Dark">Dark</sys:String>
+    <sys:String x:Key="Setup.Ui.Theme.DarkColor">Dark theme color</sys:String>
+    <sys:String x:Key="Setup.Ui.Theme.DarkColor.ToolTip">Default theme color in dark mode</sys:String>
+    <sys:String x:Key="Setup.Ui.Theme.FollowSystem">Follow system</sys:String>
+    <sys:String x:Key="Setup.Ui.Theme.Light">Light</sys:String>
+    <sys:String x:Key="Setup.Ui.Theme.LightColor">Light theme color</sys:String>
+    <sys:String x:Key="Setup.Ui.Theme.Title">Theme</sys:String>
+
+    <!-- Setup.Update -->
+
+    <sys:String x:Key="Setup.Update.Changelog.Empty">The developers seem to have forgotten to provide an update summary... Maybe click below to view the full changelog?</sys:String>
+    <sys:String x:Key="Setup.Update.Changelog.MoreInfo">More information about this update...</sys:String>
+    <sys:String x:Key="Setup.Update.Changelog.Placeholder">PCL CE 2.14.0 brings a refreshing new design, several Pigeon smart features, and a delightful cross-instance workflow to boost your productivity.</sys:String>
+    <sys:String x:Key="Setup.Update.Changelog.Title">About this update</sys:String>
+    <sys:String x:Key="Setup.Update.Changelog.Unavailable">No changelog available...</sys:String>
+    <sys:String x:Key="Setup.Update.Changelog.View">Full changelog</sys:String>
+    <sys:String x:Key="Setup.Update.CheckAgain">Check again</sys:String>
+    <sys:String x:Key="Setup.Update.CheckFailed">Failed to check for updates</sys:String>
+    <sys:String x:Key="Setup.Update.Checking">Checking for updates...</sys:String>
+    <sys:String x:Key="Setup.Update.DotNetMissing.DownloadRuntime">Download .NET 10 Runtime</sys:String>
+    <sys:String x:Key="Setup.Update.DotNetMissing.Message">A launcher update (version {0}) was found, but the new version requires .NET 10 to be installed on your computer.&#xA;You need to install .NET 10 before continuing the update.&#xA;&#xA;Click the button below to open the webpage, then select {1} under ".NET Desktop Runtime" to download.</sys:String>
+    <sys:String x:Key="Setup.Update.DotNetMissing.Title">Launcher update - missing runtime</sys:String>
+    <sys:String x:Key="Setup.Update.Error.NetworkFailed">Unable to retrieve latest version information. Please check your network connection.</sys:String>
+    <sys:String x:Key="Setup.Update.Install">Download and install</sys:String>
+    <sys:String x:Key="Setup.Update.Latest">Already up to date</sys:String>
     <sys:String x:Key="Setup.Update.MirrorChyanCdk.Get">Get CDK</sys:String>
     <sys:String x:Key="Setup.Update.MirrorChyanCdk.Label">MirrorChyan CDK</sys:String>
     <sys:String x:Key="Setup.Update.MirrorChyanCdk.ToolTip">MirrorChyan (mirrorchyan.com) is a paid third-party application distribution platform that provides high-speed download sources in China.&#xA;This is an optional service. Leaving the CDK blank does not affect normal use or updates.&#xA;If you have a MirrorChyan CDK, you can provide it to PCL Nex, and the launcher will prioritize its high-speed download source for software updates. This can also help reduce pressure on the community update server...</sys:String>
@@ -4024,7 +4049,20 @@
     <sys:String x:Key="SystemDialog.Folder.OpenFailed.Message">Failed to open File Explorer. Try closing security software, such as 360 Total Security.&#xA;&#xA;Path: {0}</sys:String>
     <sys:String x:Key="SystemDialog.Folder.SelectTitle">Select folder</sys:String>
     <sys:String x:Key="SystemDialog.Startup.DotNetRuntimeOutdated.Message">Your .NET Desktop Runtime is outdated or corrupted. Please reinstall .NET 10.</sys:String>
-    <sys:String x:Key="SystemDialog.Startup.InitializationTitle">PCL Nex failed to initialize</sys:String>
+    <sys:String x:Key="SystemDialog.Startup.InitializationTitle">PCL CE failed to initialize</sys:String>
+
+    <!-- SystemDialog.Error -->
+
+    <sys:String x:Key="SystemDialog.Error.Detail.WithException">{0}&#xA;&#xA;Details:&#xA;{1}</sys:String>
+    <sys:String x:Key="SystemDialog.Error.Message.WithLogExportGuidance">{0}&#xA;&#xA;When asking for help, do not close launcher. Export the logs now (Settings → View logs → Export logs), then send the exported log archive. A screenshot of this window alone is usually not enough to diagnose the problem.</sys:String>
+    <sys:String x:Key="SystemDialog.Error.OperationFailed.Message">An error occurred while performing this operation.&#xA;&#xA;Operation:&#xA;{0}&#xA;&#xA;Details:&#xA;{1}</sys:String>
+    <sys:String x:Key="SystemDialog.Error.OperationFailed.RuntimeMessage">An error occurred while performing this operation.&#xA;&#xA;Operation:&#xA;{0}&#xA;&#xA;Details:&#xA;{1}&#xA;&#xA;A low-level system operation failed. Please try reinstalling .NET 10.</sys:String>
+    <sys:String x:Key="SystemDialog.Error.Title">Error</sys:String>
+    <sys:String x:Key="SystemDialog.Error.Unexpected.Message">An unexpected error occurred.</sys:String>
+    <sys:String x:Key="SystemDialog.Error.Unexpected.Title">Unexpected error</sys:String>
+    <sys:String x:Key="SystemDialog.Error.UserVisible.Message">An error occurred.&#xA;&#xA;Details:&#xA;{0}</sys:String>
+
+    <!-- Tools -->
     <sys:String x:Key="Tools.Error.OperationFailed">A utilities operation failed. See the details below.</sys:String>
     <sys:String x:Key="Tools.GameLink.EasyTierVersion">Both sides are using different launcher versions, which may cause connection issues.&#xA;We strongly recommend that both sides upgrade to the latest version before continuing.</sys:String>
     <sys:String x:Key="Tools.GameLink.Error.NetworkTestFailed">Failed to get network test results. See the details below.</sys:String>
