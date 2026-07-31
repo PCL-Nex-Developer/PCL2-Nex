@@ -2537,6 +2537,8 @@
     <sys:String x:Key="Instance.Export.Option.ResourcePacks.Desc">Texture packs</sys:String>
     <sys:String x:Key="Instance.Export.Option.ShaderPacks">Shader packs</sys:String>
     <sys:String x:Key="Instance.Export.Option.Screenshots">Screenshots</sys:String>
+    <sys:String x:Key="Instance.Export.Option.OtherFolders">Other folders</sys:String>
+    <sys:String x:Key="Instance.Export.Option.OtherFolders.Desc">Other folders not covered by the options above</sys:String>
     <sys:String x:Key="Instance.Export.Option.Structures">Exported structures</sys:String>
     <sys:String x:Key="Instance.Export.Option.Structures.Desc">schematics folder</sys:String>
     <sys:String x:Key="Instance.Export.Option.Replay">Replay recordings</sys:String>
