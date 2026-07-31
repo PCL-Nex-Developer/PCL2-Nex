@@ -304,6 +304,7 @@ public partial class PageToolsTest
         {
             if (!string.IsNullOrEmpty(TextDownloadName.Text) || string.IsNullOrEmpty(TextDownloadUrl.Text)) return;
             TextDownloadName.Text = ModBase.GetFileNameFromPath(WebUtility.UrlDecode(TextDownloadUrl.Text));
+            StartButtonRefresh();
         }
         catch
         {
