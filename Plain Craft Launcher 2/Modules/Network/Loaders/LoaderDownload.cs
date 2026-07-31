@@ -112,7 +112,7 @@ public class LoaderDownload : ModLoader.LoaderBase
                     }
                     catch (Exception ex)
                     {
-                        file.Errors.Add(ex);
+                        file.AddError(ex);
                         file.State = PCL.Network.NetState.Interrupted;
                         file.Speed = 0;
                         file.ActiveThreads = 0;
@@ -154,8 +154,7 @@ public class LoaderDownload : ModLoader.LoaderBase
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!file.Loaders.Contains(this))
-            file.Loaders.Add(this);
+        file.RegisterLoader(this);
 
         Directory.CreateDirectory(Path.GetDirectoryName(file.LocalPath) ?? throw new IOException("下载路径无效"));
         if (file.Check?.canUseExistsFile == true && file.Check.Check(file.LocalPath) is null)
@@ -227,8 +226,9 @@ public class LoaderDownload : ModLoader.LoaderBase
 
     public void OnFileFail(PCL.Network.DownloadFile file)
     {
-        OnFail(file.Errors.Any()
-            ? file.Errors
+        var errors = file.Errors;
+        OnFail(errors.Count > 0
+            ? errors.ToList()
             : [new Exception($"文件下载失败：{file.LocalPath}")]);
     }
 
@@ -311,9 +311,7 @@ public class LoaderDownload : ModLoader.LoaderBase
             file.State = PCL.Network.NetState.Interrupted;
             file.Speed = 0;
             file.ActiveThreads = 0;
-            foreach (var exception in exceptions)
-                if (!file.Errors.Contains(exception))
-                    file.Errors.Add(exception);
+            file.AddErrors(exceptions);
         }
 
         ModNet.NetManager.Finish(this);
