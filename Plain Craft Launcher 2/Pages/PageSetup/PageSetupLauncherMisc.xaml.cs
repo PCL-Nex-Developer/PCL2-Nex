@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Windows;
@@ -8,6 +7,7 @@ using System.Windows.Input;
 using PCL.Core.App;
 using PCL.Core.App.Configuration;
 using PCL.Core.App.Essentials;
+using PCL.Core.App.IoC;
 using PCL.Core.App.Localization;
 using PCL.Core.IO.Net.Http;
 using PCL.Core.UI;
@@ -308,7 +308,7 @@ public partial class PageSetupLauncherMisc
             return;
         File.Copy(sourcePath, ConfigService.SharedConfigPath, true);
         ModMain.MyMsgBox(Lang.Text("Setup.Misc.Import.Success.Message"), button1: Lang.Text("Setup.Misc.Import.Success.Restart"), forceWait: true);
-        Process.Start(new ProcessStartInfo(Basics.ExecutablePath));
+        Lifecycle.RequestRestartOnExit();
         FormMain.EndProgramForce();
     }
 
