@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
@@ -9,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using PCL.Core.App;
+using PCL.Core.App.IoC;
 using PCL.Core.App.Tools;
 using PCL.Core.IO;
 using PCL.Core.IO.Net;
@@ -255,7 +255,7 @@ public partial class PageToolsTest
                     {
                         ModMain.MyMsgBox(Lang.Text("Tools.Test.Clean.ClearedMessage", num),
                             Lang.Text("Tools.Test.Clean.Cleared"), Lang.Text("Common.Action.Confirm"), "", "", false, true, true);
-                        Process.Start(new ProcessStartInfo(Basics.ExecutablePath));
+                        Lifecycle.RequestRestartOnExit();
                         FormMain.EndProgramForce();
                     }
                     else
