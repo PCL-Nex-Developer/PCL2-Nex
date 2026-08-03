@@ -194,4 +194,15 @@ partial class Lifecycle
     /// <param name="statusCode">退出状态码 (返回值)</param>
     /// <exception cref="InvalidOperationException">尝试在 <see cref="LifecycleState.BeforeLoading"/> 时调用</exception>
     public static void ForceShutdown(int statusCode = 0) => Shutdown(statusCode, true);
+
+    /// <summary>
+    /// 请求在程序退出时重启启动器。重启会在所有服务停止（例如单例锁释放）之后自动执行，请与关闭程序的调用配合使用。
+    /// </summary>
+    /// <param name="arguments">重启进程时使用的命令行参数</param>
+    public static void RequestRestartOnExit(string? arguments = null)
+    {
+        _hasRequestedRestart = true;
+        _requestRestartService = _SystemService;
+        _requestRestartArguments = arguments;
+    }
 }

@@ -2133,7 +2133,7 @@ public partial class FormMain
 
         if (ModNet.HasDownloadingTask() && ModMain.MyMsgBox(Lang.Text("Main.Exit.HasDownloadingTask"), Lang.Text("Common.Dialog.Title"), Lang.Text("Common.Action.Confirm"), Lang.Text("Common.Action.Cancel")) != 1)
             return;
-        Process.Start(new ProcessStartInfo(Basics.ExecutablePath));
+        Lifecycle.RequestRestartOnExit();
         EndProgram(false);
     }
 
