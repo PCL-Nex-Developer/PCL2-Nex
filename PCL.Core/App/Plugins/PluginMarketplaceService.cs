@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -28,10 +27,7 @@ public static class PluginMarketplaceService
         httpClient ??= NetworkService.GetClient();
         var state = new LoadState();
 
-        await LoadTopicAsync("pclnexplugin", "GitHub", [], options, httpClient, state, ct)
-            .ConfigureAwait(false);
-
-        await LoadOfficialSourceAsync(options, httpClient, state, ct).ConfigureAwait(false);
+        await LoadIndexAndTopicAsync(options, httpClient, state, ct).ConfigureAwait(false);
 
         foreach (var record in PluginTrustService.GetAllTrustRecords().Where(record => record.Enabled))
         {
@@ -96,6 +92,33 @@ public static class PluginMarketplaceService
         return CreateResult(state.Entries, state);
     }
 
+    internal static async Task<PluginMarketLoadResult> LoadIndexAndTopicForTestingAsync(
+        PluginMarketQueryOptions? options = null,
+        HttpClient? httpClient = null,
+        CancellationToken ct = default)
+    {
+        options ??= new PluginMarketQueryOptions();
+        httpClient ??= NetworkService.GetClient();
+        var state = new LoadState();
+        await LoadIndexAndTopicAsync(options, httpClient, state, ct).ConfigureAwait(false);
+        return CreateResult(state.Entries, state);
+    }
+
+    private static async Task LoadIndexAndTopicAsync(
+        PluginMarketQueryOptions options,
+        HttpClient httpClient,
+        LoadState state,
+        CancellationToken ct)
+    {
+        // 官方索引（Nex_Server 每 90 分钟生成的 plugin-market.json）是基础列表。
+        // 先加载索引再实时搜索 GitHub，只补充索引里还没有的仓库，避免重复请求。
+        // 若 GitHub 请求超时/限流，索引本身即可作为商店列表（兜底）。
+        await LoadOfficialSourceAsync(options, httpClient, state, ct).ConfigureAwait(false);
+
+        await LoadTopicAsync("pclnexplugin", "GitHub", [], options, httpClient, state, ct)
+            .ConfigureAwait(false);
+    }
+
     private static async Task LoadOfficialSourceAsync(
         PluginMarketQueryOptions options,
         HttpClient httpClient,
@@ -142,8 +165,7 @@ public static class PluginMarketplaceService
         CancellationToken ct,
         bool sourceIsOfficial = false)
     {
-        var (json, usedCache) = await ReadSourceTextAsync(location, options, httpClient, ct).ConfigureAwait(false);
-        state.UsedCache |= usedCache;
+        var json = await ReadSourceTextAsync(location, options, httpClient, ct).ConfigureAwait(false);
         using var document = JsonDocument.Parse(json, new JsonDocumentOptions
         {
             AllowTrailingCommas = true,
@@ -241,7 +263,14 @@ public static class PluginMarketplaceService
         CancellationToken ct)
     {
         var topicOptions = CloneOptions(options, topic);
-        var result = await PluginRepositoryService.SearchTopicAsync(topicOptions, httpClient, ct).ConfigureAwait(false);
+        // 索引中已提供的仓库不再实时拉取 manifest/统计信息，跳过以省 GitHub 核心 API 配额。
+        var skipRepositories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in state.Entries)
+        {
+            if (PluginRepositoryService.ParseRepositoryFullName(entry.SourceRepoUrl) is { } fullName)
+                skipRepositories.Add(fullName);
+        }
+        var result = await PluginRepositoryService.SearchTopicAsync(topicOptions, httpClient, ct, skipRepositories).ConfigureAwait(false);
         foreach (var entry in result.Entries)
         {
             entry.SourceKind = "GitHub";
@@ -250,7 +279,6 @@ public static class PluginMarketplaceService
             state.Entries.Add(entry);
         }
         state.Errors.AddRange(result.Errors);
-        state.UsedCache |= result.UsedRepositoryCache;
         state.RateLimited |= result.RateLimited;
         state.RateLimitReset ??= result.RateLimitReset;
     }
@@ -282,7 +310,7 @@ public static class PluginMarketplaceService
             manifest, manifestUrl, options.Architecture, "Manifest", group, inheritedTags));
     }
 
-    private static async Task<(string Json, bool UsedCache)> ReadSourceTextAsync(
+    private static async Task<string> ReadSourceTextAsync(
         string location,
         PluginMarketQueryOptions options,
         HttpClient httpClient,
@@ -292,18 +320,12 @@ public static class PluginMarketplaceService
         {
             var info = new FileInfo(location);
             if (info.Length > options.MaxManifestBytes) throw new InvalidDataException(Text("Plugins.Marketplace.Error.SourceJsonTooLarge", "插件来源 JSON 文件过大。"));
-            return (await File.ReadAllTextAsync(location, ct).ConfigureAwait(false), false);
+            return await File.ReadAllTextAsync(location, ct).ConfigureAwait(false);
         }
 
         if (!Uri.TryCreate(location, UriKind.Absolute, out var uri)
             || uri.Scheme is not ("http" or "https"))
             throw new InvalidDataException(Text("Plugins.Marketplace.Error.InvalidSource", "插件来源必须是 HTTP/HTTPS JSON 地址或本地 JSON 文件。"));
-
-        var cacheDirectory = options.CacheDirectory ?? Path.Combine(Paths.PluginTrust, "market-cache");
-        var sourceCache = Path.Combine(cacheDirectory, "sources");
-        Directory.CreateDirectory(sourceCache);
-        var cachePath = Path.Combine(sourceCache,
-            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(location))) + ".json");
 
         Exception? lastError = null;
         foreach (var candidate in options.GitHubMirror.HasValue
@@ -324,15 +346,12 @@ public static class PluginMarketplaceService
                 using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token)
                     .ConfigureAwait(false);
                 if (!response.IsSuccessStatusCode) continue;
-                var json = await ReadLimitedAsync(response, options.MaxManifestBytes, timeout.Token).ConfigureAwait(false);
-                WriteCache(cachePath, json);
-                return (json, false);
+                return await ReadLimitedAsync(response, options.MaxManifestBytes, timeout.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
             catch (Exception ex) { lastError = ex; }
         }
 
-        if (File.Exists(cachePath)) return (File.ReadAllText(cachePath), true);
         throw lastError ?? new HttpRequestException(Text("Plugins.Marketplace.Error.SourceJsonFetchFailed", "插件来源 JSON 获取失败。"));
     }
 
@@ -350,14 +369,6 @@ public static class PluginMarketplaceService
             output.Write(buffer, 0, read);
         }
         return Encoding.UTF8.GetString(output.ToArray());
-    }
-
-    private static void WriteCache(string path, string json)
-    {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var temp = path + ".tmp";
-        File.WriteAllText(temp, json);
-        File.Move(temp, path, true);
     }
 
     private static bool LooksLikeInlinePluginDocument(JsonElement root)
