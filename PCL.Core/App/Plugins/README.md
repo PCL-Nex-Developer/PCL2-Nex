@@ -54,7 +54,7 @@ is used only when a required Mixin fails; third-party Mixins are not hot-unloade
 ## Marketplace sources
 
 The launcher keeps the official `pclnexplugin` GitHub Topic as a built-in client source. The official
-Nex_Server `plugin-market.json` and user-added JSON sources only combine developer trust with
+Nex_Server `plugin-index.json` pre-index and user-added JSON sources combine developer trust with
 manifest and inline-plugin discovery:
 
 ```json
@@ -76,7 +76,7 @@ against the manifest location. GitHub Topic plugins without a logo use the repos
 Git installations persist their repository URL; non-Git installations persist and subscribe to
 their manifest/source JSON URL in the local launcher configuration so updates keep using the same source.
 
-The built-in NexDeveloper registry uses the GitHub Raw `plugin-market.json` URL. A user can add
+The built-in NexDeveloper registry uses the GitHub Raw `plugin-index.json` URL. A user can add
 multiple third-party registries through the existing source-management UI or `add-plugin-source` URI Scheme;
 market documents must not declare `topics`, because Topic discovery is controlled by the launcher.
 no separate developer-source action exists. Developers declared by the built-in registry with

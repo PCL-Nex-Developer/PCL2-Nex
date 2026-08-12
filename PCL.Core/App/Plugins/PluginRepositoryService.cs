@@ -61,7 +61,7 @@ public static class PluginRepositoryService
     public const int DefaultReadmeSizeLimit = 512 * 1024;
     private const string GitHubApiVersion = "2022-11-28";
     public const string OfficialMarketSourceUrl =
-        "https://raw.githubusercontent.com/PCL-Nex-Developer/Nex_Server/refs/heads/main/apiv2/plugin-market.json";
+        "https://raw.githubusercontent.com/PCL-Nex-Developer/Nex_Server/refs/heads/main/apiv2/plugin-index.json";
 
     public static string BuildSearchUrl(int page, int perPage = 100, string topic = "pclnexplugin")
     {
@@ -76,37 +76,27 @@ public static class PluginRepositoryService
     public static async Task<PluginMarketLoadResult> SearchTopicAsync(
         PluginMarketQueryOptions? options = null,
         HttpClient? httpClient = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        IReadOnlySet<string>? skipRepositories = null)
     {
         options ??= new PluginMarketQueryOptions();
         ValidateOptions(options);
         httpClient ??= NetworkService.GetClient();
 
-        var cacheDirectory = options.CacheDirectory ?? Path.Combine(Paths.PluginTrust, "market-cache");
-        Directory.CreateDirectory(cacheDirectory);
         var errors = new List<PluginMarketError>();
-        // Different Topic sources must never share repository discovery caches. Otherwise a
-        // network failure while loading a custom Topic could silently reuse pclnexplugin results.
-        var repositoryCachePath = Path.Combine(cacheDirectory,
-            "repositories-" + SafeFileName(options.Topic.Trim().ToLowerInvariant()) + ".json");
-
         List<GitHubRepository> repositories = [];
-        var usedRepositoryCache = false;
         var rateLimited = false;
         DateTimeOffset? rateLimitReset = null;
 
         try
         {
             repositories = await FetchRepositoriesAsync(options, httpClient, ct).ConfigureAwait(false);
-            WriteCache(repositoryCachePath, repositories);
         }
         catch (GitHubRateLimitException ex)
         {
             rateLimited = true;
             rateLimitReset = ex.Reset;
-            repositories = ReadCache<List<GitHubRepository>>(repositoryCachePath) ?? repositories;
-            usedRepositoryCache = repositories.Count > 0;
-            if (repositories.Count == 0) errors.Add(new PluginMarketError("GitHub", ex.Message));
+            errors.Add(new PluginMarketError("GitHub", ex.Message));
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -114,9 +104,7 @@ public static class PluginRepositoryService
         }
         catch (Exception ex)
         {
-            repositories = ReadCache<List<GitHubRepository>>(repositoryCachePath) ?? repositories;
-            usedRepositoryCache = repositories.Count > 0;
-            if (repositories.Count == 0) errors.Add(new PluginMarketError("GitHub", ex.Message));
+            errors.Add(new PluginMarketError("GitHub", ex.Message));
         }
 
         var architecture = options.Architecture ?? RuntimeInformation.OSArchitecture;
@@ -124,13 +112,14 @@ public static class PluginRepositoryService
         foreach (var repository in repositories)
         {
             ct.ThrowIfCancellationRequested();
+            if (skipRepositories is not null && skipRepositories.Contains(repository.FullName)) continue;
             if (!options.IncludeArchived && repository.Archived) continue;
             if (!options.IncludeDisabled && repository.Disabled) continue;
             if (!options.IncludeForks && repository.Fork) continue;
 
             try
             {
-                var manifest = await FetchRepositoryManifestAsync(repository, options, cacheDirectory, httpClient, ct)
+                var manifest = await FetchRepositoryManifestAsync(repository, options, httpClient, ct)
                     .ConfigureAwait(false);
                 if (manifest is null)
                 {
@@ -139,7 +128,7 @@ public static class PluginRepositoryService
                 }
                 var entry = CreateEntry(repository, manifest, architecture, options.Topic);
                 var statistics = await FetchRepositoryStatisticsAsync(
-                        repository, options, cacheDirectory, httpClient, ct)
+                        repository, options, httpClient, ct)
                     .ConfigureAwait(false);
                 entry.LastUpdatedAt = statistics?.ManifestUpdatedAt;
                 entry.DownloadCount = statistics is { DownloadCount: > 0 }
@@ -157,7 +146,7 @@ public static class PluginRepositoryService
             }
         }
 
-        return new PluginMarketLoadResult(entries, errors, usedRepositoryCache, rateLimited, rateLimitReset);
+        return new PluginMarketLoadResult(entries, errors, false, rateLimited, rateLimitReset);
     }
 
     private static async Task<List<GitHubRepository>> FetchRepositoriesAsync(
@@ -191,26 +180,19 @@ public static class PluginRepositoryService
     private static async Task<PluginRepositoryStatistics?> FetchRepositoryStatisticsAsync(
         GitHubRepository repository,
         PluginMarketQueryOptions options,
-        string cacheDirectory,
         HttpClient httpClient,
         CancellationToken ct)
     {
-        var statisticsDirectory = Path.Combine(cacheDirectory, "statistics");
-        Directory.CreateDirectory(statisticsDirectory);
-        var cachePath = Path.Combine(statisticsDirectory, SafeFileName(repository.FullName) + ".json");
-
         try
         {
             var updatedTask = FetchManifestUpdatedAtAsync(repository, options, httpClient, ct);
             var downloadsTask = FetchReleaseDownloadCountAsync(repository, options, httpClient, ct);
             await Task.WhenAll(updatedTask, downloadsTask).ConfigureAwait(false);
-            var statistics = new PluginRepositoryStatistics
+            return new PluginRepositoryStatistics
             {
                 ManifestUpdatedAt = await updatedTask.ConfigureAwait(false),
                 DownloadCount = await downloadsTask.ConfigureAwait(false)
             };
-            WriteCache(cachePath, statistics);
-            return statistics;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -218,7 +200,8 @@ public static class PluginRepositoryService
         }
         catch
         {
-            return ReadCache<PluginRepositoryStatistics>(cachePath);
+            // 统计信息失败不影响插件条目本身（仅更新时间/下载数留空）。
+            return null;
         }
     }
 
@@ -276,35 +259,36 @@ public static class PluginRepositoryService
     private static async Task<PluginMarketManifest?> FetchRepositoryManifestAsync(
         GitHubRepository repository,
         PluginMarketQueryOptions options,
-        string cacheDirectory,
         HttpClient httpClient,
         CancellationToken ct)
     {
-        var manifestCacheDirectory = Path.Combine(cacheDirectory, "manifests");
-        Directory.CreateDirectory(manifestCacheDirectory);
-        var cachePath = Path.Combine(manifestCacheDirectory, SafeFileName(repository.FullName) + ".json");
-        var manifestUrl = BuildManifestApiUrl(repository);
-
-        string? json = null;
-        var fetchedFromNetwork = false;
+        string json;
         try
         {
-            using var response = await SendGitHubAsync(manifestUrl, "application/vnd.github.raw+json", options, httpClient, ct)
+            // raw.githubusercontent.com 不受 GitHub 核心 API 配额限制。客户端每次打开商店
+            // 都会为每个 topic 仓库抓取 manifest，走 contents API 会在几分钟内耗尽 60/hr 配额，
+            // 导致所有插件在商店中消失。先走 raw，404（如默认分支变更）再回退到 contents API。
+            using var response = await SendGitHubAsync(BuildRawManifestUrl(repository), "application/vnd.github.raw+json", options, httpClient, ct)
                 .ConfigureAwait(false);
             ThrowIfRateLimited(response);
-            if (response.StatusCode == HttpStatusCode.NotFound) return null;
-            response.EnsureSuccessStatusCode();
-            json = await ReadLimitedStringAsync(response, options.MaxManifestBytes, ct).ConfigureAwait(false);
-            fetchedFromNetwork = true;
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                using var apiResponse = await SendGitHubAsync(BuildManifestApiUrl(repository), "application/vnd.github.raw+json", options, httpClient, ct)
+                    .ConfigureAwait(false);
+                ThrowIfRateLimited(apiResponse);
+                if (apiResponse.StatusCode == HttpStatusCode.NotFound) return null;
+                apiResponse.EnsureSuccessStatusCode();
+                json = await ReadLimitedStringAsync(apiResponse, options.MaxManifestBytes, ct).ConfigureAwait(false);
+            }
+            else
+            {
+                response.EnsureSuccessStatusCode();
+                json = await ReadLimitedStringAsync(response, options.MaxManifestBytes, ct).ConfigureAwait(false);
+            }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             throw;
-        }
-        catch
-        {
-            json = ReadTextCache(cachePath, options.MaxManifestBytes);
-            if (json is null) throw;
         }
 
         try
@@ -318,7 +302,6 @@ public static class PluginRepositoryService
                 NormalizeLegacyRepositoryVersionIndex(repository, manifest, metadata);
             }
             ValidateMarketManifest(manifest, repository.Owner.Login, repository.Name);
-            if (fetchedFromNetwork) WriteTextCache(cachePath, json);
             return manifest;
         }
         catch (JsonException ex)
@@ -810,6 +793,14 @@ public static class PluginRepositoryService
         return new GitHubRepositoryIdentity(segments[0], name);
     }
 
+    /// <summary>
+    /// 从仓库 URL 解析 "owner/name"。用于把已由官方索引提供的仓库从实时搜索中排除。
+    /// </summary>
+    public static string? ParseRepositoryFullName(string? repositoryUrl)
+        => ParseGitHubRepositoryUrl(repositoryUrl) is { } identity
+            ? $"{identity.Owner}/{identity.Name}"
+            : null;
+
     private static string ValidateReleaseNotes(
         string? value,
         GitHubRepositoryIdentity repository,
@@ -1210,15 +1201,6 @@ public static class PluginRepositoryService
         if (options.RequestTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(options.RequestTimeout));
     }
 
-    private static T? ReadCache<T>(string path)
-    {
-        try { return File.Exists(path) ? JsonSerializer.Deserialize<T>(File.ReadAllText(path), PluginJson.SerializerOptions) : default; }
-        catch { return default; }
-    }
-
-    private static void WriteCache<T>(string path, T value)
-        => WriteTextCache(path, JsonSerializer.Serialize(value, PluginJson.SerializerOptions));
-
     private static string? ReadTextCache(string path, int maxBytes)
     {
         try
@@ -1264,12 +1246,6 @@ public static class PluginRepositoryService
             return string.IsNullOrWhiteSpace(encoded) ? null : Encoding.UTF8.GetString(Convert.FromBase64String(encoded));
         }
         catch { return null; }
-    }
-
-    private static string SafeFileName(string value)
-    {
-        var invalid = Path.GetInvalidFileNameChars();
-        return new string(value.Select(character => invalid.Contains(character) || character == '/' ? '_' : character).ToArray());
     }
 
     private sealed class GitHubRepositorySearchResult

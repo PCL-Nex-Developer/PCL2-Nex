@@ -32,7 +32,8 @@ public class PluginMarketServiceTest
                     + "\",\"html_url\":\"https://github.com/Owner/plugin" + page
                     + "\",\"default_branch\":\"main\",\"archived\":false,\"disabled\":false,\"fork\":false,\"owner\":{\"login\":\"Owner\",\"avatar_url\":\"https://avatars.githubusercontent.com/u/1?v=4\"}}]}");
             }
-            var repositoryName = request.RequestUri.AbsolutePath.Split('/')[3];
+            var segments = request.RequestUri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            var repositoryName = segments[0] == "repos" ? segments[2] : segments[1];
             return Json(ValidManifestJson(repositoryName));
         });
         using var client = new HttpClient(handler);
@@ -57,78 +58,6 @@ public class PluginMarketServiceTest
             Assert.IsTrue(requests.All(request => request.Headers.Contains("X-GitHub-Api-Version")));
             Assert.IsTrue(requests.All(request => request.Headers.Authorization?.Scheme == "Bearer"));
             Assert.IsTrue(result.Entries.All(entry => entry.Logo == "https://avatars.githubusercontent.com/u/1?v=4"));
-        }
-        finally { Directory.Delete(cache, true); }
-    }
-
-    [TestMethod]
-    public async Task SearchTopicAsync_ShouldUseRepositoryAndManifestCacheAfterNetworkFailure()
-    {
-        var cache = NewTempDirectory();
-        try
-        {
-            using (var successClient = new HttpClient(new StubHandler(request =>
-                       request.RequestUri!.AbsolutePath.Contains("search/repositories", StringComparison.Ordinal)
-                           ? Json("""{"total_count":1,"items":[{"id":1,"name":"plugin","full_name":"Owner/plugin","html_url":"https://github.com/Owner/plugin","default_branch":"main","archived":false,"disabled":false,"fork":false,"owner":{"login":"Owner"}}]}""")
-                           : Json(ValidManifestJson("plugin")))))
-            {
-                var first = await PluginRepositoryService.SearchTopicAsync(new PluginMarketQueryOptions
-                {
-                    GitHubMirror = 0,
-                    CacheDirectory = cache,
-                    Architecture = Architecture.X64
-                }, successClient);
-                Assert.AreEqual(1, first.Entries.Count);
-            }
-
-            using var failedClient = new HttpClient(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)));
-            var fallback = await PluginRepositoryService.SearchTopicAsync(new PluginMarketQueryOptions
-            {
-                GitHubMirror = 0,
-                CacheDirectory = cache,
-                Architecture = Architecture.X64
-            }, failedClient);
-
-            Assert.IsTrue(fallback.UsedRepositoryCache);
-            Assert.AreEqual(1, fallback.Entries.Count);
-        }
-        finally { Directory.Delete(cache, true); }
-    }
-
-    [TestMethod]
-    public async Task SearchTopicAsync_ShouldKeepRepositoryCachesIsolatedByTopic()
-    {
-        var cache = NewTempDirectory();
-        try
-        {
-            using (var successClient = new HttpClient(new StubHandler(request =>
-                       request.RequestUri!.AbsolutePath.Contains("search/repositories", StringComparison.Ordinal)
-                           ? Json("""{"total_count":1,"items":[{"id":1,"name":"plugin","full_name":"Owner/plugin","html_url":"https://github.com/Owner/plugin","default_branch":"main","archived":false,"disabled":false,"fork":false,"owner":{"login":"Owner"}}]}""")
-                           : Json(ValidManifestJson("plugin")))))
-            {
-                var first = await PluginRepositoryService.SearchTopicAsync(new PluginMarketQueryOptions
-                {
-                    Topic = "topic-one",
-                    GitHubMirror = 0,
-                    CacheDirectory = cache,
-                    Architecture = Architecture.X64
-                }, successClient);
-                Assert.AreEqual(1, first.Entries.Count);
-            }
-
-            using var failedClient = new HttpClient(new StubHandler(_ =>
-                new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)));
-            var second = await PluginRepositoryService.SearchTopicAsync(new PluginMarketQueryOptions
-            {
-                Topic = "topic-two",
-                GitHubMirror = 0,
-                CacheDirectory = cache,
-                Architecture = Architecture.X64
-            }, failedClient);
-
-            Assert.IsFalse(second.UsedRepositoryCache);
-            Assert.AreEqual(0, second.Entries.Count);
-            Assert.IsTrue(second.Errors.Any(error => error.Repository == "GitHub"));
         }
         finally { Directory.Delete(cache, true); }
     }
@@ -261,7 +190,8 @@ public class PluginMarketServiceTest
         {
             if (request.RequestUri!.AbsolutePath.Contains("search/repositories", StringComparison.Ordinal))
                 return Json("""{"total_count":3,"items":[{"id":1,"name":"archived","full_name":"Owner/archived","html_url":"https://github.com/Owner/archived","default_branch":"main","archived":true,"disabled":false,"fork":false,"owner":{"login":"Owner"}},{"id":2,"name":"disabled","full_name":"Owner/disabled","html_url":"https://github.com/Owner/disabled","default_branch":"main","archived":false,"disabled":true,"fork":false,"owner":{"login":"Owner"}},{"id":3,"name":"fork","full_name":"Owner/fork","html_url":"https://github.com/Owner/fork","default_branch":"main","archived":false,"disabled":false,"fork":true,"owner":{"login":"Owner"}}]}""");
-            var repositoryName = request.RequestUri.AbsolutePath.Split('/')[3];
+            var segments = request.RequestUri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            var repositoryName = segments[0] == "repos" ? segments[2] : segments[1];
             return Json(ValidManifestJson(repositoryName));
         }));
         var cache = NewTempDirectory();
@@ -360,7 +290,7 @@ public class PluginMarketServiceTest
                 new PluginMarketQueryOptions { CacheDirectory = cacheDirectory, GitHubMirror = 0 }, client);
 
             Assert.AreEqual("raw.githubusercontent.com", capturedRequest!.RequestUri!.Host);
-            Assert.AreEqual("/PCL-Nex-Developer/Nex_Server/refs/heads/main/apiv2/plugin-market.json", capturedRequest.RequestUri.AbsolutePath);
+            Assert.AreEqual("/PCL-Nex-Developer/Nex_Server/refs/heads/main/apiv2/plugin-index.json", capturedRequest.RequestUri.AbsolutePath);
             Assert.IsTrue(capturedRequest.Headers.Accept.Any(value => value.MediaType == "application/json"));
             Assert.AreEqual(0, result.Errors.Count);
             Assert.AreEqual("OfficialUser", result.OfficialDevelopers.Single().GitHubLogin);
@@ -604,6 +534,232 @@ public class PluginMarketServiceTest
             Assert.IsTrue(requests.Any(path => path.EndsWith("/contents/plugin.json", StringComparison.Ordinal)));
         }
         finally { Directory.Delete(cache, true); }
+    }
+
+    [TestMethod]
+    public async Task SearchTopicAsync_ShouldRejectManifestWhoseRepositoryDoesNotMatchTopicRepository()
+    {
+        using var client = new HttpClient(new StubHandler(request =>
+        {
+            if (request.RequestUri!.AbsolutePath.Contains("search/repositories", StringComparison.Ordinal))
+                return Json("""{"total_count":1,"items":[{"id":1,"name":"plugin","full_name":"Owner/plugin","html_url":"https://github.com/Owner/plugin","default_branch":"main","archived":false,"disabled":false,"fork":false,"owner":{"login":"Owner"}}]}""");
+            return Json(ValidManifestJson("plugin", authorLogin: "other"));
+        }));
+        var cache = NewTempDirectory();
+        try
+        {
+            var result = await PluginRepositoryService.SearchTopicAsync(new PluginMarketQueryOptions
+            {
+                GitHubMirror = 0,
+                CacheDirectory = cache,
+                Architecture = Architecture.X64
+            }, client);
+
+            Assert.AreEqual(0, result.Entries.Count);
+            Assert.AreEqual(1, result.Errors.Count);
+        }
+        finally { Directory.Delete(cache, true); }
+    }
+
+    [TestMethod]
+    public async Task SearchTopicAsync_ShouldLoadTopicManifestMatchingTopicRepository()
+    {
+        var requests = new List<string>();
+        const string manifest = """{"id":"example.ResourceSearchEnhanced","name":"Example","author":{"githubLogin":"xjh2009","displayName":"xjh2009"},"description":"Test","repository":"https://github.com/xjh2009/ResourceSearchEnhanced","versions":[{"version":"1.0.0","pclCoreVersion":"2026.07.1","downloads":{"anycpu":{"packageUrl":"https://github.com/xjh2009/ResourceSearchEnhanced/releases/download/v1.0.0/plugin.pclx","sha256":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}},"releaseNotes":"https://github.com/xjh2009/ResourceSearchEnhanced/releases/tag/v1.0.0"}]}""";
+        using var client = new HttpClient(new StubHandler(request =>
+        {
+            requests.Add(request.RequestUri!.AbsolutePath);
+            if (request.RequestUri!.AbsolutePath.Contains("search/repositories", StringComparison.Ordinal))
+                return Json("""{"total_count":1,"items":[{"id":1,"name":"ResourceSearchEnhanced","full_name":"xjh2009/ResourceSearchEnhanced","html_url":"https://github.com/xjh2009/ResourceSearchEnhanced","default_branch":"main","archived":false,"disabled":false,"fork":false,"owner":{"login":"xjh2009"}}]}""");
+            if (request.RequestUri.AbsolutePath.Contains("/commits", StringComparison.Ordinal))
+                return Json("[]");
+            if (request.RequestUri.AbsolutePath.Contains("/releases", StringComparison.Ordinal))
+                return Json("[]");
+            return Json(manifest);
+        }));
+        var cache = NewTempDirectory();
+        try
+        {
+            var result = await PluginRepositoryService.SearchTopicAsync(new PluginMarketQueryOptions
+            {
+                GitHubMirror = 0,
+                CacheDirectory = cache,
+                Architecture = Architecture.X64
+            }, client);
+
+            Assert.AreEqual(0, result.Errors.Count);
+            Assert.AreEqual(1, result.Entries.Count);
+            Assert.AreEqual("example.ResourceSearchEnhanced", result.Entries[0].Id);
+            Assert.AreEqual("https://github.com/xjh2009/ResourceSearchEnhanced", result.Entries[0].SourceRepoUrl);
+        }
+        finally { Directory.Delete(cache, true); }
+    }
+
+    [TestMethod]
+    public async Task SearchTopicAsync_ShouldFetchManifestFromRawBeforeContentsApi()
+    {
+        var requests = new List<string>();
+        using var client = new HttpClient(new StubHandler(request =>
+        {
+            requests.Add(request.RequestUri!.Host + request.RequestUri.AbsolutePath);
+            if (request.RequestUri.AbsolutePath.Contains("search/repositories", StringComparison.Ordinal))
+                return Json("""{"total_count":1,"items":[{"id":1,"name":"plugin","full_name":"Owner/plugin","html_url":"https://github.com/Owner/plugin","default_branch":"main","archived":false,"disabled":false,"fork":false,"owner":{"login":"Owner"}}]}""");
+            if (request.RequestUri.AbsolutePath.Contains("/commits", StringComparison.Ordinal))
+                return Json("[]");
+            if (request.RequestUri.AbsolutePath.Contains("/releases", StringComparison.Ordinal))
+                return Json("[]");
+            if (request.RequestUri.Host == "raw.githubusercontent.com")
+                return Json(ValidManifestJson("plugin"));
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        }));
+        var cache = NewTempDirectory();
+        try
+        {
+            var result = await PluginRepositoryService.SearchTopicAsync(new PluginMarketQueryOptions
+            {
+                GitHubMirror = 0,
+                CacheDirectory = cache,
+                Architecture = Architecture.X64
+            }, client);
+
+            Assert.AreEqual(0, result.Errors.Count);
+            Assert.AreEqual(1, result.Entries.Count);
+            Assert.IsTrue(requests.Any(url => url.StartsWith("raw.githubusercontent.com", StringComparison.Ordinal)
+                                              && url.EndsWith("/Owner/plugin/refs/heads/main/manifest.json", StringComparison.Ordinal)));
+            Assert.IsFalse(requests.Any(url => url.StartsWith("api.github.com", StringComparison.Ordinal)
+                                               && url.Contains("/contents/manifest.json", StringComparison.Ordinal)));
+        }
+        finally { Directory.Delete(cache, true); }
+    }
+
+    [TestMethod]
+    public async Task SearchTopicAsync_ShouldFallBackToContentsApiWhenRawManifestMissing()
+    {
+        var requests = new List<string>();
+        using var client = new HttpClient(new StubHandler(request =>
+        {
+            requests.Add(request.RequestUri!.Host + request.RequestUri.AbsolutePath);
+            if (request.RequestUri.Host == "raw.githubusercontent.com")
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            if (request.RequestUri.AbsolutePath.Contains("search/repositories", StringComparison.Ordinal))
+                return Json("""{"total_count":1,"items":[{"id":1,"name":"plugin","full_name":"Owner/plugin","html_url":"https://github.com/Owner/plugin","default_branch":"main","archived":false,"disabled":false,"fork":false,"owner":{"login":"Owner"}}]}""");
+            if (request.RequestUri.AbsolutePath.Contains("/contents/manifest.json", StringComparison.Ordinal))
+                return Json(ValidManifestJson("plugin"));
+            return Json("[]");
+        }));
+        var cache = NewTempDirectory();
+        try
+        {
+            var result = await PluginRepositoryService.SearchTopicAsync(new PluginMarketQueryOptions
+            {
+                GitHubMirror = 0,
+                CacheDirectory = cache,
+                Architecture = Architecture.X64
+            }, client);
+
+            Assert.AreEqual(0, result.Errors.Count);
+            Assert.AreEqual(1, result.Entries.Count);
+            Assert.IsTrue(requests.Any(url => url.StartsWith("api.github.com", StringComparison.Ordinal)
+                                              && url.Contains("/contents/manifest.json", StringComparison.Ordinal)));
+        }
+        finally { Directory.Delete(cache, true); }
+    }
+
+    [TestMethod]
+    public async Task SearchTopicAsync_ShouldSkipRepositoriesAlreadyProvidedByIndex()
+    {
+        var requests = new List<string>();
+        using var client = new HttpClient(new StubHandler(request =>
+        {
+            requests.Add(request.RequestUri!.Host + request.RequestUri.AbsolutePath);
+            if (request.RequestUri.AbsolutePath.Contains("search/repositories", StringComparison.Ordinal))
+                return Json("""{"total_count":2,"items":[{"id":1,"name":"plugin","full_name":"Owner/plugin","html_url":"https://github.com/Owner/plugin","default_branch":"main","archived":false,"disabled":false,"fork":false,"owner":{"login":"Owner"}},{"id":2,"name":"newone","full_name":"Owner/newone","html_url":"https://github.com/Owner/newone","default_branch":"main","archived":false,"disabled":false,"fork":false,"owner":{"login":"Owner"}}]}""");
+            if (request.RequestUri.AbsolutePath.Contains("/commits", StringComparison.Ordinal))
+                return Json("[]");
+            if (request.RequestUri.AbsolutePath.Contains("/releases", StringComparison.Ordinal))
+                return Json("[]");
+            return Json(ValidManifestJson("newone"));
+        }));
+        var cache = NewTempDirectory();
+        try
+        {
+            var skip = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Owner/plugin" };
+            var result = await PluginRepositoryService.SearchTopicAsync(new PluginMarketQueryOptions
+            {
+                GitHubMirror = 0,
+                CacheDirectory = cache,
+                Architecture = Architecture.X64
+            }, client, ct: default, skipRepositories: skip);
+
+            Assert.AreEqual(0, result.Errors.Count);
+            Assert.AreEqual(1, result.Entries.Count);
+            Assert.AreEqual("example.newone", result.Entries[0].Id);
+            Assert.IsFalse(requests.Any(url => url.StartsWith("raw.githubusercontent.com", StringComparison.Ordinal)
+                                               && url.Contains("/Owner/plugin/", StringComparison.Ordinal)));
+            Assert.IsTrue(requests.Any(url => url.StartsWith("raw.githubusercontent.com", StringComparison.Ordinal)
+                                              && url.Contains("/Owner/newone/", StringComparison.Ordinal)));
+        }
+        finally { Directory.Delete(cache, true); }
+    }
+
+    [TestMethod]
+    public async Task MarketplaceLoad_ShouldUseIndexFirstAndSupplementOnlyMissingRepositories()
+    {
+        const string indexDocument = """{"version":1,"updatedAt":null,"name":"Official","group":"Official","tags":[],"developers":[],"manifests":[],"plugins":[{"id":"example.indexed","name":"Indexed","author":{"githubLogin":"Owner","displayName":"Owner"},"description":"From index","repository":"https://github.com/Owner/indexed","homepageUrl":"https://github.com/Owner/indexed","versions":[{"version":"1.0.0","pclCoreVersion":"2026.07.1","releaseNotes":"https://github.com/Owner/indexed/releases/tag/v1.0.0","downloads":{"anycpu":{"packageUrl":"https://github.com/Owner/indexed/releases/download/v1.0.0/indexed.pclx","sha256":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}}}]}]}""";
+        var requests = new List<string>();
+        using var client = new HttpClient(new StubHandler(request =>
+        {
+            requests.Add(request.RequestUri!.Host + request.RequestUri.AbsolutePath);
+            if (request.RequestUri.Host == "raw.githubusercontent.com"
+                && request.RequestUri.AbsolutePath.Contains("plugin-index.json", StringComparison.Ordinal))
+                return Json(indexDocument);
+            if (request.RequestUri.AbsolutePath.Contains("search/repositories", StringComparison.Ordinal))
+                return Json("""{"total_count":2,"items":[{"id":1,"name":"indexed","full_name":"Owner/indexed","html_url":"https://github.com/Owner/indexed","default_branch":"main","archived":false,"disabled":false,"fork":false,"owner":{"login":"Owner"}},{"id":2,"name":"newone","full_name":"Owner/newone","html_url":"https://github.com/Owner/newone","default_branch":"main","archived":false,"disabled":false,"fork":false,"owner":{"login":"Owner"}}]}""");
+            if (request.RequestUri.AbsolutePath.Contains("/commits", StringComparison.Ordinal))
+                return Json("[]");
+            if (request.RequestUri.AbsolutePath.Contains("/releases", StringComparison.Ordinal))
+                return Json("[]");
+            if (request.RequestUri.Host == "raw.githubusercontent.com"
+                && request.RequestUri.AbsolutePath.Contains("/Owner/newone/", StringComparison.Ordinal))
+                return Json(ValidManifestJson("newone"));
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        }));
+        var result = await PluginMarketplaceService.LoadIndexAndTopicForTestingAsync(new PluginMarketQueryOptions
+        {
+            GitHubMirror = 0,
+            Architecture = Architecture.X64
+        }, client);
+
+        Assert.AreEqual(2, result.Entries.Count);
+        var indexed = result.Entries.Single(entry => entry.Id == "example.indexed");
+        Assert.IsTrue(indexed.SourceIsOfficial);
+        Assert.AreEqual("example.newone", result.Entries.Single(entry => entry.Id == "example.newone").Id);
+        Assert.IsFalse(requests.Any(url => url.StartsWith("raw.githubusercontent.com", StringComparison.Ordinal)
+                                           && url.Contains("/Owner/indexed/", StringComparison.Ordinal)));
+        Assert.IsTrue(requests.Any(url => url.StartsWith("raw.githubusercontent.com", StringComparison.Ordinal)
+                                          && url.Contains("/Owner/newone/", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public async Task MarketplaceLoad_ShouldUseIndexAsFallbackWhenGitHubSearchFails()
+    {
+        const string indexDocument = """{"version":1,"updatedAt":null,"name":"Official","group":"Official","tags":[],"developers":[],"manifests":[],"plugins":[{"id":"example.indexed","name":"Indexed","author":{"githubLogin":"Owner","displayName":"Owner"},"description":"From index","repository":"https://github.com/Owner/indexed","homepageUrl":"https://github.com/Owner/indexed","versions":[{"version":"1.0.0","pclCoreVersion":"2026.07.1","releaseNotes":"https://github.com/Owner/indexed/releases/tag/v1.0.0","downloads":{"anycpu":{"packageUrl":"https://github.com/Owner/indexed/releases/download/v1.0.0/indexed.pclx","sha256":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}}}]}]}""";
+        using var client = new HttpClient(new StubHandler(request =>
+        {
+            if (request.RequestUri!.Host == "raw.githubusercontent.com"
+                && request.RequestUri.AbsolutePath.Contains("plugin-index.json", StringComparison.Ordinal))
+                return Json(indexDocument);
+            return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+        }));
+        var result = await PluginMarketplaceService.LoadIndexAndTopicForTestingAsync(new PluginMarketQueryOptions
+        {
+            GitHubMirror = 0,
+            Architecture = Architecture.X64
+        }, client);
+
+        Assert.AreEqual(1, result.Entries.Count);
+        Assert.AreEqual("example.indexed", result.Entries[0].Id);
+        Assert.IsTrue(result.Errors.Any(error => error.Repository == "GitHub"));
     }
 
     [TestMethod]

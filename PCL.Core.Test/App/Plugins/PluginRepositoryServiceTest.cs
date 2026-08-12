@@ -12,7 +12,7 @@ public class PluginRepositoryServiceTest
     public void GetOfficialIndexUrl_ShouldUseNexServerSourceDocument()
     {
         Assert.AreEqual(
-            "https://raw.githubusercontent.com/PCL-Nex-Developer/Nex_Server/refs/heads/main/apiv2/plugin-market.json",
+            "https://raw.githubusercontent.com/PCL-Nex-Developer/Nex_Server/refs/heads/main/apiv2/plugin-index.json",
             PluginRepositoryService.GetOfficialIndexUrl());
     }
 
