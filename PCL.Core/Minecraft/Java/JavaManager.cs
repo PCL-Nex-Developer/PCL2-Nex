@@ -120,6 +120,7 @@ public class JavaManager
             if (ShouldSkip()) return;
 
             await Task.Run(_ScanInternal);
+            CheckAllAvailability();
             _lastScanTime = DateTime.Now;
             SaveConfig();
         }
@@ -199,7 +200,9 @@ public class JavaManager
     {
         List<JavaEntry> ret;
         lock (_javaEntrys)
-            ret = _javaEntrys.Values.ToList();
+            ret = _javaEntrys.Values
+                .Where(j => j.Installation.IsStillAvailable)
+                .ToList();
         ret.Sort((a, b) =>
         {
             var distCmp = Math.Abs(a.Installation.MajorVersion - PreferredJavaMajor)

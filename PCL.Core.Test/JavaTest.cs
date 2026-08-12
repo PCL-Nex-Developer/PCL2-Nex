@@ -3,7 +3,10 @@ using PCL.Core.Minecraft;
 using PCL.Core.Minecraft.Java;
 using PCL.Core.Minecraft.Java.Parser;
 using PCL.Core.Minecraft.Java.Scanner;
+using PCL.Core.Utils;
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
@@ -103,6 +106,55 @@ namespace PCL.Core.Test
                 new Version(19, 0, 1),
                 new Version(1, 17, 0, 0),
                 new Version(1, 18, 999, 999)));
+        }
+    [TestMethod]
+        public async Task ScanJava_ThenRemoveDirectory_RefreshDropsUnavailableEntries()
+        {
+            var directory = Path.Combine(Path.GetTempPath(), "PCLNex-JavaTest-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            var javaExe = Path.Combine(directory, "java.exe");
+            try
+            {
+                File.WriteAllBytes(javaExe, []);
+                var manager = new JavaManager(new FakeJavaParser(), new FakeJavaScanner(javaExe));
+
+                await manager.ScanJavaAsync(force: true);
+                Assert.AreEqual(1, manager.GetSortedJavaList().Count);
+
+                // 卸载 Java：删除扫描到的目录后点击刷新
+                Directory.Delete(directory, true);
+                await manager.ScanJavaAsync(force: true);
+
+                Assert.AreEqual(0, manager.GetSortedJavaList().Count);
+                Assert.IsFalse(manager.Exist(javaExe));
+            }
+            finally
+            {
+                if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            }
+        }
+
+        private sealed class FakeJavaParser : IJavaParser
+        {
+            public JavaInstallation? Parse(string javaExePath)
+                => File.Exists(javaExePath)
+                    ? new JavaInstallation(
+                        Path.GetDirectoryName(javaExePath)!,
+                        new Version(17, 0, 10),
+                        JavaBrandType.OpenJDK,
+                        MachineType.AMD64,
+                        true,
+                        false)
+                    : null;
+        }
+
+        private sealed class FakeJavaScanner : IJavaScanner
+        {
+            private readonly string _javaExePath;
+
+            public FakeJavaScanner(string javaExePath) => _javaExePath = javaExePath;
+
+            public void Scan(ICollection<string> results) => results.Add(_javaExePath);
         }
     }
 }
