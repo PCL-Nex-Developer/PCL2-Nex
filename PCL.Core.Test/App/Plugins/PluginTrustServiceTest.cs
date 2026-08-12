@@ -143,7 +143,7 @@ public class PluginTrustServiceTest
     {
         Assert.IsTrue(PluginTrustService.IsOfficialRepository(PluginRepositoryService.GetOfficialIndexUrl()));
         Assert.IsTrue(PluginTrustService.IsOfficialRepository(
-            " HTTPS://RAW.GITHUBUSERCONTENT.COM/PCL-NEX-DEVELOPER/NEX_SERVER/REFS/HEADS/MAIN/APIV2/PLUGIN-MARKET.JSON "));
+            " HTTPS://RAW.GITHUBUSERCONTENT.COM/PCL-NEX-DEVELOPER/NEX_SERVER/REFS/HEADS/MAIN/APIV2/PLUGIN-INDEX.JSON "));
     }
 
     [TestMethod]
