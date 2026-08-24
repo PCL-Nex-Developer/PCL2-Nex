@@ -119,4 +119,11 @@
     <ItemGroup>
         <Content Include="LICENCE" />
     </ItemGroup>
+    <!-- NAudio 仅使用 WaveOutEvent (WinMM) 与 AudioFileReader (Core)，裁掉未用的子模块程序集 -->
+    <Target Name="TrimUnusedNAudioAssemblies" AfterTargets="ResolveAssemblyReferences">
+        <ItemGroup>
+            <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)"
+                Condition="'%(Filename)' == 'NAudio.Wasapi' or '%(Filename)' == 'NAudio.Midi' or '%(Filename)' == 'NAudio.WinForms' or '%(Filename)' == 'NAudio.Asio'" />
+        </ItemGroup>
+    </Target>
 </Project>
