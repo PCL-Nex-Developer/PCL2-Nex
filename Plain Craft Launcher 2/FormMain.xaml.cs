@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Shell;
 using PCL.Core.App;
 using PCL.Core.App.IoC;
 using PCL.Core.App.Localization;
@@ -93,6 +94,17 @@ public partial class FormMain
         HintWrapper.OnShow += HintService.HintWrapper_OnShow;
         // 加载 UI
         InitializeComponent();
+        if (!OperatingSystem.IsWindows())
+        {
+            MinHeight = 450;
+            MinWidth = 790;
+            WindowStyle = WindowStyle.None;
+            WindowChrome.SetWindowChrome(this, null);
+            SetResourceReference(BackgroundProperty, "ColorBrushBackground");
+            PanWindowShadow.Visibility = Visibility.Collapsed;
+            PanBack.Margin = new Thickness(0);
+            PanBack.Clip = null;
+        }
         Opacity = 0d;
         try
         {
@@ -415,18 +427,16 @@ public partial class FormMain
 
         base.OnSourceInitialized(e);
 
-        // 获取当前窗口句柄
+        if (!OperatingSystem.IsWindows()) return;
+
         var hwnd = new WindowInteropHelper(this).Handle;
         var source = HwndSource.FromHwnd(hwnd);
         if (source is not null)
         {
-            // 渲染层允许 Alpha 通道通过
             source.CompositionTarget.BackgroundColor = Colors.Transparent;
-            // 魔改窗口边缘判定
             source.AddHook(_SizeWndProc);
         }
 
-        // 设置 DWM 窗口框架
         try
         {
             WindowInterop.ExtendFrameIntoClientArea(hwnd, -1);
@@ -605,7 +615,8 @@ public partial class FormMain
 
         if (PanBack is not null)
         {
-            RectForm.Rect = new Rect(0d, 0d, PanBack.ActualWidth, PanBack.ActualHeight);
+            if (OperatingSystem.IsWindows())
+                RectForm.Rect = new Rect(0d, 0d, PanBack.ActualWidth, PanBack.ActualHeight);
 
             var formWidth = PanBack.ActualWidth + 0.001d;
             var formHeight = PanBack.ActualHeight + 0.001d;
