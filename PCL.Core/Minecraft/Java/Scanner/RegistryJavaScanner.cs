@@ -25,6 +25,7 @@ public class RegistryJavaScanner : IJavaScanner
 
     public void Scan(ICollection<string> results)
     {
+        if (!OperatingSystem.IsWindows()) return;
         try
         {
             _ScanJavaSoftRegistry(results);

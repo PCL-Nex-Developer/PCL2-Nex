@@ -17,6 +17,7 @@ public sealed partial class DependencyCheckService
     [LifecycleStart]
     private static async Task _StartAsync()
     {
+        if (!OperatingSystem.IsWindows()) return;
         Context.Info(Lang.Text("Tools.Test.Dependency.Checking"));
 
         if (RuntimeInformation.OSArchitecture.Equals(Architecture.Arm64))

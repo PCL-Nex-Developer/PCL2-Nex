@@ -36,7 +36,7 @@ Everyone is welcome to try it out!
 | Windows 10 1809 (17763) or later | ✅ Fully supported | [.NET 10 Desktop Runtime](http://get.dot.net/10) |
 | Windows 8 to Windows 10 1809 (17763) | ⚠️ Expected to run; community support offered at discretion | [.NET 10 Desktop Runtime](http://get.dot.net/10) |
 | Windows 7 or earlier | ❌ Not supported | N/A |
-| macOS / Linux / Other OS | ⚠️ Cross-platform development only (cross-compilation) | [.NET 10 SDK](http://get.dot.net/10) |
+| macOS / Linux / Other OS | 🔬 Cross-platform support in internal beta | [.NET 10 SDK](http://get.dot.net/10) |
 
 **✅ Fully supported**: We will provide as much support as possible, but you must ensure you are using the latest version of the launcher.
 
@@ -44,7 +44,7 @@ Everyone is welcome to try it out!
 
 **❌ Not supported**: PCL Nex may not be usable on these platforms and might not even launch at all. Please upgrade your OS to use PCL Nex.
 
-**⚠️ Cross-platform development only (cross-compilation)**: PCL Nex’s source code can be built on macOS and Linux, but it cannot run directly. As a developer, you can develop on these platforms and then move the build artifacts to Windows for testing.
+**🔬 Cross-platform support in internal beta**: PCL Nex is working on cross-platform support. Functionality on macOS and Linux is not yet guaranteed, so please do not rely on it in daily use.
 
 **Note:**
 The community only supports the latest version of the launcher.
@@ -59,7 +59,7 @@ You can still try using the latest launcher version on unsupported platforms, bu
 
 ## 🌟 Statistics
 
-[![Star History Chart](https://api.star-history.com/svg?repos=PCL-Nex-Developer/PCL2-Nex&type=Date)](https://www.star-history.com/#PCL-Nex-Developer/PCL2-Nex&Date)
+**Page views** (total / today): [![Hits](https://hits.zkitefly.eu.org/?tag=https://github.com/PCL-Nex-Developer/PCL2-Nex)](https://hits.zkitefly.eu.org/?tag=https://github.com/PCL-Nex-Developer/PCL2-Nex&web=true)
 
 **Views** (Total / Today): [![Hits](https://hits.zkitefly.eu.org/?tag=https://github.com/PCL-Nex-Developer/PCL2-Nex)](https://hits.zkitefly.eu.org/?tag=https://github.com/PCL-Nex-Developer/PCL2-Nex&web=true)
 

@@ -20,6 +20,7 @@ public static partial class NtInterop
     /// <returns>A <see cref="Version"/> instance, used to represent the current operating system kernel version number.</returns>
     public static Version GetCurrentOsVersion()
     {
+        if (!OperatingSystem.IsWindows()) return Environment.OSVersion.Version;
         RtlGetNtVersionNumbers(out var major, out var minor, out var build);
         build &= 0xFFFF;
         return new Version(major, minor, build);

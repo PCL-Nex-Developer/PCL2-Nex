@@ -1,20 +1,32 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Security;
 using System.Security.Principal;
+using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using PCL.Core.Logging;
 
 namespace PCL.Core.Utils.OS;
 
-public class ProcessInterop {
+public static partial class ProcessInterop {
+    [LibraryImport("libc", EntryPoint = "geteuid")]
+    private static partial uint GetEffectiveUserId();
+
     /// <summary>
     /// 检查当前程序是否以管理员权限运行。
     /// </summary>
     /// <returns>如果当前用户具有管理员权限，则返回 true；否则返回 false。</returns>
-    public static bool IsAdmin() =>
-        new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
+    public static bool IsAdmin()
+    {
+        if (!OperatingSystem.IsWindows())
+            return GetEffectiveUserId() == 0;
+
+        using var identity = WindowsIdentity.GetCurrent();
+        return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
+    }
 
     /// <summary>
     /// 从本地可执行文件启动新的进程。
@@ -26,10 +38,22 @@ public class ProcessInterop {
     public static Process? Start(string path, string? arguments = null, bool runAsAdmin = false) {
         var psi = new ProcessStartInfo(path);
         if (arguments is not null) psi.Arguments = arguments;
-        if (runAsAdmin)
+        if (runAsAdmin && OperatingSystem.IsWindows())
         {
             psi.UseShellExecute = true;
             psi.Verb = "runas";
+        }
+        else if (runAsAdmin)
+        {
+            var elevationTool = OperatingSystem.IsMacOS() ? "/usr/bin/sudo" : FindOnPath("pkexec") ?? FindOnPath("sudo");
+            if (elevationTool is null)
+                throw new PlatformNotSupportedException("当前系统未找到可用的提权工具。");
+
+            psi = new ProcessStartInfo(elevationTool) { UseShellExecute = false };
+            psi.ArgumentList.Add(path);
+            if (!string.IsNullOrWhiteSpace(arguments))
+                foreach (var argument in SplitCommandLine(arguments))
+                    psi.ArgumentList.Add(argument);
         }
         if (Directory.Exists(path))
             psi.UseShellExecute = true;
@@ -65,8 +89,7 @@ public class ProcessInterop {
     /// <param name="force">指定是否强制结束，若为 <c>true</c> 将通过带 <c>/F</c> 参数的 <c>TASKKILL.EXE</c> 结束进程</param>
     /// <returns>进程返回值，若等待超时将返回 <see cref="int.MinValue"/></returns>
     public static int Kill(Process process, int timeout = 3000, bool force = false) {
-        if (force) Process.Start(new ProcessStartInfo("TASKKILL.EXE", $"/PID {process.Id} /F") { UseShellExecute = false });
-        else process.Kill();
+        process.Kill(entireProcessTree: force);
         if (timeout == -1) process.WaitForExit();
         else if (timeout != 0) process.WaitForExit(timeout);
         return process.HasExited ? process.ExitCode : int.MinValue;
@@ -85,6 +108,12 @@ public class ProcessInterop {
         // 参数验证
         if (string.IsNullOrWhiteSpace(executable)) {
             throw new ArgumentException("可执行文件路径不能为空或仅包含空白字符", nameof(executable));
+        }
+
+        if (!OperatingSystem.IsWindows())
+        {
+            LogWrapper.Debug("System", "当前平台不提供按应用设置 GPU 偏好的系统接口");
+            return;
         }
 
         // 验证文件路径格式
@@ -187,6 +216,40 @@ public class ProcessInterop {
         } finally {
             writeKey?.Dispose();
         }
+    }
+
+    private static string? FindOnPath(string executable)
+    {
+        var path = Environment.GetEnvironmentVariable("PATH");
+        if (string.IsNullOrWhiteSpace(path)) return null;
+        return path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+            .Select(directory => Path.Combine(directory.Trim(), executable))
+            .FirstOrDefault(File.Exists);
+    }
+
+    private static IEnumerable<string> SplitCommandLine(string arguments)
+    {
+        var current = new System.Text.StringBuilder();
+        var quoted = false;
+        foreach (var character in arguments)
+        {
+            if (character == '"')
+            {
+                quoted = !quoted;
+                continue;
+            }
+            if (char.IsWhiteSpace(character) && !quoted)
+            {
+                if (current.Length > 0)
+                {
+                    yield return current.ToString();
+                    current.Clear();
+                }
+                continue;
+            }
+            current.Append(character);
+        }
+        if (current.Length > 0) yield return current.ToString();
     }
 }
 

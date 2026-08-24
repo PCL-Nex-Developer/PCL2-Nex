@@ -37,7 +37,7 @@ PCL Nex 是基于 PCL 开源代码二次开发的社区版本，包含主线暂�
 | Windows 10 1809 (17763) 或更高版本 | ✅ 完整支持 | [.NET 10 Desktop Runtime](https://get.dot.net/10) |
 | Windows 8 至 Windows 10 1809 (17763) 或更低版本 | ⚠️ 理论可运行，酌情提供社区支持 | [.NET 10 Desktop Runtime](https://get.dot.net/10) |
 | Windows 7 或更低版本 | ❌ 不支持 | / |
-| macOS / Linux / 其他操作系统 | ⚠️ 仅支持跨平台开发（交叉编译） | [.NET 10 SDK](https://get.dot.net/10) |
+| macOS / Linux / 其他操作系统 | 🔬 跨平台支持内测中 | [.NET 10 SDK](https://get.dot.net/10) |
 
 **✅ 完整支持**：我们会尽可能提供相关支持，但你必须确保正在使用最新版本的启动器。
 
@@ -45,7 +45,7 @@ PCL Nex 是基于 PCL 开源代码二次开发的社区版本，包含主线暂�
 
 **❌ 不支持**：PCL Nex 在这些平台上的可用性较低，甚至可能无法启动。请升级操作系统后再使用 PCL Nex。
 
-**⚠️ 仅支持跨平台开发（交叉编译）**：PCL Nex 的源代码可以在 macOS 与 Linux 平台编译，但无法直接运行。作为开发者，你可以在这些平台上进行开发，然后将编译产物转移到 Windows 系统测试。
+**🔬 跨平台支持内测中**：PCL Nex 正在推进跨平台支持，目前处于内测阶段，macOS 与 Linux 上尚无法保证功能可用，请勿在日常环境中依赖。
 
 **注：**
 社区仅对最新版本的启动器提供支持。
@@ -59,8 +59,6 @@ PCL Nex 始终建议使用最新版本的操作系统以获得最佳体验。
 - `其余所有目录` 使用 [Apache License 2.0](https://github.com/PCL-Nex-Developer/PCL2-Nex/blob/dev/LICENSE)
 
 ## 🌟 统计数据
-
-[![Star History Chart](https://api.star-history.com/svg?repos=PCL-Nex-Developer/PCL2-Nex&type=Date)](https://www.star-history.com/#PCL-Nex-Developer/PCL2-Nex&Date)
 
 **本页浏览量**（总计 / 今日）：[![Hits](https://hits.zkitefly.eu.org/?tag=https://github.com/PCL-Nex-Developer/PCL2-Nex)](https://hits.zkitefly.eu.org/?tag=https://github.com/PCL-Nex-Developer/PCL2-Nex&web=true)
 

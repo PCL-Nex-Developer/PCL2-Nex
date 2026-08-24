@@ -1,5 +1,7 @@
 using System;
 using System.Text;
+using System.IO;
+using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using PCL.Core.Logging;
 using PCL.Core.Utils.Exts;
@@ -20,8 +22,7 @@ public class Identify
         var code = new StringBuilder();
         try
         {
-            using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Cryptography");
-            code.Append("MachineGuid:").Append(key?.GetValue("MachineGuid")?.ToString()?.Trim() ?? "");
+            code.Append(GetMachineIdentity());
         }
         catch (Exception ex)
         {
@@ -29,6 +30,27 @@ public class Identify
         }
 
         return Encoding.UTF8.GetBytes(SHA512Provider.Instance.ComputeHash(code.ToString()).ToHexString());
+    }
+
+    private static string GetMachineIdentity()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Cryptography");
+            var machineGuid = key?.GetValue("MachineGuid")?.ToString()?.Trim();
+            if (!string.IsNullOrWhiteSpace(machineGuid)) return "MachineGuid:" + machineGuid;
+        }
+        else
+        {
+            foreach (var path in new[] { "/etc/machine-id", "/var/lib/dbus/machine-id", "/etc/hostid" })
+            {
+                if (!File.Exists(path)) continue;
+                var machineId = File.ReadAllText(path).Trim();
+                if (!string.IsNullOrWhiteSpace(machineId)) return "MachineId:" + machineId;
+            }
+        }
+
+        return $"MachineName:{Environment.MachineName}|OS:{RuntimeInformation.OSDescription}|Arch:{RuntimeInformation.OSArchitecture}";
     }
 
     private static string _GetLauncherId()

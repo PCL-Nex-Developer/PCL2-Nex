@@ -1,5 +1,3 @@
-using System.Security.AccessControl;
-
 namespace PCL.Core.IO;
 
 using System;
@@ -13,7 +11,7 @@ using Logging;
 public static class Directories {
     /// <summary>
     /// 异步检查是否拥有对指定文件夹的读写权限。
-    /// 如果文件夹不存在或没有权限，返回 false，不修改文件系统。
+    /// 如果文件夹不存在或没有权限，返回 false。检查期间会创建并立即删除一个临时探测文件。
     /// </summary>
     /// <param name="path">要检查的文件夹路径。</param>
     /// <param name="cancellationToken">取消操作的令牌。</param>
@@ -34,40 +32,7 @@ public static class Directories {
                 return false;
             }
 
-            // 检查目录访问权限
-            var directoryInfo = new DirectoryInfo(path);
-            var security = await Task.Run(() => directoryInfo.GetAccessControl(), cancellationToken);
-            var rules = security.GetAccessRules(true, true, typeof(System.Security.Principal.NTAccount));
-
-            // 检查当前用户是否有读写权限，优先考虑拒绝规则
-            var currentUser = System.Security.Principal.WindowsIdentity.GetCurrent();
-            var principal = new System.Security.Principal.WindowsPrincipal(currentUser);
-
-            var isDenied = false;
-            var isAllowed = false;
-
-            foreach (FileSystemAccessRule rule in rules) {
-                if (!rule.FileSystemRights.HasFlag(FileSystemRights.Write))
-                    continue;
-
-                // 检查规则是否适用于当前用户或其组
-                if (principal.IsInRole(rule.IdentityReference.Value)) {
-                    if (rule.AccessControlType == AccessControlType.Deny) {
-                        isDenied = true;
-                        break; // 拒绝优先，直接返回
-                    }
-                    if (rule.AccessControlType == AccessControlType.Allow) {
-                        isAllowed = true;
-                    }
-                }
-            }
-
-            if (isDenied || !isAllowed) {
-                return false;
-            }
-
-            // 尝试枚举目录内容以确认实际访问能力
-            await Task.Run(() => Directory.EnumerateFiles(path, "*", SearchOption.TopDirectoryOnly).Any(), cancellationToken);
+            await ProbeDirectoryAccessAsync(path, cancellationToken);
             return true;
         } catch (OperationCanceledException) {
             LogWrapper.Warn("权限检查被取消");
@@ -80,7 +45,7 @@ public static class Directories {
 
     /// <summary>
     /// 异步检查文件夹权限，若无权限或文件夹不存在则抛出异常。
-    /// 不修改文件系统。
+    /// 检查期间会创建并立即删除一个临时探测文件。
     /// </summary>
     /// <param name="path">要检查的文件夹路径。</param>
     /// <param name="cancellationToken">取消操作的令牌。</param>
@@ -102,20 +67,7 @@ public static class Directories {
         }
 
         try {
-            var directoryInfo = new DirectoryInfo(path);
-            var security = await Task.Run(() => directoryInfo.GetAccessControl(), cancellationToken);
-            var rules = security.GetAccessRules(true, true, typeof(System.Security.Principal.NTAccount));
-
-            var hasAccess = rules.Cast<FileSystemAccessRule>()
-                .Any(rule => rule.FileSystemRights.HasFlag(FileSystemRights.Write) &&
-                             rule.AccessControlType == AccessControlType.Allow);
-
-            if (!hasAccess) {
-                throw new UnauthorizedAccessException($"没有对文件夹 {path} 的写权限");
-            }
-
-            // 确认实际访问能力
-            await Task.Run(() => Directory.EnumerateFiles(path, "*", SearchOption.TopDirectoryOnly).Any(), cancellationToken);
+            await ProbeDirectoryAccessAsync(path, cancellationToken);
         } catch (UnauthorizedAccessException) {
             throw;
         } catch (OperationCanceledException) {
@@ -129,8 +81,32 @@ public static class Directories {
     /// 检查是否为受保护的系统文件夹。
     /// </summary>
     private static bool IsSystemProtectedFolder(string path) {
-        return path.EndsWith(":\\System Volume Information", StringComparison.OrdinalIgnoreCase) ||
-               path.EndsWith(":\\$RECYCLE.BIN", StringComparison.OrdinalIgnoreCase);
+        if (!OperatingSystem.IsWindows()) return false;
+        var normalized = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return normalized.EndsWith(":\\System Volume Information", StringComparison.OrdinalIgnoreCase) ||
+               normalized.EndsWith(":\\$RECYCLE.BIN", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static async Task ProbeDirectoryAccessAsync(string path, CancellationToken cancellationToken)
+    {
+        await Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _ = Directory.EnumerateFileSystemEntries(path).Take(1).ToArray();
+
+            var probePath = Path.Combine(path, $".pcl-write-test-{Guid.NewGuid():N}.tmp");
+            try
+            {
+                using var stream = new FileStream(probePath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1,
+                    FileOptions.DeleteOnClose);
+                stream.WriteByte(0);
+            }
+            finally
+            {
+                try { File.Delete(probePath); }
+                catch (FileNotFoundException) { }
+            }
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

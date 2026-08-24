@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32;
@@ -104,12 +107,10 @@ public static class HardwareInfo
 
     private static HardwareSnapshot _CollectHardwareInfo(HardwareSnapshot previous)
     {
-        // CPU（注册表，替代 WMI Win32_Processor）
         var cpuName = previous.CPUName;
         try
         {
-            using var key = Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\CentralProcessor\0");
-            var queriedCpuName = key?.GetValue("ProcessorNameString")?.ToString()?.Trim();
+            var queriedCpuName = GetCpuName();
             if (!string.IsNullOrEmpty(queriedCpuName))
                 cpuName = queriedCpuName;
         }
@@ -118,9 +119,8 @@ public static class HardwareInfo
             LogWrapper.Warn(ex, "获取 CPU 信息时出错");
         }
 
-        // GPU（显示适配器注册表类，替代 WMI Win32_VideoController）
         IReadOnlyList<GPUInfo> gpus = previous.GPUs;
-        try
+        if (OperatingSystem.IsWindows()) try
         {
             var gpuList = new List<GPUInfo>();
             using var classKey = Registry.LocalMachine.OpenSubKey(
@@ -157,6 +157,43 @@ public static class HardwareInfo
 
         LogWrapper.Info("已获取系统硬件信息");
         return new HardwareSnapshot(cpuName, gpus, SystemMemorySize);
+    }
+
+    private static string? GetCpuName()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\CentralProcessor\0");
+            return key?.GetValue("ProcessorNameString")?.ToString()?.Trim();
+        }
+
+        if (OperatingSystem.IsLinux() && File.Exists("/proc/cpuinfo"))
+        {
+            foreach (var line in File.ReadLines("/proc/cpuinfo"))
+            {
+                var separator = line.IndexOf(':');
+                if (separator <= 0) continue;
+                var key = line[..separator].Trim();
+                if (key is "model name" or "Hardware" or "Processor")
+                    return line[(separator + 1)..].Trim();
+            }
+        }
+
+        if (OperatingSystem.IsMacOS())
+        {
+            using var process = Process.Start(new ProcessStartInfo("/usr/sbin/sysctl", "-n machdep.cpu.brand_string")
+            {
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            });
+            var output = process?.StandardOutput.ReadToEnd().Trim();
+            process?.WaitForExit(2000);
+            return string.IsNullOrWhiteSpace(output) ? null : output;
+        }
+
+        return RuntimeInformation.ProcessArchitecture.ToString();
     }
 
     private static void _Publish(HardwareSnapshot snapshot)

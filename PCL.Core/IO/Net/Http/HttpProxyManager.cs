@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using Microsoft.Win32;
 using PCL.Core.Logging;
 using PCL.Core.Utils.Exts;
@@ -23,15 +24,26 @@ public class HttpProxyManager : IWebProxy, IDisposable
     private readonly object _lock = new();
     private ProxyMode _mode = ProxyMode.SystemProxy;
     private readonly WebProxy _customWebProxy = new() { BypassProxyOnLocal = true };
-    private readonly WebProxy _systemWebProxy = new() { BypassProxyOnLocal = true };
+    private IWebProxy _systemWebProxy = HttpClient.DefaultProxy;
     private const string ProxyRegPathFull = @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings";
     private const string ProxyRegPath = @"Software\Microsoft\Windows\CurrentVersion\Internet Settings";
-    private readonly RegistryChangeMonitor _proxyMonitor = new(ProxyRegPath);
+    private readonly RegistryChangeMonitor? _proxyMonitor;
 
     private HttpProxyManager()
     {
-        RefreshSystemProxy(); // 初始化系统代理
-        _proxyMonitor.Changed += _OnSystemProxyChanged;
+        RefreshSystemProxy();
+        if (OperatingSystem.IsWindows())
+        {
+            try
+            {
+                _proxyMonitor = new RegistryChangeMonitor(ProxyRegPath);
+                _proxyMonitor.Changed += _OnSystemProxyChanged;
+            }
+            catch (Exception ex)
+            {
+                LogWrapper.Warn(ex, "Proxy", "无法监视系统代理设置变化");
+            }
+        }
     }
 
     private void _OnSystemProxyChanged(object? sender, EventArgs e)
@@ -108,6 +120,13 @@ public class HttpProxyManager : IWebProxy, IDisposable
     {
         lock (_lock)
         {
+            if (!OperatingSystem.IsWindows())
+            {
+                _systemWebProxy = HttpClient.DefaultProxy;
+                LogWrapper.Info("Proxy", "已从操作系统环境更新代理设置");
+                return;
+            }
+
             try
             {
                 // read from reg
@@ -122,9 +141,13 @@ public class HttpProxyManager : IWebProxy, IDisposable
                 var selectedProxy = proxies.FirstOrDefault(static x => x.Protocol.Equals(ProxyProtocol.Http));
 
                 // apply
-                _systemWebProxy.Address = (isSystemProxyEnabled == 0 || selectedProxy!.Address.IsNullOrEmpty())
-                    ? null
-                    : new Uri($"http://{selectedProxy.Address}");
+                _systemWebProxy = new WebProxy
+                {
+                    Address = isSystemProxyEnabled == 0 || selectedProxy is null || selectedProxy.Address.IsNullOrEmpty()
+                        ? null
+                        : new Uri($"http://{selectedProxy.Address}"),
+                    BypassProxyOnLocal = BypassOnLocal
+                };
 
                 LogWrapper.Info("Proxy",
                     $"已从操作系统更新代理设置，系统代理状态：{isSystemProxyEnabled}|{systemProxyString}");
@@ -162,7 +185,8 @@ public class HttpProxyManager : IWebProxy, IDisposable
             lock (_lock)
             {
                 field = value;
-                _systemWebProxy.BypassProxyOnLocal = value;
+                if (_systemWebProxy is WebProxy webProxy)
+                    webProxy.BypassProxyOnLocal = value;
             }
         }
     } = true;
@@ -218,7 +242,7 @@ public class HttpProxyManager : IWebProxy, IDisposable
 
     public void Dispose()
     {
-        _proxyMonitor.Dispose();
+        _proxyMonitor?.Dispose();
         GC.SuppressFinalize(this);
     }
 }

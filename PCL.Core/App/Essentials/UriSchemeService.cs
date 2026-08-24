@@ -40,6 +40,7 @@ public sealed partial class UriSchemeService
 
     public static void RegisterUriSchemes()
     {
+        if (!OperatingSystem.IsWindows()) return;
         foreach (var scheme in SupportedSchemes)
             RegisterUriScheme(scheme);
         RegisterPluginPackageFileAssociations();
