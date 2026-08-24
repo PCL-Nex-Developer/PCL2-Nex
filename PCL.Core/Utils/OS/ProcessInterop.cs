@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Management;
 using System.Security;
 using System.Security.Principal;
 using Microsoft.Win32;
@@ -16,17 +15,6 @@ public class ProcessInterop {
     /// <returns>如果当前用户具有管理员权限，则返回 true；否则返回 false。</returns>
     public static bool IsAdmin() =>
         new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
-
-    /// <summary>
-    /// 获取指定进程 ID 的命令行参数。
-    /// </summary>
-    /// <param name="processId">进程 ID</param>
-    /// <returns>命令行参数文本</returns>
-    public static string? GetCommandLine(int processId) {
-        var query = $"SELECT CommandLine FROM Win32_Process WHERE ProcessId = {processId}";
-        using var searcher = new ManagementObjectSearcher(query);
-        return searcher.Get().GetEnumerator().Current["CommandLine"].ToString();
-    }
 
     /// <summary>
     /// 从本地可执行文件启动新的进程。

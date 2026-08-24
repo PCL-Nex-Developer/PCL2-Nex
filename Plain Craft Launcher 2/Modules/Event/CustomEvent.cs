@@ -58,12 +58,13 @@ namespace PCL
         private static string FixNewlines(string s) => s.Replace("\\n", "\r\n");
 
         /// <summary>
-        /// 禁止自定义主页写入的高危设置黑名单
+        /// 禁止自定义主页读取 / 写入的高危设置黑名单
         /// </summary>
-        private static readonly HashSet<string> SecuritySensitiveSettingKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        { 
-            "LaunchAdvanceRun", 
-            "VersionAdvanceRun"
+        internal static readonly HashSet<string> SecuritySensitiveSettingKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "LaunchAdvanceRun",
+            "VersionAdvanceRun",
+            "PluginGitHubToken"
         };
         
         /// <summary>
@@ -278,7 +279,7 @@ namespace PCL
             var args = SplitArgs(arg);
             if (args.Length == 1)
                 throw new ArgumentException(Lang.Text("Event.Error.MissingArgs", type.ToString(), "SettingName|Value"));
-            if (ConfigService.TryGetConfigItemNoType(args[0], out var item) && item.Source != ConfigSource.SharedEncrypt)
+            if (ConfigService.TryGetConfigItemNoType(args[0], out var item))
             {
                 if (!CanWriteSettingFromCustomEvent(args[0]))
                     return;

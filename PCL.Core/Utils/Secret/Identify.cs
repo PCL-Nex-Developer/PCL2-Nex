@@ -1,6 +1,6 @@
 using System;
-using System.Management;
 using System.Text;
+using Microsoft.Win32;
 using PCL.Core.Logging;
 using PCL.Core.Utils.Exts;
 using PCL.Core.Utils.Hash;
@@ -20,10 +20,8 @@ public class Identify
         var code = new StringBuilder();
         try
         {
-            code.Append("UUID:").Append(_GetWmiProperty("Win32_ComputerSystemProduct", "UUID"))
-                .Append("|MB_Prod:").Append(_GetWmiProperty("Win32_BaseBoard", "Product"))
-                .Append("|MB_SN:").Append(_GetWmiProperty("Win32_BaseBoard", "SerialNumber"))
-                .Append("|CPU:").Append(_GetWmiProperty("Win32_Processor", "ProcessorId"));
+            using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Cryptography");
+            code.Append("MachineGuid:").Append(key?.GetValue("MachineGuid")?.ToString()?.Trim() ?? "");
         }
         catch (Exception ex)
         {
@@ -31,23 +29,6 @@ public class Identify
         }
 
         return Encoding.UTF8.GetBytes(SHA512Provider.Instance.ComputeHash(code.ToString()).ToHexString());
-    }
-
-    private static string _GetWmiProperty(string className, string propertyName)
-    {
-        try
-        {
-            using var searcher =
-                new ManagementObjectSearcher($"SELECT {propertyName} FROM {className}");
-            using var results = searcher.Get();
-            foreach (var obj in results)
-            {
-                if (obj[propertyName] is not null)
-                    return (obj[propertyName].ToString() ?? string.Empty).Trim();
-            }
-        }
-        catch { /* Ignore */ }
-        return string.Empty;
     }
 
     private static string _GetLauncherId()
@@ -62,7 +43,7 @@ public class Identify
             var bufferSpan = buffer.AsSpan();
             prefix.CopyTo(bufferSpan[..prefix.Length]);
             ctx.CopyTo(bufferSpan.Slice(prefix.Length, ctx.Length));
-            suffix.CopyTo(bufferSpan.Slice(prefix.Length + ctx.Length, suffix.Length));
+            suffix.CopyTo(bufferSpan[(prefix.Length + ctx.Length)..]);
 
             var sample = SHA512Provider.Instance.ComputeHash(bufferSpan).ToHexString();
             bufferSpan.Clear();

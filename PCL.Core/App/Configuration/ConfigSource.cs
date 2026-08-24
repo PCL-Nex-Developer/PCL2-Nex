@@ -11,11 +11,6 @@ public enum ConfigSource
     Shared,
 
     /// <summary>
-    /// 加密的全局共享配置。
-    /// </summary>
-    SharedEncrypt,
-
-    /// <summary>
     /// 本地配置。
     /// </summary>
     Local,

@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Management;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Win32;
 using PCL.Core.Logging;
 
 namespace PCL.Core.Utils.OS;
@@ -103,42 +104,47 @@ public static class HardwareInfo
 
     private static HardwareSnapshot _CollectHardwareInfo(HardwareSnapshot previous)
     {
-        // CPU
+        // CPU（注册表，替代 WMI Win32_Processor）
         var cpuName = previous.CPUName;
         try
         {
-            using var searcher = new ManagementObjectSearcher(@"root\CIMV2", "SELECT * FROM Win32_Processor");
-            foreach (ManagementObject queryObj in searcher.Get())
-            {
-                var queriedCpuName = queryObj["Name"]?.ToString()?.Trim();
-                if (!string.IsNullOrEmpty(queriedCpuName))
-                    cpuName = queriedCpuName;
-                break;
-            }
+            using var key = Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\CentralProcessor\0");
+            var queriedCpuName = key?.GetValue("ProcessorNameString")?.ToString()?.Trim();
+            if (!string.IsNullOrEmpty(queriedCpuName))
+                cpuName = queriedCpuName;
         }
         catch (Exception ex)
         {
             LogWrapper.Warn(ex, "获取 CPU 信息时出错");
         }
 
-        // GPU
+        // GPU（显示适配器注册表类，替代 WMI Win32_VideoController）
         IReadOnlyList<GPUInfo> gpus = previous.GPUs;
         try
         {
             var gpuList = new List<GPUInfo>();
-            using var searcher =
-                new ManagementObjectSearcher(@"root\CIMV2", "SELECT * FROM Win32_VideoController");
-            foreach (ManagementObject queryObj in searcher.Get())
+            using var classKey = Registry.LocalMachine.OpenSubKey(
+                @"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}");
+            if (classKey is not null)
             {
-                var gpuInfo = new GPUInfo
+                foreach (var subName in classKey.GetSubKeyNames().OrderBy(s => s, StringComparer.OrdinalIgnoreCase))
                 {
-                    Name = queryObj["Name"]?.ToString() ?? "",
-                    DriverVersion = queryObj["DriverVersion"]?.ToString() ?? "",
-                    Memory = queryObj["AdapterRAM"] is not null and not DBNull
-                        ? Convert.ToInt64(queryObj["AdapterRAM"]) / (1024 * 1024)
-                        : 0
-                };
-                gpuList.Add(gpuInfo);
+                    if (subName.Length != 4 || !subName.All(char.IsDigit)) continue; // 仅 0000、0001 等实例键
+                    using var instKey = classKey.OpenSubKey(subName);
+                    var name = instKey?.GetValue("DriverDesc")?.ToString()?.Trim();
+                    if (string.IsNullOrEmpty(name)) continue;
+                    var memory = 0L;
+                    try
+                    {
+                        var memRaw = instKey!.GetValue("HardwareInformation.qwMemorySize");
+                        if (memRaw is byte[] { Length: >= 8 } bytes)
+                            memory = BitConverter.ToInt64(bytes, 0) / (1024 * 1024);
+                        else if (memRaw is not null && long.TryParse(memRaw.ToString(), out var parsed))
+                            memory = parsed / (1024 * 1024);
+                    }
+                    catch { /* Ignore */ }
+                    gpuList.Add(new GPUInfo(name, "", memory));
+                }
             }
 
             if (gpuList.Count > 0)

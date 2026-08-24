@@ -978,7 +978,8 @@ public static class ModMain
     text = ModBase.RegexReplaceEach(text, @"\{cave\}", m => replacer(PageToolsTest.GetRandomCave()));
     text = ModBase.RegexReplaceEach(text, @"\{setup:([a-zA-Z0-9]+)\}", m =>
     {
-        if (ConfigService.TryGetConfigItemNoType(m.Groups[1].Value, out var item) && item.Source != ConfigSource.SharedEncrypt)
+        if (ConfigService.TryGetConfigItemNoType(m.Groups[1].Value, out var item) &&
+            !CustomEvent.SecuritySensitiveSettingKeys.Contains(m.Groups[1].Value))
             return replacer(item.GetValueNoType(ModInstanceList.McMcInstanceSelected?.PathInstance)?.ToString() ?? "");
         return replacer("");
     });

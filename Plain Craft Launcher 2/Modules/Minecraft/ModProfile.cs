@@ -199,11 +199,11 @@ public static class ModProfile
                         Type = ModLaunch.McLoginType.Ms,
                         Uuid = (string)Profile["uuid"],
                         Username = (string)Profile["username"],
-                        AccessToken = EncryptHelper.SecretDecrypt((string?)Profile["accessToken"]),
-                        RefreshToken = EncryptHelper.SecretDecrypt((string?)Profile["refreshToken"]),
+                        AccessToken = (string?)Profile["accessToken"] ?? "",
+                        RefreshToken = (string?)Profile["refreshToken"] ?? "",
                         Expires = (long)Profile["expires"],
                         Desc = (string)Profile["desc"],
-                        RawJson = EncryptHelper.SecretDecrypt((string?)Profile["rawJson"]),
+                        RawJson = (string?)Profile["rawJson"] ?? "",
                         SkinHeadId = (string)Profile["skinHeadId"]
                     };
                 else if ((string)Profile["type"] == "authlib")
@@ -212,14 +212,14 @@ public static class ModProfile
                         Type = ModLaunch.McLoginType.Auth,
                         Uuid = (string)Profile["uuid"],
                         Username = (string)Profile["username"],
-                        AccessToken = EncryptHelper.SecretDecrypt((string?)Profile["accessToken"]),
-                        RefreshToken = EncryptHelper.SecretDecrypt((string?)Profile["refreshToken"]),
+                        AccessToken = (string?)Profile["accessToken"] ?? "",
+                        RefreshToken = (string?)Profile["refreshToken"] ?? "",
                         Expires = (long)Profile["expires"],
                         Server = (string)Profile["server"],
                         ServerName = (string)Profile["serverName"],
-                        Name = EncryptHelper.SecretDecrypt((string?)Profile["name"]),
-                        Password = EncryptHelper.SecretDecrypt((string?)Profile["password"]),
-                        ClientToken = EncryptHelper.SecretDecrypt((string?)Profile["clientToken"]),
+                        Name = (string?)Profile["name"] ?? "",
+                        Password = (string?)Profile["password"] ?? "",
+                        ClientToken = (string?)Profile["clientToken"] ?? "",
                         Desc = (string)Profile["desc"],
                         SkinHeadId = (string)Profile["skinHeadId"]
                     };
@@ -275,22 +275,22 @@ public static class ModProfile
                         profileJobj = new JsonObject
                         {
                             { "type", "microsoft" }, { "uuid", Profile.Uuid }, { "username", Profile.Username },
-                            { "accessToken", EncryptHelper.SecretEncrypt(Profile.AccessToken) },
-                            { "refreshToken", EncryptHelper.SecretEncrypt(Profile.RefreshToken) },
+                            { "accessToken", Profile.AccessToken ?? "" },
+                            { "refreshToken", Profile.RefreshToken ?? "" },
                             { "expires", Profile.Expires }, { "desc", Profile.Desc },
-                            { "rawJson", EncryptHelper.SecretEncrypt(Profile.RawJson) },
+                            { "rawJson", Profile.RawJson ?? "" },
                             { "skinHeadId", Profile.SkinHeadId }
                         };
                     else if (Profile.Type == ModLaunch.McLoginType.Auth)
                         profileJobj = new JsonObject
                         {
                             { "type", "authlib" }, { "uuid", Profile.Uuid }, { "username", Profile.Username },
-                            { "accessToken", EncryptHelper.SecretEncrypt(Profile.AccessToken) },
-                            { "refreshToken", EncryptHelper.SecretEncrypt(Profile.RefreshToken) },
+                            { "accessToken", Profile.AccessToken ?? "" },
+                            { "refreshToken", Profile.RefreshToken ?? "" },
                             { "expires", Profile.Expires }, { "server", Profile.Server },
-                            { "serverName", Profile.ServerName }, { "name", EncryptHelper.SecretEncrypt(Profile.Name) },
-                            { "password", EncryptHelper.SecretEncrypt(Profile.Password) },
-                            { "clientToken", EncryptHelper.SecretEncrypt(Profile.ClientToken) },
+                            { "serverName", Profile.ServerName }, { "name", Profile.Name ?? "" },
+                            { "password", Profile.Password ?? "" },
+                            { "clientToken", Profile.ClientToken ?? "" },
                             { "desc", Profile.Desc }, { "skinHeadId", Profile.SkinHeadId }
                         };
                     else

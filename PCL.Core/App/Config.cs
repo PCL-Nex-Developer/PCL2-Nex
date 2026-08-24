@@ -44,7 +44,7 @@ public static partial class Config
 
         [ConfigGroup("HttpProxy")] partial class HttpProxyConfigGroup
         {
-            [ConfigItem<string>("SystemHttpProxy", "", ConfigSource.SharedEncrypt)] public partial string CustomAddress { get; set; }
+            [ConfigItem<string>("SystemHttpProxy", "")] public partial string CustomAddress { get; set; }
             [ConfigItem<int>("SystemHttpProxyType", 1)] public partial int Type { get; set; }
             [ConfigItem<string>("SystemHttpProxyCustomUsername", "")] public partial string CustomUsername { get; set; }
             [ConfigItem<string>("SystemHttpProxyCustomPassword", "")] public partial string CustomPassword { get; set; }
@@ -99,7 +99,6 @@ public static partial class Config
     [ConfigGroup("Tool")] partial class ToolConfigGroup
     {
         [ConfigItem<bool>("ToolHelpChinese", true)] public partial bool AutoChangeLanguage { get; set; }
-        // [ConfigItem<int>("ToolUpdateAlpha", 0, ConfigSource.SharedEncrypt)] public partial int Alpha { get; set; }
         [ConfigItem<bool>("ToolUpdateRelease", false)] public partial bool ReleaseNotification { get; set; }
         [ConfigItem<bool>("ToolUpdateSnapshot", false)] public partial bool SnapshotNotification { get; set; }
     }
@@ -119,7 +118,7 @@ public static partial class Config
         /// </summary>
         [ConfigItem<bool>("PluginAutoUpdate", false)] public partial bool AutoUpdate { get; set; }
 
-        [ConfigItem<string>("PluginGitHubToken", "", ConfigSource.SharedEncrypt)] public partial string GitHubToken { get; set; }
+        [ConfigItem<string>("PluginGitHubToken", "")] public partial string GitHubToken { get; set; }
         [ConfigItem<bool>("PluginMarketShowArchived", false)] public partial bool ShowArchivedRepositories { get; set; }
         [ConfigItem<bool>("PluginMarketShowDisabled", false)] public partial bool ShowDisabledRepositories { get; set; }
         [ConfigItem<bool>("PluginMarketShowForks", false)] public partial bool ShowForkRepositories { get; set; }

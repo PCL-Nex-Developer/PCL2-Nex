@@ -220,17 +220,17 @@ public static partial class States
         /// <summary>
         /// 启动器打开次数。
         /// </summary>
-        [ConfigItem<int>("SystemCount", 0, ConfigSource.SharedEncrypt)] public partial int StartupCount { get; set; }
+        [ConfigItem<int>("SystemCount", 0)] public partial int StartupCount { get; set; }
 
         /// <summary>
         /// 游戏启动次数。
         /// </summary>
-        [ConfigItem<int>("SystemLaunchCount", 0, ConfigSource.SharedEncrypt)] public partial int LaunchCount { get; set; }
+        [ConfigItem<int>("SystemLaunchCount", 0)] public partial int LaunchCount { get; set; }
 
         /// <summary>
         /// 上次运行的 BaseVersion。
         /// </summary>
-        [ConfigItem<string>("SystemLastBaseVersion", "", ConfigSource.SharedEncrypt)] public partial string LastBaseVersion { get; set; }
+        [ConfigItem<string>("SystemLastBaseVersion", "")] public partial string LastBaseVersion { get; set; }
 
         /// <summary>
         /// 全局配置版本。

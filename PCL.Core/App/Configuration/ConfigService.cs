@@ -126,7 +126,6 @@ public sealed partial class ConfigService
     #region Providers
 
     private static ConfigStorage? _sharedConfigProvider;
-    private static ConfigStorage? _sharedEncryptedConfigProvider;
     private static ConfigStorage? _localConfigProvider;
     private static ConfigStorage? _instanceConfigProvider;
 
@@ -143,7 +142,6 @@ public sealed partial class ConfigService
         return source switch
         {
             ConfigSource.Shared => _sharedConfigProvider!,
-            ConfigSource.SharedEncrypt => _sharedEncryptedConfigProvider!,
             ConfigSource.Local => _localConfigProvider!,
             ConfigSource.GameInstance => _instanceConfigProvider!,
             _ => throw new ArgumentException($"Invalid source: {source}")
@@ -167,9 +165,7 @@ public sealed partial class ConfigService
                 }
                 // load
                 var fileProvider = new JsonFileProvider(SharedConfigPath);
-                var storage = new FileConfigStorage(fileProvider);
-                _sharedConfigProvider = storage;
-                _sharedEncryptedConfigProvider = new EncryptedFileConfigStorage(storage);
+                _sharedConfigProvider = new FileConfigStorage(fileProvider);
             },
             () => // local config file
             {

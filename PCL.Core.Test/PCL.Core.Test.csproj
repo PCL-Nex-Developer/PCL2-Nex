@@ -47,7 +47,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="fNbt" Version="1.0.0" />
-    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />
     <PackageReference Include="Microsoft.TestPlatform.AdapterUtilities" Version="18.7.0" />
     <PackageReference Include="Microsoft.TestPlatform.ObjectModel" Version="18.7.0" />
