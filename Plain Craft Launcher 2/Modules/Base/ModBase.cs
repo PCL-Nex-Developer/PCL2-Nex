@@ -3151,7 +3151,9 @@ public static class ModBase
     }
 
     // DPI 转换
-    public static readonly int dpi = (int)Math.Round(Graphics.FromHwnd(nint.Zero).DpiX);
+    public static readonly int dpi = OperatingSystem.IsWindows()
+        ? (int)Math.Round(Graphics.FromHwnd(nint.Zero).DpiX)
+        : 96;
 
     /// <summary>
     ///     将经过 DPI 缩放的 WPF 尺寸转化为实际的像素尺寸。

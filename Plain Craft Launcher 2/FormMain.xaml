@@ -111,7 +111,7 @@
                 </Grid.RowDefinitions>
                 <Canvas x:Name="ImgBack" IsHitTestVisible="False" Grid.Row="1"
                         RenderOptions.BitmapScalingMode="LowQuality">
-                    <MediaElement x:Name="VideoBack" LoadedBehavior="Manual" UnloadedBehavior="Stop"
+                    <local:StubMediaElement x:Name="VideoBack" LoadedBehavior="Manual" UnloadedBehavior="Stop"
                                   Stretch="UniformToFill" IsHitTestVisible="False" Visibility="Visible"
                                   MediaEnded="VideoEnded" Volume="0" />
                 </Canvas>

@@ -84,7 +84,19 @@ public static class Basics
     /// <summary>
     /// 当前进程可执行文件的绝对路径。
     /// </summary>
-    public static string ExecutablePath { get; } = Environment.ProcessPath!;
+    public static string ExecutablePath { get; } = _GetExecutablePath();
+
+    private static string _GetExecutablePath()
+    {
+        var path = Environment.ProcessPath;
+        if (!OperatingSystem.IsWindows() && path is not null &&
+            (Path.GetFileName(path) == "dotnet" || Path.GetFileName(path) == "dotnet.exe"))
+        {
+            var entry = Assembly.GetEntryAssembly()?.Location;
+            if (!string.IsNullOrEmpty(entry)) return entry;
+        }
+        return path!;
+    }
 
     /// <summary>
     /// 当前进程可执行文件所在的目录。若有需求，请使用 <see cref="Path.Combine(string[])"/> 而不是自行拼接路径。

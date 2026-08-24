@@ -36,6 +36,13 @@ public partial class RegistryChangeMonitor : IDisposable
 
     public RegistryChangeMonitor(string keyPath)
     {
+        if (!OperatingSystem.IsWindows())
+        {
+            // No registry on Linux/macOS; start a dummy monitor thread so the API contract holds.
+            _monitorThread = new Thread(() => { }) { IsBackground = true };
+            _monitorThread.Start();
+            return;
+        }
         // Open registry key with proper access rights
         var result = _RegOpenKeyEx(HKEY_CURRENT_USER, keyPath, 0, KEY_READ, out _hKey);
         if (result != 0) throw new Win32Exception(result);

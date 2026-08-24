@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -25,6 +25,14 @@ public static class StartupValidation
 
     internal static string EnsureWindowsDirectoryEnvironment()
     {
+        if (!OperatingSystem.IsWindows())
+        {
+            // 非Windows平台没有 Windows 目录，将 windir 指向字体目录以保证字体枚举正常。
+            var fontDir = "/usr/share/fonts";
+            if (!Directory.Exists(fontDir)) fontDir = Path.GetTempPath();
+            Environment.SetEnvironmentVariable("windir", fontDir, EnvironmentVariableTarget.Process);
+            return fontDir;
+        }
         var windowsDirectory = Environment.GetEnvironmentVariable("windir", EnvironmentVariableTarget.Process);
         if (IsUsableWindowsDirectory(windowsDirectory)) return windowsDirectory!;
 
