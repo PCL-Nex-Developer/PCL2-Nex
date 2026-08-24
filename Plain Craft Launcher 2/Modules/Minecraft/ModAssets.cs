@@ -152,10 +152,12 @@ namespace PCL
                     var hash = file.Value["hash"].ToString();
                     if (json["map_to_resources"] is not null && json["map_to_resources"].ToObject<bool>())
                         // Remap
-                        localPath = Path.Combine(mcInstance.PathIndie, "resources", file.Key.Replace("/", @"\"));
+                        localPath = Path.Combine(mcInstance.PathIndie, "resources",
+                            file.Key.Replace('/', Path.DirectorySeparatorChar));
                     else if (json["virtual"] is not null && json["virtual"].ToObject<bool>())
                         // Virtual
-                        localPath = Path.Combine(ModFolder.mcFolderSelected, "assets", "virtual", "legacy", file.Key.Replace("/", @"\"));
+                        localPath = Path.Combine(ModFolder.mcFolderSelected, "assets", "virtual", "legacy",
+                            file.Key.Replace('/', Path.DirectorySeparatorChar));
                     else
                     {
                         // 正常

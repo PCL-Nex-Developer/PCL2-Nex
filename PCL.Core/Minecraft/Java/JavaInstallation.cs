@@ -12,12 +12,14 @@ public sealed record JavaInstallation(
     bool Is64Bit,
     bool IsJre)
 {
-    public string JavaExePath => Path.Combine(JavaFolder, "java.exe");
+    public string JavaExePath => Path.Combine(JavaFolder, JavaPlatform.ExecutableName);
     public string? JavawExePath
     {
         get
         {
-            var javaw = Path.Combine(JavaFolder, "javaw.exe");
+            var guiExecutableName = JavaPlatform.GuiExecutableName;
+            if (guiExecutableName is null) return null;
+            var javaw = Path.Combine(JavaFolder, guiExecutableName);
             return File.Exists(javaw) ? javaw : null;
         }
     }

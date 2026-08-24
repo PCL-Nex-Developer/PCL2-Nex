@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json.Nodes;
 using PCL.Core.App;
+using PCL.Core.IO;
 using PCL.Core.Utils;
 using PCL.Core.Utils.Exts;
 using PCL.Core.Utils.OS;
@@ -591,11 +592,13 @@ public static class ModLibrary
                 continue;
             }
 
-            if (token.LocalPath.Contains(@"optifine\OptiFine"))
+            if (token.LocalPath.Contains(Path.Combine("optifine", "OptiFine"), FileSystemPath.Comparison))
             {
                 // OptiFine 主 Jar
                 var optiFineBase =
-                    token.LocalPath.Replace(Path.Combine(customMcFolder, "libraries", "optifine", "OptiFine") + @"\", "").Split("_")[0] + "/" +
+                    token.LocalPath.Replace(
+                        FileSystemPath.EnsureTrailingSeparator(Path.Combine(customMcFolder, "libraries", "optifine", "OptiFine")),
+                        "", FileSystemPath.Comparison).Split("_")[0] + "/" +
                     ModBase.GetFileNameFromPath(token.LocalPath).Replace("-", "_");
                 optiFineBase = "/maven/com/optifine/" + optiFineBase;
                 if (optiFineBase.Contains("_pre"))
@@ -614,8 +617,8 @@ public static class ModLibrary
             {
                 // 普通文件
                 urls.AddRange(ModDownload.DlSourceLibraryGet("https://libraries.minecraft.net" +
-                                                             token.LocalPath.Replace(customMcFolder + "libraries", "")
-                                                                 .Replace(@"\", "/")));
+                                                             token.LocalPath.Replace(Path.Combine(customMcFolder, "libraries"), "")
+                                                                 .Replace(Path.DirectorySeparatorChar, '/')));
             }
 
             result.Add(new DownloadFile(urls.Distinct(), token.LocalPath, checker));
@@ -637,17 +640,19 @@ public static class ModLibrary
         customMcFolder = customMcFolder ?? ModFolder.mcFolderSelected;
         var splited = original.Split(":");
         mcLibGetRet = withHead
-            ? Path.Combine(customMcFolder, "libraries", splited[0].Replace(".", @"\"), splited[1], splited[2], splited[1] + "-" + splited[2] + ".jar")
-            : Path.Combine(splited[0].Replace(".", @"\"), splited[1], splited[2], splited[1] + "-" + splited[2] + ".jar");
+            ? Path.Combine(customMcFolder, "libraries", splited[0].Replace('.', Path.DirectorySeparatorChar), splited[1], splited[2], splited[1] + "-" + splited[2] + ".jar")
+            : Path.Combine(splited[0].Replace('.', Path.DirectorySeparatorChar), splited[1], splited[2], splited[1] + "-" + splited[2] + ".jar");
         // 判断 OptiFine 是否应该使用 installer
-        if (mcLibGetRet.Contains(@"optifine\OptiFine\1.") && splited[2].Split(".").Count() > 1)
+        if (mcLibGetRet.Contains(Path.Combine("optifine", "OptiFine", "1."), FileSystemPath.Comparison) &&
+            splited[2].Split(".").Count() > 1)
         {
             var majorVersion = (int)Math.Round(ModBase.Val(splited[2].Split(".")[1].BeforeFirst("_")));
             var minorVersion = (int)Math.Round(splited[2].Split(".").Count() > 2
                 ? ModBase.Val(splited[2].Split(".")[2].BeforeFirst("_"))
                 : 0d);
             if ((majorVersion == 12 || (majorVersion == 20 && minorVersion >= 4) || majorVersion >= 21) && File.Exists(
-                    $@"{customMcFolder}libraries\{splited[0].Replace(".", @"\")}\{splited[1]}\{splited[2]}\{splited[1]}-{splited[2]}-installer.jar")) // 仅在 1.12 (无法追溯) 和 1.20.4+ (#5376) 遇到此问题
+                    Path.Combine(customMcFolder, "libraries", splited[0].Replace('.', Path.DirectorySeparatorChar),
+                        splited[1], splited[2], $"{splited[1]}-{splited[2]}-installer.jar"))) // 仅在 1.12 (无法追溯) 和 1.20.4+ (#5376) 遇到此问题
             {
                 ModLaunch.McLaunchLog("已将 " + original + " 替换为对应的 Installer 文件");
                 mcLibGetRet = mcLibGetRet.Replace(".jar", "-installer.jar");

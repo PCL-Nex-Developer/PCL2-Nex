@@ -12,7 +12,6 @@ using PCL.Core.App.Localization;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -73,9 +72,7 @@ public static class Files {
     }
     
     public static bool ArePathsEqual(string path1, string path2) {
-        var fullPath1 = Path.GetFullPath(path1).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var fullPath2 = Path.GetFullPath(path2).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        return string.Equals(fullPath1, fullPath2, StringComparison.OrdinalIgnoreCase);
+        return FileSystemPath.Equals(path1, path2);
     }
 
     public static async Task<bool> ExportAsZipArchiveAsync(
@@ -584,14 +581,9 @@ public static class Files {
         string destDirectory,
         string entryName)
     {
-        var destinationRoot =
-            Path.GetFullPath(destDirectory)
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) +
-            Path.DirectorySeparatorChar;
+        var fullPath = Path.GetFullPath(Path.Combine(destDirectory, entryName));
 
-        var fullPath = Path.GetFullPath(Path.Combine(destinationRoot, entryName));
-
-        return fullPath.StartsWith(destinationRoot, StringComparison.OrdinalIgnoreCase)
+        return FileSystemPath.IsWithinDirectory(fullPath, destDirectory)
             ? fullPath
             : throw new InvalidOperationException($"Invalid path detected: {entryName}");
     }
@@ -935,14 +927,6 @@ public static class Files {
     /// <returns></returns>
     public static bool IsPathWithinDirectory(string childPath, string baseDirectory)
     {
-        var baseDir = Path.GetFullPath(baseDirectory);
-        var child = Path.GetFullPath(childPath);
-
-        return child.StartsWith(
-            baseDir.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar,
-            RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                ? StringComparison.OrdinalIgnoreCase
-                : StringComparison.Ordinal
-        );
+        return FileSystemPath.IsWithinDirectory(childPath, baseDirectory);
     }
 }

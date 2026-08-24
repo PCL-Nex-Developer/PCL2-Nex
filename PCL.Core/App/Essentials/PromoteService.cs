@@ -123,7 +123,7 @@ public sealed partial class PromoteService
         var process = Process.GetProcessById(int.Parse(pid));
         // 验证来源
         var mainProcessPath = Path.GetFullPath(process.MainModule!.FileName);
-        if (!string.Equals(mainProcessPath, Basics.ExecutablePath, StringComparison.OrdinalIgnoreCase))
+        if (!FileSystemPath.Equals(mainProcessPath, Basics.ExecutablePath))
         {
             Context.Error("来源验证失败，正在退出");
             return;

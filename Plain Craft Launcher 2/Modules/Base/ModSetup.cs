@@ -4,6 +4,7 @@ using System.Windows.Media;
 using System.Windows.Media.Effects;
 using PCL.Core.App;
 using PCL.Core.App.Configuration;
+using PCL.Core.IO;
 using PCL.Core.IO.Net.Http;
 using PCL.Core.UI.Theme;
 using PCL.Core.Utils.Exts;
@@ -169,7 +170,7 @@ public class ModSetup
     public static void LaunchFolderSelect(string value)
     {
         ModBase.Log("[Setup] 当前选择的 Minecraft 文件夹：" + value.Replace("$", ModBase.exePath));
-        ModFolder.mcFolderSelected = value.Replace("$", ModBase.exePath);
+        ModFolder.mcFolderSelected = FileSystemPath.EnsureTrailingSeparator(value.Replace("$", ModBase.exePath));
     }
 
     // 游戏内存

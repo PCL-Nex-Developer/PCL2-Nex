@@ -10,11 +10,11 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using FluentValidation;
 using Microsoft.VisualBasic;
-using Microsoft.Win32;
 using PCL.Core.App;
 using PCL.Core.App.Configuration;
 using PCL.Core.App.IoC;
 using PCL.Core.App.Localization;
+using PCL.Core.IO;
 using PCL.Core.UI;
 using PCL.Core.Utils;
 using PCL.Core.Utils.OS;
@@ -825,6 +825,7 @@ public static class ModMain
     /// </summary>
     public static void ShowWindowToTop(nint handle)
     {
+        if (!OperatingSystem.IsWindows()) return;
         try
         {
             PostMessage(handle, 400 * 16 + 2, 0L, 0L);
@@ -851,38 +852,7 @@ public static class ModMain
     /// </summary>
     public static void SetGPUPreference(string executeable, bool wantHighPerformance = true)
     {
-        const string GPU_PERFERENCE_REG_KEY = @"Software\Microsoft\DirectX\UserGpuPreferences";
-        const string GPU_PERFERENCE_REG_VALUE_HIGH = "GpuPreference=2;";
-        const string GPU_PERFERENCE_REG_VALUE_DEFAULT = "GpuPreference=0;";
-        // Const GPU_PERFERENCE_REG_VALUE_POWER_SAVING As String = "GpuPreference=1;"
-
-        var isCurrentHighPerformance = false;
-        // 查看现有设置
-        // 就知道 My.Computer，改个注册表 Microsoft.Win32.Registry 几年前的 API 了不用，还在这 My.Computer 都 5202 年了 My 你大爷
-        using (var readOnlyKey = Registry.CurrentUser.OpenSubKey(GPU_PERFERENCE_REG_KEY, false))
-        {
-            if (readOnlyKey is not null)
-            {
-                var currentValue = readOnlyKey.GetValue(executeable);
-                if (GPU_PERFERENCE_REG_VALUE_HIGH == (currentValue?.ToString() ?? "")) isCurrentHighPerformance = true;
-            }
-            else
-            {
-                // 创建父级键
-                ModBase.Log("[System] 需要创建显卡设置的父级键");
-                Registry.CurrentUser.CreateSubKey(GPU_PERFERENCE_REG_KEY);
-            }
-        }
-
-        ModBase.Log($"[System] 当前程序 ({executeable}) 的显卡设置为高性能: {isCurrentHighPerformance}");
-        if (isCurrentHighPerformance ^ wantHighPerformance)
-            // 写入新设置
-            using (var writeKey = Registry.CurrentUser.OpenSubKey(GPU_PERFERENCE_REG_KEY, true))
-            {
-                writeKey.SetValue(executeable,
-                    wantHighPerformance ? GPU_PERFERENCE_REG_VALUE_HIGH : GPU_PERFERENCE_REG_VALUE_DEFAULT);
-                ModBase.Log($"[System] 已调整程序 ({executeable}) 显卡设置: {wantHighPerformance}");
-            }
+        ProcessInterop.SetGpuPreference(executeable, wantHighPerformance);
     }
 
     /// <summary>
@@ -1008,8 +978,9 @@ public static class ModMain
             try
             {
                 ModBase.Log("[System] 开始清理任务缓存文件夹");
-                ModBase.DeleteDirectory(Path.Combine(SystemPaths.DriveLetter, "ProgramData", "PCL", "TaskTemp"));
-                ModBase.DeleteDirectory($@"{ModBase.pathTemp}TaskTemp\");
+                if (OperatingSystem.IsWindows())
+                    ModBase.DeleteDirectory(Path.Combine(SystemPaths.DriveLetter, "ProgramData", "PCL", "TaskTemp"));
+                ModBase.DeleteDirectory(Path.Combine(ModBase.pathTemp, "TaskTemp"));
                 ModBase.Log("[System] 已清理任务缓存文件夹");
             }
             catch (Exception ex)
@@ -1042,7 +1013,8 @@ public static class ModMain
         {
             try
             {
-                resultFolder = $@"{ModBase.pathTemp}TaskTemp\{ModBase.GetUuid()}-{RandomUtils.NextInt(0, 1000000)}\";
+                resultFolder = FileSystemPath.EnsureTrailingSeparator(Path.Combine(ModBase.pathTemp, "TaskTemp",
+                    $"{ModBase.GetUuid()}-{RandomUtils.NextInt(0, 1000000)}"));
                 if (requireNonSpace && resultFolder.Contains(" "))
                     break; // 带空格
                 Directory.CreateDirectory(resultFolder);
@@ -1055,8 +1027,11 @@ public static class ModMain
         } while (false);
 
         // 使用备用路径
-        resultFolder =
-            Path.Combine(SystemPaths.DriveLetter, "ProgramData", "PCL", "TaskTemp", $"{ModBase.GetUuid()}-{RandomUtils.NextInt(0, 1000000)}");
+        var fallbackRoot = OperatingSystem.IsWindows()
+            ? Path.Combine(SystemPaths.DriveLetter, "ProgramData", "PCL", "TaskTemp")
+            : Path.Combine(Paths.SharedLocalData, "TaskTemp");
+        resultFolder = FileSystemPath.EnsureTrailingSeparator(Path.Combine(fallbackRoot,
+            $"{ModBase.GetUuid()}-{RandomUtils.NextInt(0, 1000000)}"));
         Directory.CreateDirectory(resultFolder);
         ModBase.CheckPermission(resultFolder);
         return resultFolder;

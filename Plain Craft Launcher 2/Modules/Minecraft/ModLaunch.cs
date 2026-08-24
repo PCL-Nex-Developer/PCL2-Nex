@@ -2541,7 +2541,8 @@ public static class ModLaunch
         {
             if (mcLaunchJavaSelected.Installation.MajorVersion >= 9)
                 dataList.Add("--add-exports cpw.mods.bootstraplauncher/cpw.mods.bootstraplauncher=ALL-UNNAMED");
-            dataList.Add("-Doolloo.jlw.tmpdir=\"" + ModBase.pathPure.TrimEnd('\\') + "\"");
+            dataList.Add("-Doolloo.jlw.tmpdir=\"" +
+                         ModBase.pathPure.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + "\"");
             dataList.Add("-jar \"" + ExtractJavaWrapper() + "\"");
         }
 
@@ -2662,7 +2663,8 @@ public static class ModLaunch
         {
             if (mcLaunchJavaSelected.Installation.MajorVersion >= 9)
                 dataList.Add("--add-exports cpw.mods.bootstraplauncher/cpw.mods.bootstraplauncher=ALL-UNNAMED");
-            dataList.Add("-Doolloo.jlw.tmpdir=\"" + ModBase.pathPure.TrimEnd('\\') + "\"");
+            dataList.Add("-Doolloo.jlw.tmpdir=\"" +
+                         ModBase.pathPure.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + "\"");
             dataList.Add("-jar \"" + ExtractJavaWrapper() + "\"");
         }
 
@@ -2965,7 +2967,8 @@ public static class ModLaunch
                 cpStrings.Add(library.LocalPath);
         }
 
-        foreach (var library in Config.Instance.ClasspathHead[instance.PathInstance].Split(";")) // 自定义 Classpath 头部
+        foreach (var library in Config.Instance.ClasspathHead[instance.PathInstance]
+                     .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)) // 自定义 Classpath 头部
         {
             if (string.IsNullOrWhiteSpace(library))
                 continue;
@@ -2974,7 +2977,7 @@ public static class ModLaunch
 
         if (optiFineCp is not null)
             cpStrings.Insert(cpStrings.Count - 2, optiFineCp); // OptiFine 的总是需要放到倒数第二位
-        gameArguments.Add("${classpath}", cpStrings.Select(c => ModBase.ShortenPath(c)).Join(";"));
+        gameArguments.Add("${classpath}", cpStrings.Select(c => ModBase.ShortenPath(c)).Join(Path.PathSeparator.ToString()));
 
         return gameArguments;
     }
@@ -2986,7 +2989,7 @@ public static class ModLaunch
     private static void McLaunchNatives(ModLoader.LoaderTask<List<ModLibrary.McLibToken>, int> loader)
     {
         // 创建文件夹
-        var target = GetNativesFolder() + @"\";
+        var target = GetNativesFolder();
         Directory.CreateDirectory(target);
 
         // 解压文件
@@ -3076,10 +3079,15 @@ public static class ModLaunch
         var result = Path.Combine(ModInstanceList.McMcInstanceSelected.PathInstance, ModInstanceList.McMcInstanceSelected.Name + "-natives");
         if (SystemInfo.IsGBKEncoding || result.IsASCII())
             return result;
-        result = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".minecraft", "bin", "natives");
+        var minecraftDataRoot = OperatingSystem.IsWindows()
+            ? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
+            : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        result = Path.Combine(minecraftDataRoot, ".minecraft", "bin", "natives");
         if (result.IsASCII())
             return result;
-        return Path.Combine(SystemPaths.DriveLetter, "ProgramData", "PCL", "natives");
+        return OperatingSystem.IsWindows()
+            ? Path.Combine(SystemPaths.DriveLetter, "ProgramData", "PCL", "natives")
+            : Path.Combine(Paths.SharedLocalData, "natives");
     }
 
     #endregion
@@ -3375,8 +3383,7 @@ public static class ModLaunch
             var customProcess = new Process();
             try
             {
-                customProcess.StartInfo.FileName = "cmd.exe";
-                customProcess.StartInfo.Arguments = "/c \"" + customCommandGlobal + "\"";
+                ConfigureShellCommand(customProcess.StartInfo, customCommandGlobal);
                 customProcess.StartInfo.WorkingDirectory = ModBase.ShortenPath(ModFolder.mcFolderSelected);
                 customProcess.StartInfo.UseShellExecute = false;
                 customProcess.StartInfo.CreateNoWindow = true;
@@ -3405,8 +3412,7 @@ public static class ModLaunch
             var customProcess = new Process();
             try
             {
-                customProcess.StartInfo.FileName = "cmd.exe";
-                customProcess.StartInfo.Arguments = "/c \"" + customCommandVersion + "\"";
+                ConfigureShellCommand(customProcess.StartInfo, customCommandVersion);
                 customProcess.StartInfo.WorkingDirectory = ModBase.ShortenPath(ModFolder.mcFolderSelected);
                 customProcess.StartInfo.UseShellExecute = false;
                 customProcess.StartInfo.CreateNoWindow = true;
@@ -3430,6 +3436,14 @@ public static class ModLaunch
         }
     }
 
+    private static void ConfigureShellCommand(ProcessStartInfo startInfo, string command)
+    {
+        startInfo.FileName = OperatingSystem.IsWindows() ? "cmd.exe" : "/bin/sh";
+        startInfo.ArgumentList.Clear();
+        startInfo.ArgumentList.Add(OperatingSystem.IsWindows() ? "/c" : "-c");
+        startInfo.ArgumentList.Add(command);
+    }
+
     private static void McLaunchRun(ModLoader.LoaderTask<int, Process> loader)
     {
         var noJavaw = Config.Launch.NoJavaw &&
@@ -3439,12 +3453,15 @@ public static class ModLaunch
         var gameProcess = new Process();
         var startInfo = new ProcessStartInfo(noJavaw
             ? mcLaunchJavaSelected.Installation.JavaExePath
-            : mcLaunchJavaSelected.Installation.JavawExePath);
+            : mcLaunchJavaSelected.Installation.JavawExePath ?? mcLaunchJavaSelected.Installation.JavaExePath);
 
         // 设置环境变量
-        var paths = new List<string>(startInfo.EnvironmentVariables["Path"].Split(";"));
+        var pathKey = OperatingSystem.IsWindows() ? "Path" : "PATH";
+        var currentPath = startInfo.EnvironmentVariables[pathKey];
+        var paths = new List<string>((currentPath ?? string.Empty)
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries));
         paths.Add(ModBase.ShortenPath(mcLaunchJavaSelected.Installation.JavaFolder));
-        startInfo.EnvironmentVariables["Path"] = paths.Distinct().ToList().Join(";");
+        startInfo.EnvironmentVariables[pathKey] = paths.Distinct(JavaPlatform.PathComparer).Join(Path.PathSeparator.ToString());
         startInfo.EnvironmentVariables["appdata"] = ModBase.ShortenPath(ModFolder.mcFolderSelected);
 
         // 设置其他参数
@@ -3544,7 +3561,8 @@ public static class ModLaunch
         windowTitle = ArgumentReplace(windowTitle, false);
 
         // JStack 路径
-        var jStackPath = Path.Combine(mcLaunchJavaSelected.Installation.JavaFolder, "jstack.exe");
+        var jStackPath = Path.Combine(mcLaunchJavaSelected.Installation.JavaFolder,
+            JavaPlatform.GetToolExecutableName("jstack"));
 
         // 初始化等待
         var watcher = new ModWatcher.Watcher(loader, ModInstanceList.McMcInstanceSelected, windowTitle,

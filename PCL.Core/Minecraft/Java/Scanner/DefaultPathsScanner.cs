@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 
 namespace PCL.Core.Minecraft.Java.Scanner;
 
@@ -32,15 +31,13 @@ public class DefaultPathsScanner : IJavaScanner
 
     private static HashSet<string> _GetSearchRoots()
     {
-        var roots = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".minecraft", "runtime"),
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            Path.Combine(Basics.ExecutableDirectory, "PCL")
-        };
+        var roots = new HashSet<string>(JavaPlatform.PathComparer);
+        AddIfNotEmpty(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".minecraft", "runtime"));
+        AddIfNotEmpty(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+        AddIfNotEmpty(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+        AddIfNotEmpty(Path.Combine(Basics.ExecutableDirectory, "PCL"));
 
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        if (OperatingSystem.IsWindows())
         {
             var keyFolders = new[] { "Program Files", "Program Files (x86)" };
             var drives = DriveInfo.GetDrives()
@@ -70,16 +67,15 @@ public class DefaultPathsScanner : IJavaScanner
         }
         else
         {
-            var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-            var programFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
-
-            if (!string.IsNullOrEmpty(programFiles) && Directory.Exists(programFiles))
-                roots.Add(programFiles);
-            if (!string.IsNullOrEmpty(programFilesX86) && Directory.Exists(programFilesX86))
-                roots.Add(programFilesX86);
+            foreach (var root in JavaPlatform.GetPlatformSearchRoots()) AddIfNotEmpty(root);
         }
 
         return roots;
+
+        void AddIfNotEmpty(string path)
+        {
+            if (!string.IsNullOrWhiteSpace(path)) roots.Add(path);
+        }
     }
 
     private static void _BfsSearch(string rootPath, ICollection<string> results)
@@ -98,7 +94,7 @@ public class DefaultPathsScanner : IJavaScanner
             {
                 foreach (var subDir in Directory.EnumerateDirectories(current))
                 {
-                    var javaExe = Path.Combine(subDir, "java.exe");
+                    var javaExe = Path.Combine(subDir, JavaPlatform.ExecutableName);
                     if (File.Exists(javaExe))
                     {
                         results.Add(javaExe);

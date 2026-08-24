@@ -4,6 +4,7 @@ using PCL.Core.App;
 using PCL.Core.IO;
 using PCL.Core.Minecraft;
 using PCL.Core.Minecraft.Java.UserPreference;
+using PCL.Core.Minecraft.Java;
 using PCL.Network;
 using PCL.Network.Loaders;
 using PCL.Core.App.Localization;
@@ -246,7 +247,7 @@ public static class ModJava
             if (userSetup.StartsWith("{")) // 旧版本 Json 格式
             {
                 var js = ModBase.GetJson(userSetup);
-                userSetup = $"{js["Path"]}java.exe";
+                userSetup = Path.Combine(js["Path"].ToString(), JavaPlatform.ExecutableName);
                 Config.Launch.SelectedJava = userSetup;
             }
 
@@ -403,7 +404,10 @@ public static class ModJava
         var listFileStr = (JsonObject)Requester.FetchJson(
             ModDownload.DlSourceOrder(new[] { address },
                 new[] { address.Replace("piston-meta.mojang.com", "bmclapi2.bangbang93.com") }).First(), RequestParam.WithRetry);
-        lastJavaBaseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        var minecraftDataRoot = OperatingSystem.IsWindows()
+            ? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
+            : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        lastJavaBaseDir = Path.Combine(minecraftDataRoot,
             ".minecraft", "runtime", targetName);
         var results = new List<DownloadFile>(listFileStr["files"].AsObject().Count);
         foreach (var File in listFileStr["files"].AsObject())

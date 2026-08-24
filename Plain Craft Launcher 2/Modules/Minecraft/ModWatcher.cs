@@ -666,6 +666,7 @@ public static class ModWatcher
         /// </summary>
         private KeyValuePair<nint, string>? TryGetMinecraftWindow()
         {
+            if (!OperatingSystem.IsWindows()) return null;
             KeyValuePair<nint, string>? tryGetMinecraftWindowRet = default;
             tryGetMinecraftWindowRet = default;
             EnumWindows((hwnd, lParam) =>
@@ -791,21 +792,12 @@ public static class ModWatcher
                 try
                 {
                     if (CheckAlive(gameProcess))
-                        gameProcess.Kill();
+                        gameProcess.Kill(entireProcessTree: true);
                     gameProcess.WaitForExit(5000);
                     if (CheckAlive(gameProcess))
                     {
                         WatcherLog(Lang.Text("Watcher.Kill.TaskkillAttempt"));
-                        var taskkillInfo = new ProcessStartInfo
-                        {
-                            FileName = "taskkill.exe",
-                            Arguments = $"/PID {gameProcess.Id} /F /T",
-                            RedirectStandardOutput = true,
-                            UseShellExecute = false
-                        };
-                        var taskkillProcess = Process.Start(taskkillInfo);
-                        var output = taskkillProcess.StandardOutput.ReadToEnd();
-                        WatcherLog(Lang.Text("Watcher.Kill.TaskkillResult", output));
+                        gameProcess.Kill(entireProcessTree: true);
                         gameProcess.WaitForExit(5000);
                         if (CheckAlive(gameProcess))
                         {

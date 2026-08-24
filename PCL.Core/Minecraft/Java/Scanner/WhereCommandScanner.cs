@@ -11,13 +11,12 @@ public class WhereCommandScanner : IJavaScanner
 {
     public void Scan(ICollection<string> results)
     {
-        if (!OperatingSystem.IsWindows()) return;
-
         try
         {
+            var command = OperatingSystem.IsWindows() ? "where" : "which";
             var psi = new ProcessStartInfo
             {
-                FileName = "where",
+                FileName = command,
                 Arguments = "java",
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
@@ -42,7 +41,7 @@ public class WhereCommandScanner : IJavaScanner
         }
         catch (Exception ex)
         {
-            LogWrapper.Error(ex, "Java", "where 命令扫描失败");
+            LogWrapper.Error(ex, "Java", "Java 命令定位扫描失败");
         }
     }
 }

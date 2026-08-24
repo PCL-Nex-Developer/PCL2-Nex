@@ -142,7 +142,7 @@ public partial class Application
     {
         var problemList = new List<string>();
         var currentOsVersion = NtInterop.GetCurrentOsVersion();
-        if (currentOsVersion.Build < 17763)
+        if (OperatingSystem.IsWindows() && currentOsVersion.Build < 17763)
             problemList.Add(Lang.Text("Application.EnvironmentWarning.WindowsVersion"));
         if (SystemInfo.Is32BitSystem)
             problemList.Add(Lang.Text("Application.EnvironmentWarning.System32Bit"));

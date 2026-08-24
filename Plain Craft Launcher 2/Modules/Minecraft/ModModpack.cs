@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
+using PCL.Core.Minecraft.Java;
 using PCL.Core.UI;
 using PCL.Core.Utils.Validate;
 using PCL.Network;
@@ -1170,7 +1171,9 @@ public static class ModModpack
                 var instanceName = ModBase.GetFolderNameFromPath(targetFolder);
                 Directory.CreateDirectory(Path.Combine(targetFolder, ".minecraft"));
                 PageSelectLeft.AddFolder(
-                    Path.Combine(targetFolder, ".minecraft", archiveBaseFolder.Replace("/", @"\").TrimStart('\\')), instanceName,
+                    Path.Combine(targetFolder, ".minecraft",
+                        archiveBaseFolder.Replace('/', Path.DirectorySeparatorChar)
+                            .TrimStart(Path.DirectorySeparatorChar)), instanceName,
                     false); // 格式例如：包裹文件夹\.minecraft\（最短为空字符串）
                 // 调用 modpack 文件进行安装
                 var modpackFile = Directory.GetFiles(targetFolder, "modpack.*", SearchOption.AllDirectories).First();
@@ -1206,7 +1209,8 @@ public static class ModModpack
 
         if (match is null)
             throw new Exception(Lang.Text("Minecraft.Download.Modpack.UnknownArchiveStructure")); // 没有匹配
-        var archiveBaseFolder = match.Value.Replace("/", @"\").TrimStart('\\'); // 格式例如：包裹文件夹\.minecraft\（最短为空字符串）
+        var archiveBaseFolder = match.Value.Replace('/', Path.DirectorySeparatorChar)
+            .TrimStart(Path.DirectorySeparatorChar); // 格式例如：包裹文件夹\.minecraft\（最短为空字符串）
         var instanceName = match.Groups[1].Value;
         ModBase.Log("[ModPack] 检测到压缩包的 .minecraft 根目录：" + archiveBaseFolder + "，命中的实例名：" + instanceName);
         // 获取解压路径
@@ -1563,7 +1567,7 @@ public static class ModModpack
                         if (!string.IsNullOrEmpty(preLaunchCommand))
                         {
                             preLaunchCommand = preLaunchCommand.Replace(@"\""", "\"")
-                                .Replace("$INST_JAVA", "{java}java.exe").Replace(@"$INST_MC_DIR\", "{minecraft}")
+                                .Replace("$INST_JAVA", "{java}" + JavaPlatform.ExecutableName).Replace(@"$INST_MC_DIR\", "{minecraft}")
                                 .Replace("$INST_MC_DIR", "{minecraft}").Replace(@"$INST_DIR\", "{verpath}")
                                 .Replace("$INST_DIR", "{verpath}").Replace("$INST_ID", "{name}")
                                 .Replace("$INST_NAME", "{name}");

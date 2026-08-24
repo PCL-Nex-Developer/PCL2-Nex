@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using PCL.Core.App.Localization;
+using PCL.Core.IO;
 
 namespace PCL.Core.App.Plugins;
 
@@ -58,13 +59,12 @@ public static class PluginLocalInstallService
 
     private static void ExtractZipSafely(string archivePath, string destinationDirectory)
     {
-        var destinationRoot = Path.GetFullPath(destinationDirectory) + Path.DirectorySeparatorChar;
         using var archive = ZipFile.OpenRead(archivePath);
         foreach (var entry in archive.Entries)
         {
             if (string.IsNullOrWhiteSpace(entry.FullName)) continue;
-            var targetPath = Path.GetFullPath(Path.Combine(destinationRoot, entry.FullName));
-            if (!targetPath.StartsWith(destinationRoot, StringComparison.OrdinalIgnoreCase))
+            var targetPath = Path.GetFullPath(Path.Combine(destinationDirectory, entry.FullName));
+            if (!FileSystemPath.IsWithinDirectory(targetPath, destinationDirectory))
                 throw new InvalidDataException(Text("Plugins.LocalInstall.Error.UnsafePath", "zip 包包含不安全的路径。"));
 
             if (string.IsNullOrEmpty(entry.Name))

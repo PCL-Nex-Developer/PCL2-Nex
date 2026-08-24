@@ -2,6 +2,7 @@ using System.IO;
 using PCL.Core.App;
 using PCL.Core.App.Configuration;
 using PCL.Core.App.Localization;
+using PCL.Core.IO;
 using PCL.Core.Utils.OS;
 
 namespace PCL
@@ -53,9 +54,9 @@ namespace PCL
         private static string[] SplitArgs(string arg) => arg.Split('|');
 
         /// <summary>
-        /// 将 \\n 替换为 Windows 换行符 \r\n。
+        /// 将 \\n 替换为当前平台的换行符。
         /// </summary>
-        private static string FixNewlines(string s) => s.Replace("\\n", "\r\n");
+        private static string FixNewlines(string s) => s.Replace("\\n", Environment.NewLine);
 
         /// <summary>
         /// 禁止自定义主页读取 / 写入的高危设置黑名单
@@ -313,20 +314,24 @@ namespace PCL
 
         public static string[] GetAbsoluteUrls(string relativeUrl, EventType type)
         {
-            relativeUrl = relativeUrl.Replace('/', '\\').ToLower().TrimStart('\\');
-            var pclDir = Path.Combine(Basics.ExecutableDirectory, "PCL");
+            relativeUrl = relativeUrl.Trim();
+            var pclDir = Path.GetFullPath(Path.Combine(Basics.ExecutableDirectory, "PCL"));
 
-            if (relativeUrl.Contains(":\\"))
+            if (Path.IsPathFullyQualified(relativeUrl))
             {
                 ModBase.Log($"[Control] 自定义事件中由绝对路径 {type}: {relativeUrl}");
                 return [relativeUrl, pclDir];
             }
-            if (File.Exists(Path.Combine(pclDir, relativeUrl)))
+
+            var relativePath = relativeUrl
+                .Replace('\\', Path.DirectorySeparatorChar)
+                .Replace('/', Path.DirectorySeparatorChar)
+                .TrimStart(Path.DirectorySeparatorChar);
+            var fullPath = Path.GetFullPath(Path.Combine(pclDir, relativePath));
+            if (!FileSystemPath.IsWithinDirectory(fullPath, pclDir))
+                throw new UnauthorizedAccessException(Lang.Text("Event.Error.FileNotFound", relativeUrl));
+            if (File.Exists(fullPath))
             {
-                var fullPath = Path.Combine(pclDir, relativeUrl);
-                var resolved = Path.GetFullPath(fullPath);
-                if (!resolved.StartsWith(pclDir, StringComparison.OrdinalIgnoreCase))
-                    throw new UnauthorizedAccessException(Lang.Text("Event.Error.FileNotFound", relativeUrl));
                 ModBase.Log($"[Control] 自定义事件中由相对 PCL 文件夹的路径 {type}: {fullPath}");
                 return [fullPath, pclDir];
             }

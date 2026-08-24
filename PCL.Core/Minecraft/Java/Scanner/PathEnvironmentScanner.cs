@@ -14,11 +14,12 @@ public class PathEnvironmentScanner : IJavaScanner
             var pathVar = Environment.GetEnvironmentVariable("PATH");
             if (string.IsNullOrEmpty(pathVar)) return;
 
-            foreach (var dir in pathVar.Split(';', StringSplitOptions.RemoveEmptyEntries))
+            foreach (var rawDirectory in pathVar.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
             {
+                var dir = rawDirectory.Trim();
                 if (!Directory.Exists(dir)) continue;
 
-                var javaExe = Path.Combine(dir, "java.exe");
+                var javaExe = Path.Combine(dir, JavaPlatform.ExecutableName);
                 if (File.Exists(javaExe)) results.Add(javaExe);
             }
         }

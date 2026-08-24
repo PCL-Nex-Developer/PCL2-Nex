@@ -53,9 +53,7 @@ public static class ModBase
     /// <summary>
     ///     程序可执行文件所在目录，以“\”结尾。
     /// </summary>
-    public static readonly string exePath = (Basics.ExecutableDirectory.EndsWith(@"\")
-        ? Basics.ExecutableDirectory
-        : Basics.ExecutableDirectory + @"\");
+    public static readonly string exePath = FileSystemPath.EnsureTrailingSeparator(Basics.ExecutableDirectory);
 
     /// <summary>
     ///     程序内嵌图片文件夹路径，以“/”结尾。
@@ -90,21 +88,23 @@ public static class ModBase
     /// <summary>
     ///     程序的缓存文件夹路径，以 \ 结尾。
     /// </summary>
-    public static string pathTemp = Paths.Temp + @"\";
+    public static string pathTemp = FileSystemPath.EnsureTrailingSeparator(Paths.Temp);
 
     /// <summary>
     ///     AppData 中的 PCL 文件夹路径，以 \ 结尾。
     /// </summary>
-    public static string pathAppdata = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PCL") + @"\";
+    public static string pathAppdata = FileSystemPath.EnsureTrailingSeparator(
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PCL"));
 
     /// <summary>
     ///     AppData 中的 PCLNex 配置文件夹路径，以 \ 结尾。
     /// </summary>
-    public static string pathAppdataConfig = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) +
+    public static string pathAppdataConfig = FileSystemPath.EnsureTrailingSeparator(Path.Combine(
+                                             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
 #if DEBUG
-                                             @"\.PCLNexdebug\";
+                                             ".PCLNexdebug"));
 #else
-                                             @"\.PCLNex\";
+                                             ".PCLNex"));
 #endif
 
 
@@ -1522,6 +1522,7 @@ public static class ModBase
     /// </summary>
     public static string ShortenPath(string longPath, int shortenThreshold = 247)
     {
+        if (!OperatingSystem.IsWindows()) return longPath;
         if (longPath.Length <= shortenThreshold)
             return longPath;
         var shortPath = new StringBuilder(260);
@@ -1551,6 +1552,15 @@ public static class ModBase
 
     public static void CreateSymbolicLink(string linkPath, string targetPath, int flags)
     {
+        if (!OperatingSystem.IsWindows())
+        {
+            if (flags == 0)
+                File.CreateSymbolicLink(linkPath, targetPath);
+            else
+                Directory.CreateSymbolicLink(linkPath, targetPath);
+            return;
+        }
+
         var cMDProcess = new Process();
         var linkDPath = ModLaunch.ExtractLinkD();
         {
@@ -2376,13 +2386,15 @@ public static class ModBase
 
     private static string GetPureASCIIDir()
     {
-        if (exePath.IsASCII()) return exePath + @"PCL\";
+        if (exePath.IsASCII()) return FileSystemPath.EnsureTrailingSeparator(Path.Combine(exePath, "PCL"));
 
         if (pathAppdata.IsASCII()) return pathAppdata;
 
         if (pathTemp.IsASCII()) return pathTemp;
 
-        return Path.Combine(SystemPaths.DriveLetter, "ProgramData", "PCL");
+        return OperatingSystem.IsWindows()
+            ? Path.Combine(SystemPaths.DriveLetter, "ProgramData", "PCL")
+            : Path.Combine(Paths.SharedLocalData, "pure");
     }
 
     /// <summary>
@@ -2565,7 +2577,8 @@ public static class ModBase
         };
 
         // 设置工作目录（如果提供）
-        if (!string.IsNullOrEmpty(workingDirectory)) info.WorkingDirectory = workingDirectory.TrimEnd('\\');
+        if (!string.IsNullOrEmpty(workingDirectory))
+            info.WorkingDirectory = workingDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
         Log("[System] 执行外部命令并等待返回结果：" + fileName + " " + arguments);
 
@@ -2834,9 +2847,28 @@ public static class ModBase
     {
         try
         {
-            location = ShortenPath(location.Replace("/", @"\").Trim(' ', '"'));
+            location = location.Trim(' ', '"');
+            var isDirectory = Directory.Exists(location) || Path.EndsInDirectorySeparator(location);
+            location = Path.GetFullPath(location);
             Log("[System] 正在打开资源管理器：" + location);
-            if (location.EndsWithF(@"\"))
+            if (!OperatingSystem.IsWindows())
+            {
+                if (OperatingSystem.IsMacOS() && File.Exists(location))
+                {
+                    var startInfo = new ProcessStartInfo("/usr/bin/open") { UseShellExecute = false };
+                    startInfo.ArgumentList.Add("-R");
+                    startInfo.ArgumentList.Add(location);
+                    Process.Start(startInfo);
+                }
+                else
+                {
+                    Basics.OpenPath(isDirectory ? location : Path.GetDirectoryName(location)!);
+                }
+                return;
+            }
+
+            location = ShortenPath(location.Replace("/", @"\"));
+            if (isDirectory)
                 ShellOnly(location);
             else
                 ShellOnly("explorer", $"/select,\"{location}\"");

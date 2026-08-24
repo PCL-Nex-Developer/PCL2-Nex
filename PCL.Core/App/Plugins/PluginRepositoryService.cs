@@ -12,6 +12,7 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using PCL.Core.App.Localization;
+using PCL.Core.IO;
 using PCL.Core.IO.Net;
 using PCL.Core.IO.Net.Http;
 using PCL.Core.Utils;
@@ -1385,7 +1386,7 @@ public static class PluginRepositoryService
             var baseDirectory = File.Exists(sourceUrl) ? Path.GetDirectoryName(Path.GetFullPath(sourceUrl)) : null;
             if (baseDirectory is null) return fallback;
             var candidate = Path.GetFullPath(Path.Combine(baseDirectory, value));
-            return candidate.StartsWith(baseDirectory + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+            return FileSystemPath.IsWithinDirectory(candidate, baseDirectory)
                 ? candidate
                 : fallback;
         }

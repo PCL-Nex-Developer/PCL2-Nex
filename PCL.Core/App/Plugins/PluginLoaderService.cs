@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using PCL.Core.App.IoC;
 using PCL.Core.App.Localization;
+using PCL.Core.IO;
 using PCL.Core.Logging;
 using PCL.Mixin;
 
@@ -339,11 +340,10 @@ public sealed class PluginLoaderService : GeneralService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(pluginDirectory);
         ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
-        var root = Path.GetFullPath(pluginDirectory).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
         var fullPath = Path.GetFullPath(Path.Combine(
             pluginDirectory,
             relativePath.Replace('/', Path.DirectorySeparatorChar)));
-        if (!fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+        if (!FileSystemPath.IsWithinDirectory(fullPath, pluginDirectory))
             throw new InvalidOperationException(Text("Plugins.Loader.Error.FileOutsidePluginDir", "插件文件不能位于插件目录之外：{0}", relativePath));
         return fullPath;
     }

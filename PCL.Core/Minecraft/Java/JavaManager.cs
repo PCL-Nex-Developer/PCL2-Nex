@@ -19,7 +19,7 @@ namespace PCL.Core.Minecraft;
 public class JavaManager
 {
     private const string ModuleName = "JavaManager";
-    private readonly Dictionary<string, JavaEntry> _javaEntrys = new();
+    private readonly Dictionary<string, JavaEntry> _javaEntrys = new(JavaPlatform.PathComparer);
 
     private readonly IJavaParser _parser;
     private readonly IJavaScanner[] _scanners;
@@ -89,14 +89,15 @@ public class JavaManager
             {
                 foreach(var item in itemsAdded)
                 {
-                    if (_javaEntrys.TryGetValue(item.Installation.JavaExePath, out var existingRecord))
+                    var path = _NormalizePath(item.Installation.JavaExePath);
+                    if (_javaEntrys.TryGetValue(path, out var existingRecord))
                     {
                         existingRecord.IsEnabled = item.IsEnabled;
                         existingRecord.Source = item.Source;
                     }
                     else
                     {
-                        _javaEntrys.Add(item.Installation.JavaExePath, item);
+                        _javaEntrys.Add(path, item);
                     }
                 }
             }
@@ -137,7 +138,7 @@ public class JavaManager
 
     private void _ScanInternal()
     {
-        var pathSet = new ConcurrentDictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        var pathSet = new ConcurrentDictionary<string, bool>(JavaPlatform.PathComparer);
 
         Parallel.ForEach(_scanners, scanner =>
         {
@@ -153,7 +154,7 @@ public class JavaManager
 
         Dictionary<string, JavaEntry> existingEntries;
         lock (_javaEntrys)
-            existingEntries = new Dictionary<string, JavaEntry>(_javaEntrys, StringComparer.OrdinalIgnoreCase);
+            existingEntries = new Dictionary<string, JavaEntry>(_javaEntrys, JavaPlatform.PathComparer);
 
         var scannedEntries = pathSet.Keys
             .Select(_parser.Parse)
@@ -185,6 +186,10 @@ public class JavaManager
 
     private static bool _ShouldEnableByDefault(JavaInstallation inst)
     {
+        if (!OperatingSystem.IsWindows())
+            return !(inst.IsJre && inst.MajorVersion > 8) &&
+                   !(inst.Is64Bit ^ Environment.Is64BitOperatingSystem);
+
         var libDir = Path.Combine(Directory.GetParent(inst.JavaFolder)!.FullName, "lib");
         var isUsable = (!inst.IsJre && File.Exists(Path.Combine(libDir, "jvm.lib"))) ||
                        (inst.IsJre && File.Exists(Path.Combine(libDir, "rt.jar")));

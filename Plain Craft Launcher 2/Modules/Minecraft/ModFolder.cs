@@ -6,6 +6,7 @@ using System.IO;
 using System.Text;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
+using PCL.Core.IO;
 using PCL.Core.Utils;
 using PCL.Core.Utils.Exts;
 
@@ -76,14 +77,15 @@ public static class ModFolder
             {
                 if (string.IsNullOrEmpty(folder))
                     continue;
-                if (!folder.Contains(">") || !folder.EndsWithF(@"\"))
+                var folderParts = folder.Split('>', 2);
+                if (folderParts.Length != 2 || string.IsNullOrWhiteSpace(folderParts[1]))
                 {
                     HintService.Hint(Lang.Text("Select.Folder.Invalid", folder), HintType.Error);
                     continue;
                 }
 
-                var name = folder.Split(">")[0];
-                var path = folder.Split(">")[1];
+                var name = folderParts[0];
+                var path = FileSystemPath.EnsureTrailingSeparator(folderParts[1]);
                 try
                 {
                     ModBase.CheckPermissionWithException(path);
@@ -107,14 +109,14 @@ public static class ModFolder
             // 扫描当前文件夹
             try
             {
-                if (Directory.Exists(ModBase.exePath + @"versions\"))
+                if (Directory.Exists(Path.Combine(ModBase.exePath, "versions")))
                     originalMcFolderList.Add(new McFolder
                         { Name = Lang.Text("Select.Folder.CurrentFolder"), Location = ModBase.exePath, type = McFolder.Types.Original });
                 foreach (var folder in new DirectoryInfo(ModBase.exePath).GetDirectories())
                     if (Directory.Exists(Path.Combine(folder.FullName, "versions")) || folder.Name == ".minecraft")
                     {
                         var newCurrentFolder = new McFolder
-                            { Name = folder.Name, Location = folder.FullName + @"\", type = McFolder.Types.Original };
+                            { Name = folder.Name, Location = FileSystemPath.EnsureTrailingSeparator(folder.FullName), type = McFolder.Types.Original };
                         originalMcFolderList.Add(newCurrentFolder);
                         currentMcFolderList.Add(newCurrentFolder);
                     }
@@ -125,7 +127,10 @@ public static class ModFolder
             }
 
             // 扫描官启文件夹
-            var mojangPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".minecraft") + @"\";
+            var minecraftDataRoot = OperatingSystem.IsWindows()
+                ? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
+                : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var mojangPath = FileSystemPath.EnsureTrailingSeparator(Path.Combine(minecraftDataRoot, ".minecraft"));
             if ((!currentMcFolderList.Any() || (mojangPath ?? "") != (currentMcFolderList[0].Location ?? "")) &&
                 Directory.Exists(Path.Combine(mojangPath, "versions"))) // 当前文件夹不是官启文件夹
                 // 具有权限且存在 versions 文件夹

@@ -77,7 +77,7 @@ public static class ModSkin
             throw new Exception(Lang.Text("Minecraft.Skin.Error.OfflineNoSkin"));
 
         // 尝试读取缓存
-        var cachePath = Path.Combine(ModBase.pathTemp, $"Cache\\Skin\\Index{type}.ini");
+        var cachePath = Path.Combine(ModBase.pathTemp, "Cache", "Skin", $"Index{type}.ini");
         var cacheSkinAddress = ModBase.ReadIni(cachePath, uuid);
         if (!string.IsNullOrEmpty(cacheSkinAddress))
             return cacheSkinAddress;

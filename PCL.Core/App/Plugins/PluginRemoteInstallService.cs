@@ -13,6 +13,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
+using PCL.Core.IO;
 using PCL.Core.IO.Net.Http;
 using PCL.Core.Logging;
 using PCL.Core.Utils;
@@ -533,13 +534,12 @@ public static class PluginRemoteInstallService
 
     internal static void ExtractZipSafely(string archivePath, string destinationDirectory)
     {
-        var destinationRoot = Path.GetFullPath(destinationDirectory) + Path.DirectorySeparatorChar;
         using var archive = ZipFile.OpenRead(archivePath);
         foreach (var entry in archive.Entries)
         {
             if (string.IsNullOrWhiteSpace(entry.FullName)) continue;
-            var targetPath = Path.GetFullPath(Path.Combine(destinationRoot, entry.FullName));
-            if (!targetPath.StartsWith(destinationRoot, StringComparison.OrdinalIgnoreCase))
+            var targetPath = Path.GetFullPath(Path.Combine(destinationDirectory, entry.FullName));
+            if (!FileSystemPath.IsWithinDirectory(targetPath, destinationDirectory))
                 throw new InvalidDataException(Lang.Text("Plugins.RemoteInstall.Error.UnsafePathInPackage"));
 
             if (string.IsNullOrEmpty(entry.Name))

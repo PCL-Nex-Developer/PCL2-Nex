@@ -4,6 +4,7 @@ using System.IO.Compression;
 using System.Text.RegularExpressions;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
+using PCL.Core.IO;
 using PCL.Core.Utils;
 
 namespace PCL;
@@ -51,7 +52,10 @@ public class McInstance
         /// <param name="name">实例名，或实例文件夹的完整路径（不规定是否以 \ 结尾）。</param>
         public McInstance(string name)
         {
-            PathInstance = (name.Contains(":") ? name : Path.Combine(ModFolder.mcFolderSelected, "versions", name)) + (name.EndsWithF(@"\") ? "" : @"\");
+            var path = Path.IsPathFullyQualified(name)
+                ? name
+                : Path.Combine(ModFolder.mcFolderSelected, "versions", name);
+            PathInstance = FileSystemPath.EnsureTrailingSeparator(path);
         }
 
         /// <summary>
@@ -82,8 +86,8 @@ public class McInstance
                         }
 
                         // 若实例文件夹下包含 mods 或 saves 文件夹，则自动开启版本隔离
-                        var modFolder = new DirectoryInfo(PathInstance + @"mods\");
-                        var saveFolder = new DirectoryInfo(PathInstance + @"saves\");
+                        var modFolder = new DirectoryInfo(Path.Combine(PathInstance, "mods"));
+                        var saveFolder = new DirectoryInfo(Path.Combine(PathInstance, "saves"));
                         if ((modFolder.Exists && modFolder.EnumerateFiles().Any()) ||
                             (saveFolder.Exists && saveFolder.EnumerateDirectories().Any()))
                         {
