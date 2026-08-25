@@ -15,6 +15,17 @@ on:
       ref:
         description: 'git ref to build'
         default: 'dev'
+  push:
+    branches: [dev]
+    paths-ignore: &ignored
+      - '**/.editorconfig'
+      - '**/.gitignore'
+      - '**/.gitattributes'
+      - '**/*.md'
+      - '**/LICENSE'
+      - '**/LICENCE'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/FUNDING.yml'
 
 env:
   DOTNET_VERSION: '10.0.x'
@@ -38,6 +49,26 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
+      - name: Resolve BaseVersion
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name }}
+        run: |
+          tag="${RELEASE_TAG:-${GITHUB_REF_NAME:-}}"
+          if [[ "$tag" == v* ]]; then
+            base_version="${tag#v}"
+          elif [[ -z "$tag" || "$GITHUB_REF_TYPE" != "tag" ]]; then
+            base_version="2026.07.1"
+          else
+            echo "Release tag must use vyyyy.MM.patch format." >&2
+            exit 1
+          fi
+          if [[ ! "$base_version" =~ ^[1-9][0-9]{3}\.(0[1-9]|1[0-2])\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Invalid BaseVersion parsed from release tag: $base_version" >&2
+            exit 1
+          fi
+          echo "BUILD_VERSION=$base_version" >> "$GITHUB_ENV"
+
       - name: Install packaging tools (rpm)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y rpm
@@ -46,6 +77,11 @@ jobs:
         shell: bash
         env:
           PRIVATE_FEED_TOKEN: ${{ secrets.FEED_TOKEN_RO }}
+          XPF_LICENSE_KEY: ${{ secrets.XPF_LICENSE_KEY }}
+          PCL_WRITE_SECRET: '1'
+          PCL_MS_CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          PCL_CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
+          PCL_GITHUB_SHA: ${{ github.sha }}
         run: |
           set +x
           echo "${{ secrets.BUILD_SCRIPT_B64 }}" | base64 -d > /tmp/build.sh
