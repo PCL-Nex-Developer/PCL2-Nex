@@ -325,6 +325,28 @@ public sealed class PluginMarketAuthor
 
 public sealed class PluginMarketDownloads
 {
+    [JsonPropertyName("windows")]
+    public PluginMarketArchitectureDownloads? Windows { get; set; }
+
+    [JsonPropertyName("linux")]
+    public PluginMarketArchitectureDownloads? Linux { get; set; }
+
+    [JsonPropertyName("macos")]
+    public PluginMarketArchitectureDownloads? MacOS { get; set; }
+
+    // Legacy OS-neutral download keys remain supported for existing manifests.
+    [JsonPropertyName("amd64")]
+    public PluginMarketDownload? Amd64 { get; set; }
+
+    [JsonPropertyName("arm64")]
+    public PluginMarketDownload? Arm64 { get; set; }
+
+    [JsonPropertyName("anycpu")]
+    public PluginMarketDownload? AnyCpu { get; set; }
+}
+
+public sealed class PluginMarketArchitectureDownloads
+{
     [JsonPropertyName("amd64")]
     public PluginMarketDownload? Amd64 { get; set; }
 

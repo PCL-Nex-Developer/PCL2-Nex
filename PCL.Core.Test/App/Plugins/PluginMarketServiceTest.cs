@@ -168,6 +168,51 @@ public class PluginMarketServiceTest
     }
 
     [TestMethod]
+    public void SelectDownload_ShouldHonorOperatingSystemAndArchitecture()
+    {
+        var version = new PluginMarketVersion
+        {
+            Downloads = new PluginMarketDownloads
+            {
+                Linux = new PluginMarketArchitectureDownloads
+                {
+                    Amd64 = Download("linux-amd64"),
+                    Arm64 = Download("linux-arm64"),
+                    AnyCpu = Download("linux-anycpu")
+                },
+                MacOS = new PluginMarketArchitectureDownloads
+                {
+                    Amd64 = Download("macos-amd64"),
+                    Arm64 = Download("macos-arm64")
+                },
+                Amd64 = Download("legacy-amd64"),
+                AnyCpu = Download("legacy-anycpu")
+            }
+        };
+
+        Assert.AreEqual("linux-amd64", FileName(PluginRepositoryService.SelectDownload(version, OSPlatform.Linux, Architecture.X64)));
+        Assert.AreEqual("linux-arm64", FileName(PluginRepositoryService.SelectDownload(version, OSPlatform.Linux, Architecture.Arm64)));
+        Assert.AreEqual("macos-amd64", FileName(PluginRepositoryService.SelectDownload(version, OSPlatform.OSX, Architecture.X64)));
+        Assert.AreEqual("macos-arm64", FileName(PluginRepositoryService.SelectDownload(version, OSPlatform.OSX, Architecture.Arm64)));
+
+        version.Downloads.Linux.Arm64 = null;
+        Assert.AreEqual("linux-anycpu", FileName(PluginRepositoryService.SelectDownload(version, OSPlatform.Linux, Architecture.Arm64)));
+        version.Downloads.MacOS.Arm64 = null;
+        Assert.IsNull(PluginRepositoryService.SelectDownload(version, OSPlatform.OSX, Architecture.Arm64));
+        Assert.AreEqual("legacy-amd64", FileName(PluginRepositoryService.SelectDownload(version, OSPlatform.Windows, Architecture.X64)));
+        Assert.AreEqual("legacy-anycpu", FileName(PluginRepositoryService.SelectDownload(version, OSPlatform.Create("unknown"), Architecture.Arm64)));
+
+        static PluginMarketDownload Download(string name) => new()
+        {
+            PackageUrl = $"https://example.com/{name}.pclx",
+            Sha256 = ValidSha256
+        };
+
+        static string? FileName(PluginMarketDownload? download)
+            => download is null ? null : Path.GetFileNameWithoutExtension(new Uri(download.PackageUrl).AbsolutePath);
+    }
+
+    [TestMethod]
     public void SelectLatestVersion_ShouldUseSemanticVersionPrecedence()
     {
         var manifest = new PluginMarketManifest

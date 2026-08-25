@@ -323,8 +323,9 @@ public static class PluginRepositoryService
         // current architecture. The UI uses SelectedVersion + a null SelectedDownload to report
         // an explicit platform-incompatible state instead of incorrectly showing an unknown Core
         // compatibility state.
-        var version = SelectLatestVersion(manifest, architecture) ?? SelectLatestVersion(manifest);
-        var download = version is null ? null : SelectDownload(version, architecture);
+        var platform = GetCurrentPlatform();
+        var version = SelectLatestVersion(manifest, platform, architecture) ?? SelectLatestVersion(manifest);
+        var download = version is null ? null : SelectDownload(version, platform, architecture);
         if (version is not null && download is not null)
         {
             version.ResolvedPackageUrl = download.PackageUrl;
@@ -376,8 +377,9 @@ public static class PluginRepositoryService
     {
         ValidateMarketManifest(manifest);
         var selectedArchitecture = architecture ?? RuntimeInformation.OSArchitecture;
-        var version = SelectLatestVersion(manifest, selectedArchitecture) ?? SelectLatestVersion(manifest);
-        var download = version is null ? null : SelectDownload(version, selectedArchitecture);
+        var platform = GetCurrentPlatform();
+        var version = SelectLatestVersion(manifest, platform, selectedArchitecture) ?? SelectLatestVersion(manifest);
+        var download = version is null ? null : SelectDownload(version, platform, selectedArchitecture);
         if (version is not null && download is not null)
         {
             version.ResolvedPackageUrl = download.PackageUrl;
@@ -440,11 +442,17 @@ public static class PluginRepositoryService
     }
 
     public static PluginMarketVersion? SelectLatestVersion(PluginMarketManifest manifest, Architecture? architecture)
+        => SelectLatestVersion(manifest, GetCurrentPlatform(), architecture);
+
+    public static PluginMarketVersion? SelectLatestVersion(
+        PluginMarketManifest manifest,
+        OSPlatform platform,
+        Architecture? architecture)
     {
         var candidates = (manifest.Versions ?? [])
             .Select((version, index) => new { Version = version, Index = index, Parsed = ParsePluginVersion(version.Version) })
             .Where(item => item.Parsed is not null)
-            .Where(item => architecture is null || SelectDownload(item.Version, architecture.Value) is not null)
+            .Where(item => architecture is null || SelectDownload(item.Version, platform, architecture.Value) is not null)
             .OrderByDescending(item => item.Parsed)
             .ThenBy(item => item.Index)
             .Select(item => item.Version)
@@ -458,19 +466,61 @@ public static class PluginRepositoryService
     }
 
     public static PluginMarketDownload? SelectDownload(PluginMarketVersion version, Architecture architecture)
+        => SelectDownload(version, GetCurrentPlatform(), architecture);
+
+    public static PluginMarketDownload? SelectDownload(
+        PluginMarketVersion version,
+        OSPlatform platform,
+        Architecture architecture)
     {
         var downloads = version.Downloads;
-        PluginMarketDownload? selected = architecture switch
+        var platformDownloads = GetPlatformDownloads(downloads, platform);
+        PluginMarketDownload? selected = SelectArchitectureDownload(platformDownloads, architecture);
+
+        // A declared OS group is authoritative. Legacy keys are consulted only when that whole
+        // group is absent, preventing native packages for another OS from being selected.
+        if (platformDownloads is null)
         {
-            Architecture.X64 => downloads?.Amd64 ?? downloads?.AnyCpu,
-            Architecture.Arm64 => downloads?.Arm64 ?? downloads?.AnyCpu,
-            _ => downloads?.AnyCpu
-        };
+            selected = architecture switch
+            {
+                Architecture.X64 => downloads?.Amd64 ?? downloads?.AnyCpu,
+                Architecture.Arm64 => downloads?.Arm64 ?? downloads?.AnyCpu,
+                _ => downloads?.AnyCpu
+            };
+        }
 
         return selected is not null && IsGeneralPackageUrl(selected.PackageUrl) && IsValidSha256(selected.Sha256)
             ? selected
             : null;
     }
+
+    private static OSPlatform GetCurrentPlatform()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return OSPlatform.Windows;
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) return OSPlatform.Linux;
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) return OSPlatform.OSX;
+        return OSPlatform.Create("unknown");
+    }
+
+    private static PluginMarketArchitectureDownloads? GetPlatformDownloads(
+        PluginMarketDownloads? downloads,
+        OSPlatform platform)
+    {
+        if (platform.Equals(OSPlatform.Windows)) return downloads?.Windows;
+        if (platform.Equals(OSPlatform.Linux)) return downloads?.Linux;
+        if (platform.Equals(OSPlatform.OSX)) return downloads?.MacOS;
+        return null;
+    }
+
+    private static PluginMarketDownload? SelectArchitectureDownload(
+        PluginMarketArchitectureDownloads? downloads,
+        Architecture architecture)
+        => architecture switch
+        {
+            Architecture.X64 => downloads?.Amd64 ?? downloads?.AnyCpu,
+            Architecture.Arm64 => downloads?.Arm64 ?? downloads?.AnyCpu,
+            _ => downloads?.AnyCpu
+        };
 
     public static bool IsValidSha256(string? value)
     {
@@ -499,7 +549,17 @@ public static class PluginRepositoryService
             if (downloads is null)
                 throw new InvalidDataException($"Plugin version {version.Version ?? "?"} has no downloads.");
 
-            var declared = new[] { downloads.Amd64, downloads.Arm64, downloads.AnyCpu }
+            ValidateArchitectureGroup(downloads.Windows, "windows", version.Version);
+            ValidateArchitectureGroup(downloads.Linux, "linux", version.Version);
+            ValidateArchitectureGroup(downloads.MacOS, "macos", version.Version);
+
+            var declared = new[]
+                {
+                    downloads.Amd64, downloads.Arm64, downloads.AnyCpu,
+                    downloads.Windows?.Amd64, downloads.Windows?.Arm64, downloads.Windows?.AnyCpu,
+                    downloads.Linux?.Amd64, downloads.Linux?.Arm64, downloads.Linux?.AnyCpu,
+                    downloads.MacOS?.Amd64, downloads.MacOS?.Arm64, downloads.MacOS?.AnyCpu
+                }
                 .Where(download => download is not null)
                 .Cast<PluginMarketDownload>()
                 .ToArray();
@@ -524,6 +584,19 @@ public static class PluginRepositoryService
                 }
             }
         }
+    }
+
+    private static void ValidateArchitectureGroup(
+        PluginMarketArchitectureDownloads? downloads,
+        string platform,
+        string? version)
+    {
+        if (downloads is not null
+            && downloads.Amd64 is null
+            && downloads.Arm64 is null
+            && downloads.AnyCpu is null)
+            throw new InvalidDataException(
+                $"Plugin version {version ?? "?"} has an empty downloads.{platform} group.");
     }
 
     public static void ValidateMarketManifest(PluginMarketManifest manifest)

@@ -11,6 +11,32 @@ namespace PCL.Core.Test.App.Plugins;
 public class PluginIndexModelsTest
 {
     [TestMethod]
+    public void PluginMarketDownloads_Deserialize_ShouldPreserveOperatingSystemGroups()
+    {
+        const string json = """
+            {
+              "linux": {
+                "amd64": {
+                  "packageUrl": "https://example.com/linux-amd64.pclx",
+                  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                }
+              },
+              "macos": {
+                "arm64": {
+                  "packageUrl": "https://example.com/macos-arm64.pclx",
+                  "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                }
+              }
+            }
+            """;
+
+        var downloads = JsonSerializer.Deserialize<PluginMarketDownloads>(json, PluginJson.SerializerOptions);
+
+        Assert.AreEqual("https://example.com/linux-amd64.pclx", downloads?.Linux?.Amd64?.PackageUrl);
+        Assert.AreEqual("https://example.com/macos-arm64.pclx", downloads?.MacOS?.Arm64?.PackageUrl);
+    }
+
+    [TestMethod]
     public void PluginPackageManifest_Deserialize_ShouldPreserveCriticalFields()
     {
         var json = """
