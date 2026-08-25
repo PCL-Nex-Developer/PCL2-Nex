@@ -50,3 +50,7 @@ jobs:
       configuration: ${{ matrix.configuration }}
       architecture: ${{ matrix.architecture }}
     secrets: inherit
+
+  cross-platform:
+    uses: ./.github/workflows/cross-platform.yml
+    secrets: inherit

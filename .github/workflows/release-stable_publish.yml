@@ -10,6 +10,8 @@ on:
 jobs:
   cross-platform:
     if: ${{ !github.event.release.prerelease }}
+    permissions:
+      contents: write
     uses: ./.github/workflows/cross-platform.yml
     with:
       tag: ${{ github.event.release.tag_name }}
