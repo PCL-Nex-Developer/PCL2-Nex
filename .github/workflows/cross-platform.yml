@@ -77,7 +77,6 @@ jobs:
         shell: bash
         env:
           PRIVATE_FEED_TOKEN: ${{ secrets.FEED_TOKEN_RO }}
-          XPF_LICENSE_KEY: ${{ secrets.XPF_LICENSE_KEY }}
           PCL_WRITE_SECRET: '1'
           PCL_MS_CLIENT_ID: ${{ secrets.CLIENT_ID }}
           PCL_CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
