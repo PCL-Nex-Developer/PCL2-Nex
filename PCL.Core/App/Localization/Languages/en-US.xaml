@@ -3202,11 +3202,6 @@
 
     <!-- Setup.Misc.Network extras -->
 
-    <sys:String x:Key="Setup.Misc.Network.GitHubAcceleration">GitHub acceleration</sys:String>
-    <sys:String x:Key="Setup.Misc.Network.GitHubMirror.ToolTip">Rewrite GitHub file links to {0}</sys:String>
-    <sys:String x:Key="Setup.Misc.Network.AcceleratedDomains">Accelerated domains</sys:String>
-    <sys:String x:Key="Setup.Misc.Network.SpeedTest.InProgress">Testing GitHub acceleration speed, please wait...</sys:String>
-    <sys:String x:Key="Setup.Misc.Network.SpeedTest.Failed">GitHub acceleration speed test failed. Please try again later.</sys:String>
     <sys:String x:Key="Setup.Misc.Network.SpeedTest.Success">Selected {0}, speed test result approx. {1} MB/s.</sys:String>
 
     <!-- Setup.Left -->
@@ -3477,10 +3472,6 @@
 
     <!-- PageSetupLauncherMisc -->
     <sys:String x:Key="Setup.Misc.Network.ProxyHint">e.g. http://127.0.0.1:1080/</sys:String>
-    <sys:String x:Key="Setup.Misc.Network.GitHubMirror.ToolTip1">Rewrite GitHub file links to https://gh-proxy.org/https://github.com/...</sys:String>
-    <sys:String x:Key="Setup.Misc.Network.GitHubMirror.ToolTip2">Rewrite GitHub file links to https://v4.gh-proxy.org/https://github.com/...</sys:String>
-    <sys:String x:Key="Setup.Misc.Network.GitHubMirror.ToolTip3">Rewrite GitHub file links to https://v6.gh-proxy.org/https://github.com/...</sys:String>
-    <sys:String x:Key="Setup.Misc.Network.GitHubMirror.ToolTip4">Rewrite GitHub file links to https://cdn.gh-proxy.org/https://github.com/...</sys:String>
 
     <!-- PageSetupLauncherMisc.xaml.cs -->
     <sys:String x:Key="Setup.Misc.ExportConfigFileName">PCL Global Config.json</sys:String>

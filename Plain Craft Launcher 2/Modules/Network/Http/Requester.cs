@@ -97,7 +97,7 @@ public static class Requester
     private static async Task<string> FetchOnceAsync(string url, FetchParam param)
     {
         HttpResponseMessage? response = null;
-        var requestUrl = GitHubAccelerator.RewriteByConfig(RequestSigning.SecretCdnSign(url));
+        var requestUrl = RequestSigning.SecretCdnSign(url);
         var request = new HttpRequestMessage(ParseMethod(param.Method), requestUrl);
         RequestSigning.SecretHeadersSign(requestUrl, ref request, param.UseBrowserUserAgent);
         try
@@ -146,7 +146,7 @@ public static class Requester
 
     public static DownloadService CreateDownloadService(string url, bool useBrowserUserAgent = false)
     {
-        var requestUrl = GitHubAccelerator.RewriteByConfig(RequestSigning.SecretCdnSign(url));
+        var requestUrl = RequestSigning.SecretCdnSign(url);
         var chunkCount = Math.Min(Math.Max(1, ModNet.NetTaskThreadLimit), 4);
         return new DownloadService(new DownloadConfiguration
         {

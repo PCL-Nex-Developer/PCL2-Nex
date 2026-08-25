@@ -74,10 +74,6 @@ public static partial class Config
         [ConfigItem<int>("ToolDownloadVersion", 1)] public partial int VersionListSource { get; set; }
         [ConfigItem<bool>("ToolDownloadAutoSelectVersion", true)] public partial bool AutoSelectInstance { get; set; }
         [ConfigItem<bool>("ToolFixAuthlib", true)] public partial bool FixAuthLib { get; set; }
-        [ConfigItem<int>("ToolPluginGitMirror", 0)] public partial int PluginGitMirror { get; set; }
-        [ConfigItem<string>("ToolPluginGitAcceleratedDomains", "github.com|api.github.com|raw.githubusercontent.com|objects.githubusercontent.com|release-assets.githubusercontent.com|gist.githubusercontent.com|avatars.githubusercontent.com")]
-        public partial string PluginGitAcceleratedDomains { get; set; }
-
         /// <summary>
         /// 第三方资源配置。
         /// </summary>

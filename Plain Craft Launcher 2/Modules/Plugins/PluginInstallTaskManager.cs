@@ -240,6 +240,6 @@ public static class PluginInstallTaskManager
         string? ExpectedVersion,
         IReadOnlyList<PluginDependency>? ExpectedDependencies)
     {
-        public IReadOnlyList<string> Urls { get; } = GitHubAccelerator.GetRequestCandidatesByConfig(Url);
+        public IReadOnlyList<string> Urls { get; } = [Url];
     }
 }

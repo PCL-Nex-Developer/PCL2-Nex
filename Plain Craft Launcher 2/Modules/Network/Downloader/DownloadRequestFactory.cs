@@ -8,7 +8,7 @@ internal static class DownloadRequestFactory
 {
     internal static RequestConfiguration Create(string url, bool useBrowserUserAgent, string customUserAgent = "")
     {
-        var requestUrl = GitHubAccelerator.RewriteByConfig(RequestSigning.SecretCdnSign(url));
+        var requestUrl = RequestSigning.SecretCdnSign(url);
         var request = new HttpRequestMessage(HttpMethod.Get, requestUrl);
         RequestSigning.SecretHeadersSign(requestUrl, ref request, useBrowserUserAgent, customUserAgent);
         try

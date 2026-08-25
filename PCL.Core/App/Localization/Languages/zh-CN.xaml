@@ -3201,11 +3201,6 @@
 
     <!-- Setup.Misc.Network extras -->
 
-    <sys:String x:Key="Setup.Misc.Network.GitHubAcceleration">GitHub 加速</sys:String>
-    <sys:String x:Key="Setup.Misc.Network.GitHubMirror.ToolTip">将 GitHub 文件链接改写为 {0}</sys:String>
-    <sys:String x:Key="Setup.Misc.Network.AcceleratedDomains">加速域名</sys:String>
-    <sys:String x:Key="Setup.Misc.Network.SpeedTest.InProgress">正在测试 GitHub 加速站速度，请稍候……</sys:String>
-    <sys:String x:Key="Setup.Misc.Network.SpeedTest.Failed">GitHub 加速测速失败，请稍后再试。</sys:String>
     <sys:String x:Key="Setup.Misc.Network.SpeedTest.Success">已选择 {0}，测速约 {1} MB/s。</sys:String>
 
     <!-- Setup.Left -->
@@ -3476,10 +3471,6 @@
 
     <!-- PageSetupLauncherMisc -->
     <sys:String x:Key="Setup.Misc.Network.ProxyHint">比如 http://127.0.0.1:1080/</sys:String>
-    <sys:String x:Key="Setup.Misc.Network.GitHubMirror.ToolTip1">将 GitHub 文件链接改写为 https://gh-proxy.org/https://github.com/...</sys:String>
-    <sys:String x:Key="Setup.Misc.Network.GitHubMirror.ToolTip2">将 GitHub 文件链接改写为 https://v4.gh-proxy.org/https://github.com/...</sys:String>
-    <sys:String x:Key="Setup.Misc.Network.GitHubMirror.ToolTip3">将 GitHub 文件链接改写为 https://v6.gh-proxy.org/https://github.com/...</sys:String>
-    <sys:String x:Key="Setup.Misc.Network.GitHubMirror.ToolTip4">将 GitHub 文件链接改写为 https://cdn.gh-proxy.org/https://github.com/...</sys:String>
 
     <!-- PageSetupLauncherMisc.xaml.cs -->
     <sys:String x:Key="Setup.Misc.ExportConfigFileName">PCL 全局配置.json</sys:String>

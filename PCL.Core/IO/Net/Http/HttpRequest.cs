@@ -8,7 +8,7 @@ public static class HttpRequest
 {
     private static Uri CreateUri(string url)
     {
-        return new Uri(GitHubAccelerator.RewriteByConfig(url));
+        return new Uri(url);
     }
 
     public static HttpRequestMessage Create(string url)
