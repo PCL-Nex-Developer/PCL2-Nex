@@ -55,6 +55,10 @@ public partial class PageSetupLauncherMisc
         TextSystemHttpProxyCustomPassword.Text = Config.Network.HttpProxy.CustomPassword;
         ((MyRadioBox)FindName($"RadioHttpProxyType{Config.Network.HttpProxy.Type}")).SetChecked(true, false);
         CheckNetDohEnable.Checked = Config.Network.EnableDoH;
+        ComboPluginGitMirror.SelectedIndex = CoerceSelectedIndex(Config.Download.PluginGitMirror, ComboPluginGitMirror.Items.Count);
+        var acceleratedDomains = GitHubAccelerator.GetConfiguredDomains();
+        foreach (var checkBox in GetGitHubDomainCheckBoxes())
+            checkBox.Checked = acceleratedDomains.Contains(checkBox.Tag?.ToString() ?? string.Empty, StringComparer.OrdinalIgnoreCase);
         TextPluginGitHubToken.Text = Config.Plugin.GitHubToken;
         PluginRepositoryListUi.BuildRepoList(PanPluginRepoList);
 
@@ -93,6 +97,45 @@ public partial class PageSetupLauncherMisc
             SetByTag(sender.Tag?.ToString(), sender.SelectedIndex);
     }
 
+    private void ComboPluginGitMirror_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!isLoaded || ModAnimation.AniControlEnabled != 0) return;
+        Config.Download.PluginGitMirror = ComboPluginGitMirror.SelectedIndex;
+    }
+
+    private async void BtnPluginGitMirrorSpeedTest_Click(object sender, MouseButtonEventArgs e)
+    {
+        BtnPluginGitMirrorSpeedTest.IsEnabled = false;
+        var oldText = BtnPluginGitMirrorSpeedTest.Text;
+        BtnPluginGitMirrorSpeedTest.Text = Lang.Text("Common.Action.SpeedTesting");
+        HintService.Hint(Lang.Text("Setup.Misc.Network.SpeedTest.InProgress"), HintType.Info);
+
+        try
+        {
+            var result = await GitHubAccelerator.FindFastestMirrorAsync(TimeSpan.FromSeconds(15));
+            if (result is null)
+            {
+                HintService.Hint(Lang.Text("Setup.Misc.Network.SpeedTest.Failed"), HintType.Error);
+                return;
+            }
+
+            Config.Download.PluginGitMirror = result.Mirror;
+            ComboPluginGitMirror.SelectedIndex = CoerceSelectedIndex(result.Mirror, ComboPluginGitMirror.Items.Count);
+            HintService.Hint(
+                Lang.Text("Setup.Misc.Network.SpeedTest.Success", result.MirrorUrl, (result.BytesPerSecond / 1024d / 1024d).ToString("F2")),
+                HintType.Success);
+        }
+        catch (Exception ex)
+        {
+            ModBase.Log(ex, Lang.Text("Setup.Misc.Network.SpeedTest.Failed"), ModBase.LogLevel.Hint);
+        }
+        finally
+        {
+            BtnPluginGitMirrorSpeedTest.Text = oldText;
+            BtnPluginGitMirrorSpeedTest.IsEnabled = true;
+        }
+    }
+
     private void BtnPluginRepoAdd_Click(object sender, MouseButtonEventArgs e)
     {
         PluginRepositoryListUi.ShowAddRepoDialog(PanPluginRepoList);
@@ -103,6 +146,28 @@ public partial class PageSetupLauncherMisc
         if (!isLoaded || ModAnimation.AniControlEnabled != 0) return;
         Config.Plugin.GitHubToken = TextPluginGitHubToken.Text.Trim();
     }
+
+    private void PluginGitDomain_Change(object sender, bool user)
+    {
+        if (!user || ModAnimation.AniControlEnabled != 0) return;
+        GitHubAccelerator.SetConfiguredDomains(GetGitHubDomainCheckBoxes()
+            .Where(checkBox => checkBox.Checked == true)
+            .Select(checkBox => checkBox.Tag?.ToString() ?? string.Empty));
+    }
+
+    private IEnumerable<MyCheckBox> GetGitHubDomainCheckBoxes()
+    {
+        yield return CheckGitDomainGithub;
+        yield return CheckGitDomainApi;
+        yield return CheckGitDomainRaw;
+        yield return CheckGitDomainObjects;
+        yield return CheckGitDomainReleases;
+        yield return CheckGitDomainGist;
+        yield return CheckGitDomainAvatars;
+    }
+
+    private static int CoerceSelectedIndex(int value, int count)
+        => value >= 0 && value < count ? value : 0;
 
     private void RadioBoxChange(object senderRaw, ModBase.RouteEventArgs e)
     {

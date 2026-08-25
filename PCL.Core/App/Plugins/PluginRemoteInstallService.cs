@@ -502,7 +502,7 @@ public static class PluginRemoteInstallService
     private static async Task<PluginPreparedInstall> PrepareGitAsync(string source, string? reference, CancellationToken ct)
     {
         var gitSource = ParseGitSource(source, reference);
-        var cloneUrl = gitSource.CloneUrl;
+        var cloneUrl = RewriteGitCloneUrl(gitSource.CloneUrl, Config.Download.PluginGitMirror);
         var workDir = Path.Combine(PCL.Core.App.Paths.PluginTemp, "git_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(workDir);
 

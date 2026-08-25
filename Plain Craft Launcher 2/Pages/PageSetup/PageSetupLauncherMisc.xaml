@@ -152,6 +152,33 @@
                         <local:MyButton Text="{DynamicResource Setup.Misc.Network.Proxy.Apply}" TextPadding="3" Grid.Row="4" Grid.Column="4"
                                         x:Name="BtnApplyHttpProxy" Click="ApplyHttpProxyBtn_OnClicked" />
                     </Grid>
+                    <TextBlock Text="{DynamicResource Setup.Misc.Network.GitHubAcceleration}" Grid.Row="6" VerticalAlignment="Center" Margin="0,0,25,0" />
+                    <Grid Grid.Row="6" Grid.Column="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="9" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <local:MyComboBox x:Name="ComboPluginGitMirror" Grid.Column="0" SelectionChanged="ComboPluginGitMirror_SelectionChanged">
+                            <local:MyComboBoxItem Content="{DynamicResource Common.Action.Close}" />
+                            <local:MyComboBoxItem Content="gh-proxy.org" ToolTip="{StaticResource Setup.Misc.Network.GitHubMirror.ToolTip1}" />
+                            <local:MyComboBoxItem Content="v4.gh-proxy.org" ToolTip="{StaticResource Setup.Misc.Network.GitHubMirror.ToolTip2}" />
+                            <local:MyComboBoxItem Content="v6.gh-proxy.org" ToolTip="{StaticResource Setup.Misc.Network.GitHubMirror.ToolTip3}" />
+                            <local:MyComboBoxItem Content="cdn.gh-proxy.org" ToolTip="{StaticResource Setup.Misc.Network.GitHubMirror.ToolTip4}" />
+                        </local:MyComboBox>
+                        <local:MyButton x:Name="BtnPluginGitMirrorSpeedTest" Grid.Column="2" MinWidth="80" Text="{DynamicResource Common.Action.SpeedTest}" TextPadding="3"
+                                        Click="BtnPluginGitMirrorSpeedTest_Click" />
+                    </Grid>
+                    <TextBlock Text="{DynamicResource Setup.Misc.Network.AcceleratedDomains}" Grid.Row="8" VerticalAlignment="Center" Margin="0,0,25,0" />
+                    <WrapPanel Grid.Row="8" Grid.Column="1" VerticalAlignment="Center">
+                        <local:MyCheckBox x:Name="CheckGitDomainGithub" Text="github.com" Tag="github.com" Margin="0,0,12,6" Change="PluginGitDomain_Change" />
+                        <local:MyCheckBox x:Name="CheckGitDomainApi" Text="API" Tag="api.github.com" Margin="0,0,12,6" ToolTip="api.github.com" Change="PluginGitDomain_Change" />
+                        <local:MyCheckBox x:Name="CheckGitDomainRaw" Text="Raw" Tag="raw.githubusercontent.com" Margin="0,0,12,6" ToolTip="raw.githubusercontent.com" Change="PluginGitDomain_Change" />
+                        <local:MyCheckBox x:Name="CheckGitDomainObjects" Text="Objects" Tag="objects.githubusercontent.com" Margin="0,0,12,6" ToolTip="objects.githubusercontent.com" Change="PluginGitDomain_Change" />
+                        <local:MyCheckBox x:Name="CheckGitDomainReleases" Text="Releases" Tag="release-assets.githubusercontent.com" Margin="0,0,12,6" ToolTip="release-assets.githubusercontent.com" Change="PluginGitDomain_Change" />
+                        <local:MyCheckBox x:Name="CheckGitDomainGist" Text="Gist" Tag="gist.githubusercontent.com" Margin="0,0,12,6" ToolTip="gist.githubusercontent.com" Change="PluginGitDomain_Change" />
+                        <local:MyCheckBox x:Name="CheckGitDomainAvatars" Text="Avatars" Tag="avatars.githubusercontent.com" Margin="0,0,0,6" ToolTip="avatars.githubusercontent.com" Change="PluginGitDomain_Change" />
+                    </WrapPanel>
                 </Grid>
             </local:MyCard>
             <local:MyCard Margin="0,0,0,15" Title="{DynamicResource Plugins.Repository.ManagementTitle}">
