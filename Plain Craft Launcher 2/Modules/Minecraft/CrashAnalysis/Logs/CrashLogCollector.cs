@@ -70,7 +70,7 @@ internal sealed class CrashLogCollector(CrashAnalysisContext context)
         }
 
         possibleLogs.Add(Path.Combine(versionPathIndie, "logs", "latest.log"));
-        var launchScript = CrashFileIo.ReadText(Path.Combine(Basics.ExecutableDirectory, "PCL", "LatestLaunch.bat"));
+        var launchScript = CrashFileIo.ReadText(Path.Combine(Paths.Data, "LatestLaunch.bat"));
         if (launchScript.Contains("-Dlog4j2.formatMsgNoLookups=false", StringComparison.OrdinalIgnoreCase))
             possibleLogs.Add(Path.Combine(versionPathIndie, "logs", "debug.log"));
 

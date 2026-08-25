@@ -315,7 +315,7 @@ namespace PCL
         public static string[] GetAbsoluteUrls(string relativeUrl, EventType type)
         {
             relativeUrl = relativeUrl.Trim();
-            var pclDir = Path.GetFullPath(Path.Combine(Basics.ExecutableDirectory, "PCL"));
+            var pclDir = Path.GetFullPath(Paths.Data);
 
             if (Path.IsPathFullyQualified(relativeUrl))
             {

@@ -28,7 +28,7 @@ public class LogService : ILifecycleLogService
     public Task StartAsync()
     {
         Context.Trace("正在初始化 Logger 实例");
-        var config = new LoggerConfiguration(Path.Combine(Basics.ExecutableDirectory, "PCL", "Log"));
+        var config = new LoggerConfiguration(Path.Combine(Paths.Data, "Log"));
         _logger = new Logger(config);
         Context.Trace("正在注册日志事件");
         LogWrapper.OnLog += _OnWrapperLog;
