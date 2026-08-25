@@ -30,10 +30,6 @@ jobs:
           - { os: macos-14,     platform: osx-arm64 }
       fail-fast: false
     runs-on: ${{ matrix.os }}
-    env:
-      PRIVATE_FEED_URL: https://nuget.cnb.cool/Tram-ai/NexCrossBuild/-/packages/v3/index.json
-      PRIVATE_FEED_USER: cnb
-      PRIVATE_FEED_TOKEN: ${{ secrets.FEED_TOKEN_RO }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -48,6 +44,8 @@ jobs:
 
       - name: Build
         shell: bash
+        env:
+          PRIVATE_FEED_TOKEN: ${{ secrets.FEED_TOKEN_RO }}
         run: |
           set +x
           echo "${{ secrets.BUILD_SCRIPT_B64 }}" | base64 -d > /tmp/build.sh
