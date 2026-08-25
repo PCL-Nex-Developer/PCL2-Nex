@@ -2412,11 +2412,17 @@ public static class ModLaunch
             else
             {
                 // 老版本
-                if (server.Contains(":"))
-                    // 包含端口号
-                    finalArguments += " --server " + server.Split(":")[0] + " --port " + server.Split(":")[1];
+                if (System.Net.IPAddress.TryParse(server, out _))
+                    finalArguments += " --server " + server + " --port 25565";
+                else if (server.StartsWith('[') && server.IndexOf(']') is var end && end > 1 &&
+                         System.Net.IPAddress.TryParse(server[1..end], out _))
+                {
+                    var port = server.Length > end + 1 && server[end + 1] == ':' ? server[(end + 2)..] : "25565";
+                    finalArguments += " --server " + server[1..end] + " --port " + port;
+                }
+                else if (server.Contains(':'))
+                    finalArguments += " --server " + server.Split(':')[0] + " --port " + server.Split(':')[1];
                 else
-                    // 不包含端口号
                     finalArguments += " --server " + server + " --port 25565";
                 if (ModInstanceList.McMcInstanceSelected.Info.HasOptiFine)
                     HintService.Hint(Lang.Text("Minecraft.Launch.Error.OptiFineAutoJoinWarning"), HintType.Error);

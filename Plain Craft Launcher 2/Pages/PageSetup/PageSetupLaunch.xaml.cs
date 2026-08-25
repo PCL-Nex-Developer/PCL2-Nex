@@ -494,6 +494,7 @@ public partial class PageSetupLaunch
             TextArgumentWindowHeight.Visibility = Visibility.Collapsed;
             TextArgumentWindowWidth.Visibility = Visibility.Collapsed;
         }
+        CardArgument.TriggerForceResize();
     }
 
     // 可见性选择直接关闭的警告

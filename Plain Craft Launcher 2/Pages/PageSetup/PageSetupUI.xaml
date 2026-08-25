@@ -185,6 +185,7 @@
                             <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
                             <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
                             <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
                         </Grid.ColumnDefinitions>
                         <local:MyButton x:Name="BtnBackgroundOpen" MinWidth="140" Text="{DynamicResource Common.Action.OpenFolder}" Padding="13,0"
                                         Margin="0,0,20,0" Click="BtnUIBgOpen_Click"
@@ -318,6 +319,9 @@
                         <local:MyButton x:Name="BtnCustomTutorial" Grid.Column="1" MinWidth="140" Text="{DynamicResource Setup.Ui.Homepage.Tutorial}"
                                         Padding="13,0" Margin="0,0,20,0" HorizontalAlignment="Left"
                                         Click="BtnCustomTutorial_Click" />
+                        <local:MyButton x:Name="BtnCustomOpen" Grid.Column="2" MinWidth="140" Text="打开主页文件夹"
+                                        Padding="13,0" Margin="0,0,20,0" HorizontalAlignment="Left"
+                                        Click="BtnCustomOpen_Click" />
                     </Grid>
                     <Grid x:Name="PanCustomNet" Visibility="Collapsed" Margin="0,10,0,5">
                         <Grid.ColumnDefinitions>

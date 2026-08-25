@@ -592,6 +592,11 @@ public partial class PageSetupUI
         ModBase.OpenWebsite("https://docs.pclc.cc/ce/customization/xaml-format");
     }
 
+    private void BtnCustomOpen_Click(object sender, MouseButtonEventArgs e)
+    {
+        ModBase.OpenExplorer(ModBase.pathPCLData);
+    }
+
     // 主题
     private void ThemeColor_Change(object senderRaw, SelectionChangedEventArgs e)
     {
