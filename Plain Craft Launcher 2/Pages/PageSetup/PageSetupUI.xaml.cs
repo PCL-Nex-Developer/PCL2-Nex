@@ -236,7 +236,7 @@ public partial class PageSetupUI
     // 背景图片
     private void BtnUIBgOpen_Click(object sender, MouseButtonEventArgs e)
     {
-        ModBase.OpenExplorer(ModBase.exePath + @"PCL\Pictures\");
+        ModBase.OpenExplorer(ModBase.pathPCLData + "Pictures" + System.IO.Path.DirectorySeparatorChar);
     }
 
     private void BtnBackgroundRefresh_Click(object sender, MouseButtonEventArgs e)
@@ -276,7 +276,7 @@ public partial class PageSetupUI
                 Lang.Text("Common.Dialog.Warning"), button2: Lang.Text("Common.Action.Cancel"),
                 isWarn: true) == 1)
         {
-            ModBase.DeleteDirectory(ModBase.exePath + @"PCL\Pictures");
+            ModBase.DeleteDirectory(System.IO.Path.Combine(ModBase.pathPCLData, "Pictures"));
             BackgroundRefresh(false, true);
             HintService.Hint(Lang.Text("Setup.Ui.Background.Clear.Success"), HintType.Success);
         }
@@ -292,8 +292,8 @@ public partial class PageSetupUI
         try
         {
             // 获取可用的图片文件
-            Directory.CreateDirectory(ModBase.exePath + @"PCL\Pictures\");
-            var pic = ModBase.EnumerateFiles(ModBase.exePath + @"PCL\Pictures\").Where(file =>
+            Directory.CreateDirectory(ModBase.pathPCLData + "Pictures" + System.IO.Path.DirectorySeparatorChar);
+            var pic = ModBase.EnumerateFiles(ModBase.pathPCLData + "Pictures" + System.IO.Path.DirectorySeparatorChar).Where(file =>
                     !(file.Extension.Equals(".ini", StringComparison.OrdinalIgnoreCase) ||
                       file.Extension.Equals(".db", StringComparison.OrdinalIgnoreCase))).Select(file => file.FullName)
                 .ToList();
@@ -402,11 +402,11 @@ public partial class PageSetupUI
         try
         {
             // 拷贝文件
-            File.Delete(ModBase.exePath + @"PCL\Logo.png");
-            ModBase.CopyFile(fileName, ModBase.exePath + @"PCL\Logo.png");
+            File.Delete(System.IO.Path.Combine(ModBase.pathPCLData, "Logo.png"));
+            ModBase.CopyFile(fileName, System.IO.Path.Combine(ModBase.pathPCLData, "Logo.png"));
             // 设置当前显示
             ModMain.frmMain.ImageTitleLogo.Source = null; // 防止因为 Source 属性前后的值相同而不更新 (#5628)
-            ModMain.frmMain.ImageTitleLogo.Source = ModBase.exePath + @"PCL\Logo.png";
+            ModMain.frmMain.ImageTitleLogo.Source = System.IO.Path.Combine(ModBase.pathPCLData, "Logo.png");
         }
         catch (Exception ex)
         {
@@ -426,12 +426,12 @@ public partial class PageSetupUI
         Refresh: ;
 
         // 已有图片则不再选择
-        if (File.Exists(ModBase.exePath + @"PCL\Logo.png"))
+        if (File.Exists(System.IO.Path.Combine(ModBase.pathPCLData, "Logo.png")))
         {
             try
             {
                 ModMain.frmMain.ImageTitleLogo.Source = null; // 防止因为 Source 属性前后的值相同而不更新 (#5628)
-                ModMain.frmMain.ImageTitleLogo.Source = ModBase.exePath + @"PCL\Logo.png";
+                ModMain.frmMain.ImageTitleLogo.Source = System.IO.Path.Combine(ModBase.pathPCLData, "Logo.png");
             }
             catch (Exception ex)
             {
@@ -444,7 +444,7 @@ public partial class PageSetupUI
                 e.handled = true;
                 try
                 {
-                    File.Delete(ModBase.exePath + @"PCL\Logo.png");
+                    File.Delete(System.IO.Path.Combine(ModBase.pathPCLData, "Logo.png"));
                 }
                 catch (Exception exx)
                 {
@@ -467,8 +467,8 @@ public partial class PageSetupUI
             try
             {
                 // 拷贝文件
-                File.Delete(ModBase.exePath + @"PCL\Logo.png");
-                ModBase.CopyFile(fileName, ModBase.exePath + @"PCL\Logo.png");
+                File.Delete(System.IO.Path.Combine(ModBase.pathPCLData, "Logo.png"));
+                ModBase.CopyFile(fileName, System.IO.Path.Combine(ModBase.pathPCLData, "Logo.png"));
                 goto Refresh;
             }
             catch (Exception ex)
@@ -482,7 +482,7 @@ public partial class PageSetupUI
     {
         try
         {
-            File.Delete(ModBase.exePath + @"PCL\Logo.png");
+            File.Delete(System.IO.Path.Combine(ModBase.pathPCLData, "Logo.png"));
             RadioLogoType1.SetChecked(true, true);
             HintService.Hint(Lang.Text("Setup.Ui.Logo.Clear.Success"), HintType.Success);
         }
@@ -495,7 +495,7 @@ public partial class PageSetupUI
     // 背景音乐
     private void BtnMusicOpen_Click(object sender, MouseButtonEventArgs e)
     {
-        ModBase.OpenExplorer(ModBase.exePath + @"PCL\Musics\");
+        ModBase.OpenExplorer(ModBase.pathPCLData + "Musics" + System.IO.Path.DirectorySeparatorChar);
     }
 
     private void BtnMusicRefresh_Click(object sender, MouseButtonEventArgs e)
@@ -512,7 +512,7 @@ public partial class PageSetupUI
             PanMusicVolume.Visibility = Visibility.Visible;
             PanMusicDetail.Visibility = Visibility.Visible;
             BtnMusicClear.Visibility = Visibility.Visible;
-            CardMusic.Title = Lang.Text("Setup.Ui.Music.TitleWithCount", ModBase.EnumerateFiles(ModBase.exePath + @"PCL\Musics\").Count());
+            CardMusic.Title = Lang.Text("Setup.Ui.Music.TitleWithCount", ModBase.EnumerateFiles(ModBase.pathPCLData + "Musics" + System.IO.Path.DirectorySeparatorChar).Count());
         }
         else
         {
@@ -541,7 +541,7 @@ public partial class PageSetupUI
                 // 删除文件
                 try
                 {
-                    ModBase.DeleteDirectory(ModBase.exePath + @"PCL\Musics");
+                    ModBase.DeleteDirectory(System.IO.Path.Combine(ModBase.pathPCLData, "Musics"));
                     // DisableSMTCSupport()
                     HintService.Hint(Lang.Text("Setup.Ui.Music.Delete.Success"), HintType.Success);
                 }
@@ -552,7 +552,7 @@ public partial class PageSetupUI
 
                 try
                 {
-                    Directory.CreateDirectory(ModBase.exePath + @"PCL\Musics");
+                    Directory.CreateDirectory(System.IO.Path.Combine(ModBase.pathPCLData, "Musics"));
                     ModBase.RunInUi(() => ModMusic.MusicRefreshPlay(false));
                 }
                 catch (Exception ex)

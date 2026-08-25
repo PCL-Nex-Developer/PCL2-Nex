@@ -3357,7 +3357,7 @@ public static class ModLaunch
                 customCommandGlobal + "\r\n" + customCommandVersion + "\r\n" +
                 $"\"{mcLaunchJavaSelected.Installation.JavaExePath}\" {mcLaunchArgument}" + "\r\n" +
                 "echo 游戏已退出。" + "\r\n" + "pause";
-            ModBase.WriteFile(currentLaunchOptions.SaveBatch ?? ModBase.exePath + @"PCL\LatestLaunch.bat",
+            ModBase.WriteFile(currentLaunchOptions.SaveBatch ?? System.IO.Path.Combine(ModBase.pathPCLData, "LatestLaunch.bat"),
                 McLogFilter.FilterAccessToken(cmdString, 'F'),
                 encoding: mcLaunchJavaSelected.Installation.MajorVersion > 8 ? Encoding.UTF8 : Encoding.Default);
             if (currentLaunchOptions.SaveBatch is not null)

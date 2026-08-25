@@ -149,7 +149,7 @@ public static class ModMusic
             if (musicAllList is null)
             {
                 musicAllList = new List<string>();
-                var musicDir = Path.Combine(ModBase.exePath, "PCL", "Musics");
+                var musicDir = System.IO.Path.Combine(ModBase.pathPCLData, "Musics");
                 Directory.CreateDirectory(musicDir);
                 foreach (var file in ModBase.EnumerateFiles(musicDir))
                 {

@@ -92,7 +92,7 @@ public partial class PageLaunchRight : IRefreshable
         {
             // 本地文件
             LogWrapper.Info("[Page] 主页自定义数据来源：本地文件");
-            content = ModBase.ReadFile(Path.Combine(ModBase.exePath, "PCL", "Custom.xaml"));
+            content = ModBase.ReadFile(System.IO.Path.Combine(ModBase.pathPCLData, "Custom.xaml"));
         }
         else if (uiCustomType == 2)
         {
@@ -658,7 +658,7 @@ public partial class PageLaunchRight : IRefreshable
 
     private static string _GetHomepageLiveDirectory()
     {
-        return Path.Combine(ModBase.exePath, "PCL");
+        return ModBase.pathPCLData;
     }
 
     private static void _WriteHomepageLiveSupportMarker(string directory)

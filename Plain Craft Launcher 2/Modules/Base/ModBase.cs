@@ -2391,7 +2391,8 @@ public static class ModBase
 
     private static string GetPureASCIIDir()
     {
-        if (exePath.IsASCII()) return FileSystemPath.EnsureTrailingSeparator(Path.Combine(exePath, "PCL"));
+        if (OperatingSystem.IsWindows() && exePath.IsASCII()) return FileSystemPath.EnsureTrailingSeparator(Path.Combine(exePath, "PCL"));
+        if (pathPCLData.IsASCII()) return FileSystemPath.EnsureTrailingSeparator(pathPCLData);
 
         if (pathAppdata.IsASCII()) return pathAppdata;
 
@@ -3623,7 +3624,7 @@ public static class ModBase
                              ModMain.MyMsgBox(
                                  "若你在汇报一个 Bug，请点击 打开文件夹 按钮，并上传 Launch-" + currentDate + "-[一串数字].log 中包含错误信息的文件。" +
                                  "\r\n" + "游戏崩溃一般与启动器无关，请不要因为游戏崩溃而提交反馈。", "反馈提交提醒", Lang.Text("Common.Action.OpenFolder"), "不需要") ==
-                             1)) OpenExplorer(exePath + @"PCL\Log\");
+                             1)) OpenExplorer(pathPCLData + "Log" + Path.DirectorySeparatorChar);
         OpenWebsite("https://github.com/PCL-Nex-Developer/PCL2-Nex/issues/");
     }
 
