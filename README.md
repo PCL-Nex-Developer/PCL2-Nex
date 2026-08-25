@@ -60,7 +60,9 @@ PCL Nex 始终建议使用最新版本的操作系统以获得最佳体验。
 
 ## 🌟 统计数据
 
-**本页浏览量**（总计 / 今日）：[![Hits](https://hits.zkitefly.eu.org/?tag=https://github.com/PCL-Nex-Developer/PCL2-Nex)](https://hits.zkitefly.eu.org/?tag=https://github.com/PCL-Nex-Developer/PCL2-Nex&web=true)
+[![Star History Chart](https://star-history.dera.page/svg?repos=PCL-Nex-Developer/PCL2-Nex&type=Date)](https://star-history.dera.page/#PCL-Nex-Developer/PCL2-Nex&type=Date)
+
+**本页浏览量**：[![总计访问](https://hitscounter.dev/api/hit?url=https%3A%2F%2Fgitflic.ru%2Fproject%2Fltcat%2Fpclpro&label=%E6%80%BB%E8%AE%A1%E8%AE%BF%E9%97%AE&icon=eye&color=%23198754&message=&style=flat&tz=Asia%2FShanghai)](https://github.com/PCL-Nex-Developer/PCL2-Nex)
 
 ## ❤️ 贡献者
 

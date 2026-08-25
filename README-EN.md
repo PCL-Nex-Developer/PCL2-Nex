@@ -59,6 +59,8 @@ You can still try using the latest launcher version on unsupported platforms, bu
 
 ## 🌟 Statistics
 
+[![Star History Chart](https://star-history.dera.page/svg?repos=PCL-Nex-Developer/PCL2-Nex&type=Date)](https://star-history.dera.page/#PCL-Nex-Developer/PCL2-Nex&type=Date)
+
 **Page views** (total / today): [![Hits](https://hits.zkitefly.eu.org/?tag=https://github.com/PCL-Nex-Developer/PCL2-Nex)](https://hits.zkitefly.eu.org/?tag=https://github.com/PCL-Nex-Developer/PCL2-Nex&web=true)
 
 **Views** (Total / Today): [![Hits](https://hits.zkitefly.eu.org/?tag=https://github.com/PCL-Nex-Developer/PCL2-Nex)](https://hits.zkitefly.eu.org/?tag=https://github.com/PCL-Nex-Developer/PCL2-Nex&web=true)
