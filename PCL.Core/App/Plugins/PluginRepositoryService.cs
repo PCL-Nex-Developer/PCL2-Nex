@@ -377,6 +377,8 @@ public static class PluginRepositoryService
     {
         ValidateMarketManifest(manifest);
         var selectedArchitecture = architecture ?? RuntimeInformation.OSArchitecture;
+        var indexedManifestUrl = manifest.Index?.ManifestUrl?.Trim();
+        var effectiveManifestUrl = IsAbsoluteHttpUri(indexedManifestUrl) ? indexedManifestUrl! : sourceUrl;
         var platform = GetCurrentPlatform();
         var version = SelectLatestVersion(manifest, platform, selectedArchitecture) ?? SelectLatestVersion(manifest);
         var download = version is null ? null : SelectDownload(version, platform, selectedArchitecture);
@@ -404,17 +406,18 @@ public static class PluginRepositoryService
             Name = manifest.Name.Trim(),
             Description = manifest.Description?.Trim(),
             Readme = string.IsNullOrWhiteSpace(manifest.Readme) ? null : manifest.Readme.Trim(),
-            ReadmeUrl = ResolveResourceUrl(manifest.ReadmeUrl, sourceUrl, fallbackReadme),
+            ReadmeUrl = ResolveResourceUrl(manifest.ReadmeUrl, effectiveManifestUrl, fallbackReadme),
             Author = string.IsNullOrWhiteSpace(manifest.Author?.DisplayName)
                 ? githubLogin
                 : manifest.Author.DisplayName.Trim(),
             GitHubLogin = githubLogin,
             Version = version?.Version,
-            ManifestUrl = sourceUrl,
-            ManifestUrlIsDirect = string.Equals(sourceKind, "Manifest", StringComparison.OrdinalIgnoreCase),
+            ManifestUrl = effectiveManifestUrl,
+            ManifestUrlIsDirect = IsAbsoluteHttpUri(indexedManifestUrl)
+                                  || string.Equals(sourceKind, "Manifest", StringComparison.OrdinalIgnoreCase),
             HomepageUrl = string.IsNullOrWhiteSpace(manifest.HomepageUrl) ? repository : manifest.HomepageUrl.Trim(),
             SourceRepoUrl = repository,
-            Logo = ResolveLogoUrl(manifest.Logo, sourceUrl, fallbackLogo),
+            Logo = ResolveLogoUrl(manifest.Logo, effectiveManifestUrl, fallbackLogo),
             Tags = tags,
             Group = string.IsNullOrWhiteSpace(manifest.Group) ? null : manifest.Group.Trim(),
             SourceKind = sourceKind,
@@ -422,7 +425,12 @@ public static class PluginRepositoryService
             MarketManifest = manifest,
             SelectedVersion = version,
             SelectedDownload = download,
-            CompatibilityStatus = PluginCompatibility.EvaluatePclCoreVersion(version?.PclCoreVersion)
+            CompatibilityStatus = PluginCompatibility.EvaluatePclCoreVersion(version?.PclCoreVersion),
+            LastUpdatedAt = manifest.Index?.LastUpdatedAt,
+            DownloadCount = manifest.Index is { DownloadCount: > 0 } ? manifest.Index.DownloadCount : null,
+            Archived = manifest.Index?.Archived ?? false,
+            Disabled = manifest.Index?.Disabled ?? false,
+            Fork = manifest.Index?.Fork ?? false
         };
     }
 

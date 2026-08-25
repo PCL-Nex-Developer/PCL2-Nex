@@ -748,9 +748,9 @@ public class PluginMarketServiceTest
     }
 
     [TestMethod]
-    public async Task MarketplaceLoad_ShouldUseIndexFirstAndSupplementOnlyMissingRepositories()
+    public async Task MarketplaceLoad_ShouldUseCompleteIndexWithoutGitHubDiscovery()
     {
-        const string indexDocument = """{"version":1,"updatedAt":null,"name":"Official","group":"Official","tags":[],"developers":[],"manifests":[],"plugins":[{"id":"example.indexed","name":"Indexed","author":{"githubLogin":"Owner","displayName":"Owner"},"description":"From index","repository":"https://github.com/Owner/indexed","homepageUrl":"https://github.com/Owner/indexed","versions":[{"version":"1.0.0","pclCoreVersion":"2026.07.1","releaseNotes":"https://github.com/Owner/indexed/releases/tag/v1.0.0","downloads":{"anycpu":{"packageUrl":"https://github.com/Owner/indexed/releases/download/v1.0.0/indexed.pclx","sha256":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}}}]}]}""";
+        const string indexDocument = """{"version":1,"updatedAt":null,"name":"Official","group":"Official","tags":[],"developers":[],"manifests":[],"plugins":[{"id":"example.indexed","name":"Indexed","author":{"githubLogin":"Owner","displayName":"Owner"},"description":"From index","readmeUrl":"https://raw.githubusercontent.com/Owner/indexed/main/README.md","repository":"https://github.com/Owner/indexed","homepageUrl":"https://github.com/Owner/indexed","logo":"https://avatars.githubusercontent.com/u/1?v=4","versions":[{"version":"1.0.0","pclCoreVersion":"2026.07.1","releaseNotes":"https://github.com/Owner/indexed/releases/tag/v1.0.0","downloads":{"anycpu":{"packageUrl":"https://github.com/Owner/indexed/releases/download/v1.0.0/indexed.pclx","sha256":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}}}],"index":{"manifestUrl":"https://raw.githubusercontent.com/Owner/indexed/main/manifest.json","lastUpdatedAt":"2026-08-25T10:00:00Z","downloadCount":42,"archived":false,"disabled":false,"fork":false}}]}""";
         var requests = new List<string>();
         using var client = new HttpClient(new StubHandler(request =>
         {
@@ -775,26 +775,38 @@ public class PluginMarketServiceTest
             Architecture = Architecture.X64
         }, client);
 
-        Assert.AreEqual(2, result.Entries.Count);
+        Assert.AreEqual(1, result.Entries.Count);
         var indexed = result.Entries.Single(entry => entry.Id == "example.indexed");
         Assert.IsTrue(indexed.SourceIsOfficial);
-        Assert.AreEqual("example.newone", result.Entries.Single(entry => entry.Id == "example.newone").Id);
-        Assert.IsFalse(requests.Any(url => url.StartsWith("raw.githubusercontent.com", StringComparison.Ordinal)
-                                           && url.Contains("/Owner/indexed/", StringComparison.Ordinal)));
-        Assert.IsTrue(requests.Any(url => url.StartsWith("raw.githubusercontent.com", StringComparison.Ordinal)
-                                          && url.Contains("/Owner/newone/", StringComparison.Ordinal)));
+        Assert.AreEqual("https://raw.githubusercontent.com/Owner/indexed/main/manifest.json", indexed.ManifestUrl);
+        Assert.IsTrue(indexed.ManifestUrlIsDirect);
+        Assert.AreEqual(42, indexed.DownloadCount);
+        Assert.AreEqual(DateTimeOffset.Parse("2026-08-25T10:00:00Z"), indexed.LastUpdatedAt);
+        Assert.IsFalse(requests.Any(url => url.Contains("search/repositories", StringComparison.Ordinal)));
+        CollectionAssert.AreEqual(
+            new[] { "raw.githubusercontent.com/PCL-Nex-Developer/Nex_Server/refs/heads/main/apiv2/plugin-index.json" },
+            requests);
     }
 
     [TestMethod]
-    public async Task MarketplaceLoad_ShouldUseIndexAsFallbackWhenGitHubSearchFails()
+    public async Task MarketplaceLoad_ShouldFallBackToGitHubDiscoveryWhenIndexFails()
     {
-        const string indexDocument = """{"version":1,"updatedAt":null,"name":"Official","group":"Official","tags":[],"developers":[],"manifests":[],"plugins":[{"id":"example.indexed","name":"Indexed","author":{"githubLogin":"Owner","displayName":"Owner"},"description":"From index","repository":"https://github.com/Owner/indexed","homepageUrl":"https://github.com/Owner/indexed","versions":[{"version":"1.0.0","pclCoreVersion":"2026.07.1","releaseNotes":"https://github.com/Owner/indexed/releases/tag/v1.0.0","downloads":{"anycpu":{"packageUrl":"https://github.com/Owner/indexed/releases/download/v1.0.0/indexed.pclx","sha256":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}}}]}]}""";
+        var requests = new List<string>();
         using var client = new HttpClient(new StubHandler(request =>
         {
+            requests.Add(request.RequestUri!.Host + request.RequestUri.AbsolutePath);
             if (request.RequestUri!.Host == "raw.githubusercontent.com"
                 && request.RequestUri.AbsolutePath.Contains("plugin-index.json", StringComparison.Ordinal))
-                return Json(indexDocument);
-            return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+                return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+            if (request.RequestUri.AbsolutePath.Contains("search/repositories", StringComparison.Ordinal))
+                return Json("""{"total_count":1,"items":[{"id":1,"name":"fallback","full_name":"Owner/fallback","html_url":"https://github.com/Owner/fallback","default_branch":"main","archived":false,"disabled":false,"fork":false,"owner":{"login":"Owner"}}]}""");
+            if (request.RequestUri.AbsolutePath.Contains("/commits", StringComparison.Ordinal)
+                || request.RequestUri.AbsolutePath.Contains("/releases", StringComparison.Ordinal))
+                return Json("[]");
+            if (request.RequestUri.Host == "raw.githubusercontent.com"
+                && request.RequestUri.AbsolutePath.Contains("/Owner/fallback/", StringComparison.Ordinal))
+                return Json(ValidManifestJson("fallback"));
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
         }));
         var result = await PluginMarketplaceService.LoadIndexAndTopicForTestingAsync(new PluginMarketQueryOptions
         {
@@ -803,8 +815,9 @@ public class PluginMarketServiceTest
         }, client);
 
         Assert.AreEqual(1, result.Entries.Count);
-        Assert.AreEqual("example.indexed", result.Entries[0].Id);
-        Assert.IsTrue(result.Errors.Any(error => error.Repository == "GitHub"));
+        Assert.AreEqual("example.fallback", result.Entries[0].Id);
+        Assert.IsTrue(result.Errors.Any(error => error.Repository == "NexDeveloper"));
+        Assert.IsTrue(requests.Any(url => url.Contains("search/repositories", StringComparison.Ordinal)));
     }
 
     [TestMethod]

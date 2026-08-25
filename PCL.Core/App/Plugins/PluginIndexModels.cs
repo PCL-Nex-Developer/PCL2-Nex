@@ -259,6 +259,31 @@ public sealed class PluginMarketManifest
     /// <summary>可下载版本列表。客户端按 pclCoreVersion 和当前平台选择最高版本。</summary>
     [JsonPropertyName("versions")]
     public List<PluginMarketVersion> Versions { get; set; } = [];
+
+    /// <summary>Nex_Server 预索引元数据；开发者仓库中的 manifest.json 无需声明。</summary>
+    [JsonPropertyName("index")]
+    public PluginMarketIndexMetadata? Index { get; set; }
+}
+
+public sealed class PluginMarketIndexMetadata
+{
+    [JsonPropertyName("manifestUrl")]
+    public string ManifestUrl { get; set; } = string.Empty;
+
+    [JsonPropertyName("lastUpdatedAt")]
+    public DateTimeOffset? LastUpdatedAt { get; set; }
+
+    [JsonPropertyName("downloadCount")]
+    public long DownloadCount { get; set; }
+
+    [JsonPropertyName("archived")]
+    public bool Archived { get; set; }
+
+    [JsonPropertyName("disabled")]
+    public bool Disabled { get; set; }
+
+    [JsonPropertyName("fork")]
+    public bool Fork { get; set; }
 }
 
 /// <summary>

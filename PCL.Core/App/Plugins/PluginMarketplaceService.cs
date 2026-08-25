@@ -110,16 +110,15 @@ public static class PluginMarketplaceService
         LoadState state,
         CancellationToken ct)
     {
-        // 官方索引（Nex_Server 每小时间隔生成的 plugin-index.json）是基础列表。
-        // 先加载索引再实时搜索 GitHub，只补充索引里还没有的仓库，避免重复请求。
-        // 若 GitHub 请求超时/限流，索引本身即可作为商店列表（兜底）。
-        await LoadOfficialSourceAsync(options, httpClient, state, ct).ConfigureAwait(false);
-
-        await LoadTopicAsync("pclnexplugin", "GitHub", [], options, httpClient, state, ct)
-            .ConfigureAwait(false);
+        // Nex_Server 每小时生成完整预索引。正常加载只请求该静态文件；仅当索引本身
+        // 不可用时才实时搜索 Topic，避免每次打开商店都消耗 GitHub API 配额。
+        var loaded = await LoadOfficialSourceAsync(options, httpClient, state, ct).ConfigureAwait(false);
+        if (!loaded)
+            await LoadTopicAsync("pclnexplugin", "GitHub", [], options, httpClient, state, ct)
+                .ConfigureAwait(false);
     }
 
-    private static async Task LoadOfficialSourceAsync(
+    private static async Task<bool> LoadOfficialSourceAsync(
         PluginMarketQueryOptions options,
         HttpClient httpClient,
         LoadState state,
@@ -135,11 +134,13 @@ public static class PluginMarketplaceService
                 state,
                 ct,
                 sourceIsOfficial: true).ConfigureAwait(false);
+            return true;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (Exception ex)
         {
             state.Errors.Add(new PluginMarketError("NexDeveloper", ex.Message));
+            return false;
         }
     }
 
