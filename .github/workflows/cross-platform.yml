@@ -15,17 +15,6 @@ on:
       ref:
         description: 'git ref to build'
         default: 'dev'
-  push:
-    branches: [dev]
-    paths-ignore: &ignored
-      - '**/.editorconfig'
-      - '**/.gitignore'
-      - '**/.gitattributes'
-      - '**/*.md'
-      - '**/LICENSE'
-      - '**/LICENCE'
-      - '.github/ISSUE_TEMPLATE/**'
-      - '.github/FUNDING.yml'
 
 env:
   DOTNET_VERSION: '10.0.x'
