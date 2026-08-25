@@ -37,9 +37,11 @@ jobs:
       PRIVATE_FEED_TOKEN: ${{ secrets.FEED_TOKEN_RO }}
     steps:
       - uses: actions/checkout@v6
-        with: { ref: ${{ inputs.ref || github.ref }} }
+        with:
+          ref: ${{ inputs.ref || github.ref }}
       - uses: actions/setup-dotnet@v5
-        with: { dotnet-version: env.DOTNET_VERSION }
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Build
         shell: bash
@@ -63,7 +65,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v5
-        with: { path: artifacts, pattern: cross-*, merge-multiple: true }
+        with:
+          path: artifacts
+          pattern: cross-*
+          merge-multiple: true
       - name: Attach to release
         env:
           GH_TOKEN: ${{ github.token }}
