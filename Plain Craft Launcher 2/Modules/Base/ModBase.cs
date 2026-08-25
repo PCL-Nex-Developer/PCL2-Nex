@@ -56,6 +56,11 @@ public static class ModBase
     public static readonly string exePath = FileSystemPath.EnsureTrailingSeparator(Basics.ExecutableDirectory);
 
     /// <summary>
+    ///     程序数据目录（Windows 为程序目录下 PCL，其他平台为系统标准数据目录），以分隔符结尾。
+    /// </summary>
+    public static readonly string pathPCLData = FileSystemPath.EnsureTrailingSeparator(Paths.Data);
+
+    /// <summary>
     ///     程序内嵌图片文件夹路径，以“/”结尾。
     /// </summary>
     public static readonly string pathImage = "pack://application:,,,/Plain Craft Launcher 2;component/Images/";
@@ -630,7 +635,7 @@ public static class ModBase
     public static void IniClearCache(string fileName)
     {
         if (!fileName.Contains(@":\"))
-            fileName = $@"{exePath}PCL\{fileName}.ini";
+            fileName = Path.Combine(pathPCLData, fileName + ".ini");
         if (iniCache.ContainsKey(fileName))
             iniCache.Remove(fileName, out _);
     }
@@ -646,7 +651,7 @@ public static class ModBase
         {
             // 还原文件路径
             if (!fileName.Contains(@":\"))
-                fileName = $@"{exePath}PCL\{fileName}.ini";
+                fileName = Path.Combine(pathPCLData, fileName + ".ini");
             // 检索缓存
             if (iniCache.ContainsKey(fileName))
                 return iniCache[fileName];
@@ -752,7 +757,7 @@ public static class ModBase
                 }
 
                 if (!fileName.Contains(@":\"))
-                    fileName = $@"{exePath}PCL\{fileName}.ini";
+                    fileName = Path.Combine(pathPCLData, fileName + ".ini");
                 WriteFile(fileName, fileContent.ToString());
             }
         }

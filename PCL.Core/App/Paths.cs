@@ -85,7 +85,19 @@ public static class Paths
         const string oldName = ".PCLNex";
 #endif
         // fill paths
-        _data = Path.Combine(DefaultDirectory, "PCL");
+        // 数据目录按各平台惯例：Windows = 程序目录下 PCL；macOS = ~/Library/Application Support；
+        // Linux = $XDG_DATA_HOME（默认 ~/.local/share）。程序目录在 mac 上位于 .app 包内，不应写入。
+        if (OperatingSystem.IsMacOS())
+            _data = Path.Combine(Environment.GetFolderPath(Special.UserProfile), "Library", "Application Support", name);
+        else if (OperatingSystem.IsLinux())
+        {
+            var xdg = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
+            _data = string.IsNullOrWhiteSpace(xdg)
+                ? Path.Combine(Environment.GetFolderPath(Special.UserProfile), ".local", "share", name)
+                : Path.Combine(xdg, name);
+        }
+        else
+            _data = Path.Combine(DefaultDirectory, "PCL");
         _sharedData = GetSpecialPath(Special.ApplicationData, name);
         _sharedLocalData = GetSpecialPath(Special.LocalApplicationData, name);
         _temp = Path.Combine(Path.GetTempPath(), name);

@@ -27,6 +27,14 @@ public partial class PageSetupUpdate
 
         TextCurrentVersion.Text = Lang.Text("Update.VersionPrefix", Basics.BaseVersion);
         ModAnimation.AniControlEnabled -= 1;
+        if (!UpdateManager.IsUpdateEnabled)
+        {
+            // 当前构建不支持自动更新：禁用相关选项，仅展示版本号
+            ModBase.Log("[Update] 当前构建不支持自动更新");
+            ComboSystemUpdateChannel.IsEnabled = false;
+            ComboSystemUpdateMode.IsEnabled = false;
+            return;
+        }
         CheckUpdate();
     }
 
