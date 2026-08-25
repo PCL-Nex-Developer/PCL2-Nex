@@ -24,9 +24,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - { os: ubuntu-latest, platform: deb }
-          - { os: ubuntu-latest, platform: appimage }
-          - { os: ubuntu-latest, platform: rpm }
+          # linux 单 job：一次构建出 deb + AppImage + rpm（同一 staging 打三种包）
+          - { os: ubuntu-latest, platform: linux }
           - { os: macos-14,     platform: osx-x64 }
           - { os: macos-14,     platform: osx-arm64 }
       fail-fast: false
@@ -42,6 +41,10 @@ jobs:
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install packaging tools (rpm)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y rpm
 
       - name: Build
         shell: bash
