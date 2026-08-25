@@ -57,22 +57,17 @@ public class HttpProxyManager : IWebProxy, IDisposable
         Socks
     }
 
-    private record ProxyItem
-    {
-        public ProxyProtocol Protocol;
-        public required string Address;
-    }
+    private sealed record ProxyItem(ProxyProtocol Protocol, string Address);
 
     private static ProxyItem[] _GetProxyFromString(string? proxyString)
     {
         if (proxyString.IsNullOrWhiteSpace()) return [];
 
-        var ret = new List<ProxyItem>();
-
         // 形式：http=192.168.1.100:8080;socks=192.168.1.100:1080
         if (proxyString.Contains('='))
         {
-            foreach (var segment in proxyString.Split(';', StringSplitOptions.RemoveEmptyEntries))
+            var items = new List<ProxyItem>();
+            foreach (var segment in proxyString.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
                 var eqIndex = segment.IndexOf('=');
                 if (eqIndex <= 0 || eqIndex >= segment.Length - 1)
@@ -84,23 +79,26 @@ public class HttpProxyManager : IWebProxy, IDisposable
                 if (string.IsNullOrWhiteSpace(address))
                     continue;
 
-                ret.Add(new ProxyItem { Protocol = _ParseProtocol(protocolStr), Address = address });
+                if (Uri.TryCreate(address, new UriCreationOptions(), out var proxyUri) && !proxyUri.Host.IsNullOrEmpty())
+                    address = proxyUri.Port > 0 ? $"{proxyUri.Host}:{proxyUri.Port}" : proxyUri.Host;
+                items.Add(new ProxyItem(_ParseProtocol(protocolStr), address));
             }
 
-            return ret.Count > 0 ? [.. ret] : [];
+            return [.. items];
         }
 
         // 形式：http://127.0.0.1:1145/ 或者单纯 127.0.0.1:1145
+        var ret = new List<ProxyItem>();
         if (Uri.TryCreate(proxyString, new UriCreationOptions(), out var proxyAddr))
         {
             var address = proxyAddr.Port > 0
                 ? $"{proxyAddr.Host}:{proxyAddr.Port}"
                 : proxyAddr.Host;
-            ret.Add(new ProxyItem { Protocol = _ParseProtocol(proxyAddr.Scheme), Address = address });
+            ret.Add(new ProxyItem(_ParseProtocol(proxyAddr.Scheme), address));
         }
         else
         {
-            ret.Add(new ProxyItem { Protocol = ProxyProtocol.Http, Address = proxyString.Trim() });
+            ret.Add(new ProxyItem(ProxyProtocol.Http, proxyString.Trim()));
         }
 
         return [.. ret];
