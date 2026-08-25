@@ -727,9 +727,14 @@ public partial class FormMain
             }
         }
 
-        // 按 ESC 返回上一级
+        // 按 ESC：启动中则取消启动，否则返回上一级
         if (e.Key == Key.Escape)
-            TriggerPageBack();
+        {
+            if (ModLaunch.mcLaunchLoader.State == ModBase.LoadState.Loading)
+                ModLaunch.mcLaunchLoader.Abort();
+            else
+                TriggerPageBack();
+        }
         // 更改隐藏实例可见性
         if (e.Key == Key.F11 && pageCurrent == PageType.InstanceSelect)
         {
@@ -1151,6 +1156,7 @@ public partial class FormMain
                     (t ?? "") == (extension ?? ""))) // 部分压缩包是 zip 格式但后缀为 rar，总之试一试
             {
                 ModBase.Log("[System] 文件为压缩包，尝试作为整合包安装");
+                HintService.Hint("检测到压缩包拖入，正在准备安装……", HintType.Info);
                 try
                 {
                     ModModpack.ModpackInstall(filePath);
