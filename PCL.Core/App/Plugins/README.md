@@ -43,6 +43,35 @@ A Mixin configuration follows the Sponge-style shape:
 }
 ```
 
+## Experimental feature packages
+
+A package may declare `experimentalFeatures` instead of putting every Mixin configuration in the
+always-loaded `mixinConfig`/`mixinConfigs` fields. Each feature owns one or more unique Mixin
+configuration files and is disabled by default. The installed-plugin page persists the selected
+feature IDs under that plugin's data directory; only selected configurations are applied after
+restart. If an experimental configuration fails, Core disables that feature and continues loading
+the rest of the package.
+
+```json
+{
+  "id": "example.experimental",
+  "version": "1.0.0",
+  "entryAssembly": "lib/Example.Experimental.dll",
+  "experimentalFeatures": [
+    {
+      "id": "keyboard-step",
+      "name": "Keyboard precision",
+      "description": "Use one-unit keyboard steps for sliders.",
+      "pullRequestUrl": "https://github.com/example/project/pull/1",
+      "mixinConfig": "mixins/keyboard-step.json"
+    }
+  ]
+}
+```
+
+Experimental feature IDs are stable ASCII identifiers. Configurations cannot be shared with the
+base package or another feature, which keeps each checkbox independently loadable and recoverable.
+
 There is no generic plugin lifecycle, dependency-injected host, event bus, UI API, command API,
 or script runtime. A configuration processor may only implement `IMixinConfigPlugin` to decide
 whether a Mixin applies and to validate its dedicated pre/post-apply phases.

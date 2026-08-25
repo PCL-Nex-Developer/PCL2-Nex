@@ -55,6 +55,14 @@ public class MixinRuntimeTest
     }
 
     [TestMethod]
+    public void HeadInject_WithRefArgument_ShouldUpdateTheOriginalMethodArgument()
+    {
+        using var runtime = ApplyAll();
+
+        Assert.AreEqual("https://example.test", RefArgumentTarget.PassThrough("example.test"));
+    }
+
+    [TestMethod]
     public void FieldRedirectAndInvokeInject_ShouldPatchMidMethodInstructions()
     {
         using var runtime = ApplyAll();
@@ -739,6 +747,19 @@ public class MixinRuntimeTest
             args.Set(0, 2);
             args.Set(1, 3);
         }
+    }
+
+    public static class RefArgumentTarget
+    {
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static string PassThrough(string value) => value;
+    }
+
+    [Mixin(typeof(RefArgumentTarget))]
+    private static class RefArgumentMixin
+    {
+        [Inject(nameof(RefArgumentTarget.PassThrough), At = MixinAt.Head)]
+        private static void AddHttps([Arg(0)] ref string value) => value = "https://" + value;
     }
 
     public sealed class InstructionTarget

@@ -106,6 +106,99 @@ public sealed class PluginLoaderEndToEndTest
         }
     }
 
+    [TestMethod]
+    public async Task ExperimentalFeatureSelection_ShouldOnlyApplyTheSelectedConfiguration()
+    {
+        const string pluginId = "test.loader.experimental-selected";
+        const string featureId = "force-skip";
+        var root = CreateExperimentalPackage(pluginId, featureId);
+        var originalSafeMode = PluginLoaderService.SafeMode;
+        try
+        {
+            PluginLoaderService.SafeMode = false;
+            await PluginLoaderService.LoadAllFromDirectoryAsync(
+                root,
+                isEnabled: id => string.Equals(id, pluginId, StringComparison.OrdinalIgnoreCase),
+                enabledOrder: [pluginId],
+                disableFailedPlugins: false,
+                getEnabledFeatureIds: _ => [featureId]);
+
+            AssertExperimentalLoaded(pluginId, "selected.mixins.json");
+            Assert.IsTrue(PluginLoaderService.ShouldSkipThirdPartyMixins(new PluginPackageManifest()));
+        }
+        finally
+        {
+            PluginLoaderService.RollbackLoadedPluginForTesting(pluginId);
+            PluginLoaderService.SafeMode = originalSafeMode;
+            DeleteAfterCollectibleUnload(root);
+        }
+    }
+
+    [TestMethod]
+    public async Task ExperimentalFeatureSelection_ShouldAllowAnEnabledPackageWithNoSelectedFeatures()
+    {
+        const string pluginId = "test.loader.experimental-empty";
+        var root = CreateExperimentalPackage(pluginId, "force-skip");
+        var originalSafeMode = PluginLoaderService.SafeMode;
+        try
+        {
+            PluginLoaderService.SafeMode = false;
+            await PluginLoaderService.LoadAllFromDirectoryAsync(
+                root,
+                isEnabled: id => string.Equals(id, pluginId, StringComparison.OrdinalIgnoreCase),
+                enabledOrder: [pluginId],
+                disableFailedPlugins: false,
+                getEnabledFeatureIds: _ => Array.Empty<string>());
+
+            AssertExperimentalLoaded(pluginId);
+            Assert.IsFalse(PluginLoaderService.ShouldSkipThirdPartyMixins(new PluginPackageManifest()));
+        }
+        finally
+        {
+            PluginLoaderService.RollbackLoadedPluginForTesting(pluginId);
+            PluginLoaderService.SafeMode = originalSafeMode;
+            DeleteAfterCollectibleUnload(root);
+        }
+    }
+
+    [TestMethod]
+    public async Task ExperimentalFeatureFailure_ShouldDisableOnlyTheFailedFeature()
+    {
+        const string pluginId = "test.loader.experimental-failure";
+        const string featureId = "broken-feature";
+        var root = CreateExperimentalPackage(pluginId, featureId, RequiredMissingConfiguration);
+        var manifest = new PluginPackageManifest
+        {
+            Id = pluginId,
+            ExperimentalFeatures =
+            [
+                new PluginExperimentalFeature { Id = featureId, Name = "Broken feature", MixinConfig = "selected.mixins.json" }
+            ]
+        };
+        var originalSafeMode = PluginLoaderService.SafeMode;
+        try
+        {
+            PluginExperimentalFeatureService.SetFeatureEnabled(manifest, featureId, true);
+            PluginLoaderService.SafeMode = false;
+            await PluginLoaderService.LoadAllFromDirectoryAsync(
+                root,
+                isEnabled: id => string.Equals(id, pluginId, StringComparison.OrdinalIgnoreCase),
+                enabledOrder: [pluginId],
+                disableFailedPlugins: false);
+
+            AssertExperimentalLoaded(pluginId);
+            AssertExperimentalFailureWarning(pluginId, featureId);
+            Assert.AreEqual(0, PluginExperimentalFeatureService.GetEnabledFeatureIds(manifest).Count);
+        }
+        finally
+        {
+            PluginLoaderService.RollbackLoadedPluginForTesting(pluginId);
+            PluginLoaderService.SafeMode = originalSafeMode;
+            DeleteExperimentalFeatureTestState(pluginId);
+            DeleteAfterCollectibleUnload(root);
+        }
+    }
+
     private static void AssertLoadedWithOptionalWarning(string pluginId)
     {
         var record = PluginLoaderService.LoadedPlugins.Single(item =>
@@ -152,6 +245,59 @@ public sealed class PluginLoaderEndToEndTest
             PclCoreVersion = PluginCompatibility.MinimumSupportedPclCoreVersion,
             EntryAssembly = "plugin.dll",
             MixinConfigs = configurations.Select(configuration => configuration.Name).ToArray()
+        };
+        File.WriteAllText(
+            Path.Combine(pluginDirectory, "plugin.json"),
+            JsonSerializer.Serialize(manifest, PluginJson.SerializerOptions));
+        return root;
+    }
+
+    private static void DeleteExperimentalFeatureTestState(string pluginId)
+    {
+        var directory = Path.Combine(PCL.Core.App.Paths.Plugins, "data", pluginId);
+        if (!Directory.Exists(directory)) return;
+        Directory.Delete(directory, recursive: true);
+    }
+
+    private static void AssertExperimentalLoaded(string pluginId, params string[] configurations)
+    {
+        var record = PluginLoaderService.LoadedPlugins.Single(item =>
+            string.Equals(item.Id, pluginId, StringComparison.OrdinalIgnoreCase));
+        CollectionAssert.AreEqual(configurations, record.AppliedMixinConfigurations.ToArray());
+    }
+
+    private static void AssertExperimentalFailureWarning(string pluginId, string featureId)
+    {
+        var record = PluginLoaderService.LoadedPlugins.Single(item =>
+            string.Equals(item.Id, pluginId, StringComparison.OrdinalIgnoreCase));
+        Assert.IsTrue(record.Warnings.Any(warning => warning.Contains(featureId, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private static string CreateExperimentalPackage(string pluginId, string featureId, string configuration = MainConfiguration)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pcl-loader-experimental-" + Guid.NewGuid().ToString("N"));
+        var pluginDirectory = Path.Combine(root, pluginId);
+        Directory.CreateDirectory(pluginDirectory);
+        File.Copy(typeof(PluginLoaderEndToEndMixin).Assembly.Location, Path.Combine(pluginDirectory, "plugin.dll"));
+        File.WriteAllText(Path.Combine(pluginDirectory, "selected.mixins.json"), configuration);
+
+        var manifest = new PluginPackageManifest
+        {
+            Id = pluginId,
+            Name = "Experimental loader test",
+            Version = "1.0.0",
+            Author = "PCL.Core.Test",
+            PclCoreVersion = PluginCompatibility.MinimumSupportedPclCoreVersion,
+            EntryAssembly = "plugin.dll",
+            ExperimentalFeatures =
+            [
+                new PluginExperimentalFeature
+                {
+                    Id = featureId,
+                    Name = "Force skip",
+                    MixinConfig = "selected.mixins.json"
+                }
+            ]
         };
         File.WriteAllText(
             Path.Combine(pluginDirectory, "plugin.json"),

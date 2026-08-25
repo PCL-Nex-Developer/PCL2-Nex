@@ -60,7 +60,8 @@ public sealed class PluginLoaderService : GeneralService
         CancellationToken cancellationToken = default,
         Func<string, bool>? isEnabled = null,
         IReadOnlyList<string>? enabledOrder = null,
-        bool disableFailedPlugins = true)
+        bool disableFailedPlugins = true,
+        Func<PluginPackageManifest, IReadOnlyCollection<string>>? getEnabledFeatureIds = null)
     {
         isEnabled ??= PluginEnablementService.IsEnabled;
         enabledOrder ??= PluginEnablementService.GetEnabledPluginOrder();
@@ -102,8 +103,10 @@ public sealed class PluginLoaderService : GeneralService
                 loadResults[manifest.Id] = false;
                 continue;
             }
+            var enabledFeatureIds = getEnabledFeatureIds?.Invoke(manifest)
+                                    ?? PluginExperimentalFeatureService.GetEnabledFeatureIds(manifest);
             loadResults[manifest.Id] = await LoadPackageAsync(
-                    manifest, pluginDirectory, cancellationToken, disableFailedPlugins)
+                    manifest, pluginDirectory, cancellationToken, disableFailedPlugins, enabledFeatureIds)
                 .ConfigureAwait(false);
         }
 
@@ -169,7 +172,8 @@ public sealed class PluginLoaderService : GeneralService
         PluginPackageManifest manifest,
         string pluginDirectory,
         CancellationToken cancellationToken,
-        bool disableFailedPlugins)
+        bool disableFailedPlugins,
+        IReadOnlyCollection<string> enabledFeatureIds)
     {
         if (ContainsRecord(manifest.Id))
         {
@@ -190,9 +194,9 @@ public sealed class PluginLoaderService : GeneralService
                 assemblyPath,
                 GetSharedDependencyAssemblies(manifest));
             assembly = loadContext.LoadFromAssemblyPath(Path.GetFullPath(assemblyPath));
-            var configPaths = manifest.GetMixinConfigurationPaths();
-            if (configPaths.Count == 0)
-                throw new MixinApplyException(Text("Plugins.Loader.Error.MissingMixinConfig", "插件未声明 mixinConfig 或 mixinConfigs；旧 LoadAsync 插件不再受支持。"));
+            var configPaths = manifest.GetEnabledMixinConfigurationPaths(enabledFeatureIds);
+            if (configPaths.Count == 0 && (manifest.ExperimentalFeatures ?? []).Count == 0)
+                throw new MixinApplyException(Text("Plugins.Loader.Error.MissingMixinConfig", "插件未声明 Mixin 配置；旧 LoadAsync 插件不再受支持。"));
 
             var warnings = new List<string>();
             var appliedConfigs = new List<string>();
@@ -200,6 +204,7 @@ public sealed class PluginLoaderService : GeneralService
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var configPath = ResolvePackagePath(pluginDirectory, relativeConfigPath);
+                var experimentalFeature = manifest.FindExperimentalFeatureByMixinConfiguration(relativeConfigPath);
                 MixinConfiguration configuration;
                 try
                 {
@@ -211,8 +216,26 @@ public sealed class PluginLoaderService : GeneralService
                         $"Mixin 配置已应用：{manifest.Id}/{relativeConfigPath}，" +
                         $"Mixin={result.MixinCount}，目标方法={result.TargetMethodCount}");
                 }
-                catch (Exception exception) when (TryReadOptionalConfiguration(configPath))
+                catch (Exception exception) when (experimentalFeature is not null || TryReadOptionalConfiguration(configPath))
                 {
+                    if (experimentalFeature is not null)
+                    {
+                        warnings.Add($"实验功能 {experimentalFeature.Id} 已关闭：{relativeConfigPath}：{exception.Message}");
+                        try
+                        {
+                            PluginExperimentalFeatureService.SetFeatureEnabled(manifest, experimentalFeature.Id, false);
+                        }
+                        catch (Exception stateException)
+                        {
+                            _context?.Warn($"保存实验功能关闭状态失败：{manifest.Id}/{experimentalFeature.Id}", stateException);
+                        }
+                        _context?.Warn(
+                            $"实验功能 Mixin 配置失败，已关闭该功能并继续加载：{manifest.Id}/{experimentalFeature.Id}",
+                            exception,
+                            ActionLevel.NormalLog);
+                        continue;
+                    }
+
                     warnings.Add($"可选 Mixin 配置失败：{relativeConfigPath}：{exception.Message}");
                     _context?.Warn(
                         $"可选 Mixin 配置失败，继续加载其他配置：{manifest.Id}/{relativeConfigPath}",

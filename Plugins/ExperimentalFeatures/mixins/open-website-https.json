@@ -1,0 +1,7 @@
+{
+  "required": true,
+  "package": "PclNex.ExperimentalFeatures.Mixins",
+  "mixins": ["OpenWebsiteHttpsMixin"],
+  "priority": 1000,
+  "injectors": { "defaultRequire": 1 }
+}

@@ -132,6 +132,64 @@ public class PluginPackageServiceTest
     }
 
     [TestMethod]
+    public void ExperimentalFeatures_ShouldValidateAndOnlyExposeSelectedMixinConfigurations()
+    {
+        var manifest = CreateValidManifest();
+        manifest.MixinConfig = null;
+        manifest.MixinConfigs = [];
+        manifest.ExperimentalFeatures =
+        [
+            new PluginExperimentalFeature
+            {
+                Id = "keyboard-step",
+                Name = "Keyboard step",
+                PullRequestUrl = "https://github.com/example/repository/pull/1",
+                MixinConfig = "mixins/keyboard-step.json"
+            },
+            new PluginExperimentalFeature
+            {
+                Id = "url-normalize",
+                Name = "URL normalize",
+                MixinConfigs = ["mixins/url-normalize.json"]
+            }
+        ];
+
+        Assert.IsTrue(PluginPackageService.ValidatePackageManifest(manifest).IsValid);
+        CollectionAssert.AreEqual(
+            new[] { "mixins/keyboard-step.json", "mixins/url-normalize.json" },
+            manifest.GetAllMixinConfigurationPaths().ToArray());
+        CollectionAssert.AreEqual(
+            new[] { "mixins/url-normalize.json" },
+            manifest.GetEnabledMixinConfigurationPaths(["url-normalize"]).ToArray());
+        Assert.AreEqual("keyboard-step", manifest.FindExperimentalFeatureByMixinConfiguration("mixins/keyboard-step.json")!.Id);
+    }
+
+    [TestMethod]
+    public void ExperimentalFeatures_ShouldRejectSharedOrMissingMixinConfigurations()
+    {
+        var manifest = CreateValidManifest();
+        manifest.ExperimentalFeatures =
+        [
+            new PluginExperimentalFeature
+            {
+                Id = "bad-feature",
+                Name = "Bad feature",
+                MixinConfig = "mixins.json"
+            }
+        ];
+
+        var sharedWithBase = PluginPackageService.ValidatePackageManifest(manifest);
+        Assert.IsFalse(sharedWithBase.IsValid);
+        StringAssert.Contains(sharedWithBase.ErrorMessage!, "共享");
+
+        manifest.MixinConfig = null;
+        manifest.ExperimentalFeatures[0].MixinConfig = null;
+        var missingConfiguration = PluginPackageService.ValidatePackageManifest(manifest);
+        Assert.IsFalse(missingConfiguration.IsValid);
+        StringAssert.Contains(missingConfiguration.ErrorMessage!, "Mixin 配置");
+    }
+
+    [TestMethod]
     public void ValidatePackageManifest_ShouldAllowNetworkOrLocalLogoAndRejectTraversal()
     {
         var local = CreateValidManifest();

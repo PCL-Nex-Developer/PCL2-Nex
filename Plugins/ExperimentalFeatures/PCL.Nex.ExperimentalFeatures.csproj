@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable>
+    <LangVersion>14.0</LangVersion>
+    <AssemblyName>PCL.Nex.ExperimentalFeatures</AssemblyName>
+    <RootNamespace>PclNex.ExperimentalFeatures</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\PCL.Core\PCL.Core.csproj" Private="false" />
+    <ProjectReference Include="..\..\Plain Craft Launcher 2\Plain Craft Launcher 2.csproj" Private="false" />
+  </ItemGroup>
+</Project>

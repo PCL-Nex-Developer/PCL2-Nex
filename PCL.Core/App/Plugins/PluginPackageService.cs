@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -55,10 +56,16 @@ public static class PluginPackageService
         if (string.IsNullOrWhiteSpace(manifest.EntryAssembly))
             return new PluginPackageValidationResult(false, Text("Plugins.Package.Error.MissingEntryAssembly", "缺少必填字段 EntryAssembly。"));
 
-        if (manifest.GetMixinConfigurationPaths().Count == 0)
+        if (manifest.GetAllMixinConfigurationPaths().Count == 0)
             return new PluginPackageValidationResult(
                 false,
-                Text("Plugins.Package.Error.MissingMixinConfig", "缺少必填字段 mixinConfig 或 mixinConfigs；LoadAsync/UnloadAsync 与 JavaScript 插件已不再支持。"));
+                Text("Plugins.Package.Error.MissingMixinConfig", "缺少 Mixin 配置；请声明 mixinConfig、mixinConfigs 或 experimentalFeatures 中的功能配置。LoadAsync/UnloadAsync 与 JavaScript 插件已不再支持。"));
+
+        if (manifest.GetAllMixinConfigurationPaths().Any(path => !IsSafeRelativePackagePath(path)))
+            return new PluginPackageValidationResult(false, Text("Plugins.Package.Error.InvalidMixinConfigPath", "Mixin 配置必须是插件包内的安全相对路径。"));
+
+        var experimentalFeatureValidation = ValidateExperimentalFeatures(manifest);
+        if (!experimentalFeatureValidation.IsValid) return experimentalFeatureValidation;
 
         if (!PluginUpdateService.TryParseVersion(manifest.Version, out _))
             return new PluginPackageValidationResult(false, Text("Plugins.Package.Error.InvalidVersion", "Version 无效或未设置。"));
@@ -98,6 +105,61 @@ public static class PluginPackageService
             }
         }
         return true;
+    }
+
+    /// <summary>校验实验功能在单个插件包内使用的稳定 Id。</summary>
+    public static bool IsValidExperimentalFeatureId(string? featureId)
+    {
+        if (string.IsNullOrWhiteSpace(featureId) || featureId.Length > 96) return false;
+        var trimmed = featureId.Trim();
+        if (!string.Equals(featureId, trimmed, StringComparison.Ordinal)) return false;
+        if (trimmed.Length == 0 || trimmed[0] is '-' or '_' or '.') return false;
+        foreach (var character in trimmed)
+        {
+            var isAsciiLetter = character is >= 'A' and <= 'Z' or >= 'a' and <= 'z';
+            var isDigit = character is >= '0' and <= '9';
+            if (!isAsciiLetter && !isDigit && character is not ('-' or '_' or '.')) return false;
+        }
+        return true;
+    }
+
+    private static PluginPackageValidationResult ValidateExperimentalFeatures(PluginPackageManifest manifest)
+    {
+        var featureIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var baseConfigurations = new HashSet<string>(manifest.GetMixinConfigurationPaths(), StringComparer.OrdinalIgnoreCase);
+        var configurationOwners = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var feature in manifest.ExperimentalFeatures ?? [])
+        {
+            if (feature is null)
+                return new PluginPackageValidationResult(false, Text("Plugins.Package.Error.ExperimentalFeatureNull", "experimentalFeatures 中不能包含 null。"));
+            if (!IsValidExperimentalFeatureId(feature.Id))
+                return new PluginPackageValidationResult(false, Text("Plugins.Package.Error.InvalidExperimentalFeatureId", "实验功能 Id 无效。仅可使用 ASCII 字母、数字、下划线、连字符和点号。"));
+            if (!featureIds.Add(feature.Id.Trim()))
+                return new PluginPackageValidationResult(false, Text("Plugins.Package.Error.DuplicateExperimentalFeatureId", "实验功能 Id 不能重复。"));
+            if (string.IsNullOrWhiteSpace(feature.Name))
+                return new PluginPackageValidationResult(false, Text("Plugins.Package.Error.MissingExperimentalFeatureName", "实验功能缺少显示名称。"));
+
+            var configurations = feature.GetMixinConfigurationPaths();
+            if (configurations.Count == 0)
+                return new PluginPackageValidationResult(false, Text("Plugins.Package.Error.MissingExperimentalFeatureMixinConfig", "每个实验功能都必须声明独立的 Mixin 配置。"));
+
+            if (!string.IsNullOrWhiteSpace(feature.PullRequestUrl) && !IsHttpUrl(feature.PullRequestUrl))
+                return new PluginPackageValidationResult(false, Text("Plugins.Package.Error.InvalidExperimentalFeaturePullRequestUrl", "实验功能的 PR 地址必须是 HTTP/HTTPS URL。"));
+
+            foreach (var configuration in configurations)
+            {
+                if (!IsSafeRelativePackagePath(configuration))
+                    return new PluginPackageValidationResult(false, Text("Plugins.Package.Error.InvalidMixinConfigPath", "Mixin 配置必须是插件包内的安全相对路径。"));
+                if (baseConfigurations.Contains(configuration))
+                    return new PluginPackageValidationResult(false, Text("Plugins.Package.Error.ExperimentalFeatureConfigSharedWithBase", "实验功能不能与基础插件共享 Mixin 配置。"));
+                if (configurationOwners.TryGetValue(configuration, out _))
+                    return new PluginPackageValidationResult(false, Text("Plugins.Package.Error.ExperimentalFeatureConfigShared", "两个实验功能不能共享同一个 Mixin 配置。"));
+                configurationOwners[configuration] = feature.Id;
+            }
+        }
+
+        return new PluginPackageValidationResult(true, null);
     }
 
     private static bool IsHttpUrl(string value)

@@ -96,7 +96,9 @@ public static class PluginInstallService
             var entryFullPath = PluginLoaderService.ResolvePackagePath(tempDir, entryPath);
             if (!File.Exists(entryFullPath))
                 throw new FileNotFoundException(Lang.Text("Plugins.Install.Error.EntryAssemblyNotFound", entryPath));
-            foreach (var mixinConfig in manifest.GetMixinConfigurationPaths())
+            // 实验功能即使默认关闭，也必须在安装时验证其 Mixin 配置存在，避免用户后续
+            // 勾选时才遇到损坏的插件包。
+            foreach (var mixinConfig in manifest.GetAllMixinConfigurationPaths())
             {
                 var configFullPath = PluginLoaderService.ResolvePackagePath(tempDir, mixinConfig);
                 if (!File.Exists(configFullPath))

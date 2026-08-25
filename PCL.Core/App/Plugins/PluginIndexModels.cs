@@ -539,6 +539,13 @@ public sealed class PluginPackageManifest
     public string[] MixinConfigs { get; set; } = [];
 
     /// <summary>
+    /// 可由用户逐项启用的实验功能。每一项都必须声明自己独占的 Mixin 配置，
+    /// 未选中时不会参与启动时的注入。
+    /// </summary>
+    [JsonPropertyName("experimentalFeatures")]
+    public List<PluginExperimentalFeature> ExperimentalFeatures { get; set; } = [];
+
+    /// <summary>
     /// 必须先安装、启用并成功加载的前置插件。依赖插件的公共程序集会共享给当前插件，
     /// 可用于实现 Bridge，而无需由 Core 内置脚本运行时或通用 Host API。
     /// </summary>
@@ -573,7 +580,77 @@ public sealed class PluginPackageManifest
     {
         var result = new List<string>();
         if (!string.IsNullOrWhiteSpace(MixinConfig)) result.Add(MixinConfig.Trim());
-        result.AddRange(MixinConfigs.Where(path => !string.IsNullOrWhiteSpace(path)).Select(path => path.Trim()));
+        result.AddRange((MixinConfigs ?? []).Where(path => !string.IsNullOrWhiteSpace(path)).Select(path => path.Trim()));
+        return result.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
+    /// <summary>返回安装时必须存在的全部 Mixin 配置，包括尚未启用的实验功能。</summary>
+    public IReadOnlyList<string> GetAllMixinConfigurationPaths()
+    {
+        var result = new List<string>(GetMixinConfigurationPaths());
+        foreach (var feature in ExperimentalFeatures ?? [])
+        {
+            if (feature is null) continue;
+            result.AddRange(feature.GetMixinConfigurationPaths());
+        }
+        return result.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
+    /// <summary>返回本次启动应应用的基础和已启用实验功能的 Mixin 配置。</summary>
+    public IReadOnlyList<string> GetEnabledMixinConfigurationPaths(IEnumerable<string>? enabledFeatureIds)
+    {
+        var enabled = new HashSet<string>(enabledFeatureIds ?? [], StringComparer.OrdinalIgnoreCase);
+        var result = new List<string>(GetMixinConfigurationPaths());
+        foreach (var feature in ExperimentalFeatures ?? [])
+        {
+            if (feature is null) continue;
+            if (enabled.Contains(feature.Id)) result.AddRange(feature.GetMixinConfigurationPaths());
+        }
+        return result.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
+    /// <summary>根据 Mixin 配置路径查询其所属实验功能。</summary>
+    public PluginExperimentalFeature? FindExperimentalFeatureByMixinConfiguration(string configurationPath)
+    {
+        if (string.IsNullOrWhiteSpace(configurationPath)) return null;
+        return (ExperimentalFeatures ?? []).FirstOrDefault(feature => feature is not null &&
+            feature.GetMixinConfigurationPaths().Any(path =>
+                string.Equals(path, configurationPath.Trim(), StringComparison.OrdinalIgnoreCase)));
+    }
+}
+
+/// <summary>插件包内可单独启用的实验功能声明。</summary>
+public sealed class PluginExperimentalFeature
+{
+    /// <summary>包内稳定标识符，用于保存用户选择。</summary>
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    /// <summary>显示名称。</summary>
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>面向用户的简短说明。</summary>
+    [JsonPropertyName("description")]
+    public string? Description { get; set; }
+
+    /// <summary>该实验功能的来源 PR 地址。</summary>
+    [JsonPropertyName("pullRequestUrl")]
+    public string? PullRequestUrl { get; set; }
+
+    /// <summary>该实验功能专属的单个 Mixin 配置。</summary>
+    [JsonPropertyName("mixinConfig")]
+    public string? MixinConfig { get; set; }
+
+    /// <summary>该实验功能专属的多个 Mixin 配置。</summary>
+    [JsonPropertyName("mixinConfigs")]
+    public string[] MixinConfigs { get; set; } = [];
+
+    public IReadOnlyList<string> GetMixinConfigurationPaths()
+    {
+        var result = new List<string>();
+        if (!string.IsNullOrWhiteSpace(MixinConfig)) result.Add(MixinConfig.Trim());
+        result.AddRange((MixinConfigs ?? []).Where(path => !string.IsNullOrWhiteSpace(path)).Select(path => path.Trim()));
         return result.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     }
 }

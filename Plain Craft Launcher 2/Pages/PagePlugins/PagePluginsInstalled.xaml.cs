@@ -16,6 +16,7 @@ namespace PCL;
 public partial class PagePluginsInstalled
 {
     private IReadOnlyList<PluginUpdateCandidate> _updates = [];
+    private readonly HashSet<string> _expandedExperimentalPluginIds = new(StringComparer.OrdinalIgnoreCase);
 
     public PagePluginsInstalled()
     {
@@ -90,6 +91,7 @@ public partial class PagePluginsInstalled
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             var noIcon = "pack://application:,,,/images/Icons/NoIcon.png";
             row.Children.Add(new MyImage
@@ -118,6 +120,22 @@ public partial class PagePluginsInstalled
             src.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
             info.Children.Add(src);
 
+            var experimentalFeatures = manifest?.ExperimentalFeatures?.Where(feature => feature is not null).ToList() ?? [];
+            var enabledExperimentalFeatures = manifest is null
+                ? Array.Empty<string>()
+                : PluginExperimentalFeatureService.GetEnabledFeatureIds(manifest);
+            if (experimentalFeatures.Count > 0)
+            {
+                var experimentalSummary = new TextBlock
+                {
+                    Text = $"实验功能：{enabledExperimentalFeatures.Count}/{experimentalFeatures.Count} 已启用，重启后生效",
+                    FontSize = 11,
+                    Margin = new Thickness(0, 2, 0, 0)
+                };
+                experimentalSummary.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
+                info.Children.Add(experimentalSummary);
+            }
+
             info.SetValue(Grid.ColumnProperty, 2);
             row.Children.Add(info);
 
@@ -136,6 +154,22 @@ public partial class PagePluginsInstalled
 
             row.Children.Add(orderButtons);
 
+            if (manifest is not null && experimentalFeatures.Count > 0)
+            {
+                var experimentalButton = new MyButton
+                {
+                    Text = $"实验功能 {enabledExperimentalFeatures.Count}/{experimentalFeatures.Count}",
+                    Height = 28,
+                    MinWidth = 88,
+                    Margin = new Thickness(8, 0, 0, 0),
+                    ColorType = MyButton.ColorState.Highlight
+                };
+                experimentalButton.SetValue(Grid.ColumnProperty, 4);
+                var experimentalId = pluginId;
+                experimentalButton.Click += (_, _) => ToggleExperimentalFeatures(experimentalId);
+                row.Children.Add(experimentalButton);
+            }
+
             var toggleBtn = new MyButton
             {
                 Text = isEnabled ? Lang.Text("Common.Action.Disable") : Lang.Text("Common.Action.Enable"),
@@ -144,18 +178,113 @@ public partial class PagePluginsInstalled
                 Margin = new Thickness(8, 0, 0, 0),
                 IsEnabled = true
             };
-            toggleBtn.SetValue(Grid.ColumnProperty, 4);
+            toggleBtn.SetValue(Grid.ColumnProperty, 5);
             var id1 = pluginId; var en = isEnabled;
             toggleBtn.Click += (_, _) => TogglePlugin(id1, !en);
             row.Children.Add(toggleBtn);
 
             var uninstallBtn = new MyButton { Text = Lang.Text("Plugins.Installed.Button.Uninstall"), Height = 28, MinWidth = 60, Margin = new Thickness(4, 0, 0, 0), ColorType = MyButton.ColorState.Red, IsEnabled = true };
-            uninstallBtn.SetValue(Grid.ColumnProperty, 5);
+            uninstallBtn.SetValue(Grid.ColumnProperty, 6);
             var id2 = pluginId;
             uninstallBtn.Click += (_, _) => _Uninstall(id2);
             row.Children.Add(uninstallBtn);
 
             PanInstalled.Children.Add(row);
+            if (manifest is not null && experimentalFeatures.Count > 0 && _expandedExperimentalPluginIds.Contains(pluginId))
+                PanInstalled.Children.Add(BuildExperimentalFeaturePanel(pluginId, manifest));
+        }
+    }
+
+    private FrameworkElement BuildExperimentalFeaturePanel(string pluginId, PluginPackageManifest manifest)
+    {
+        var enabledIds = new HashSet<string>(PluginExperimentalFeatureService.GetEnabledFeatureIds(manifest), StringComparer.OrdinalIgnoreCase);
+        var panel = new StackPanel { Margin = new Thickness(50, -2, 0, 10) };
+        var hint = new TextBlock
+        {
+            Text = "选择需要参与下次启动的实验功能。每项功能都可独立关闭；加载失败时只会自动关闭该项。",
+            FontSize = 11,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 5)
+        };
+        hint.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
+        panel.Children.Add(hint);
+
+        foreach (var feature in (manifest.ExperimentalFeatures ?? []).Where(feature => feature is not null))
+        {
+            var row = new Grid { Margin = new Thickness(0, 2, 0, 3) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var info = new StackPanel();
+            var checkbox = new MyCheckBox
+            {
+                Text = feature.Name,
+                Checked = enabledIds.Contains(feature.Id),
+                MinHeight = 22
+            };
+            var featureId = feature.Id;
+            checkbox.Change += (_, user) =>
+            {
+                if (!user) return;
+                SetExperimentalFeatureEnabled(manifest, featureId, checkbox.Checked == true);
+            };
+            info.Children.Add(checkbox);
+
+            if (!string.IsNullOrWhiteSpace(feature.Description))
+            {
+                var description = new TextBlock
+                {
+                    Text = feature.Description,
+                    FontSize = 11,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(20, 1, 0, 0)
+                };
+                description.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
+                info.Children.Add(description);
+            }
+
+            row.Children.Add(info);
+
+            if (!string.IsNullOrWhiteSpace(feature.PullRequestUrl))
+            {
+                var pullRequestButton = new MyButton
+                {
+                    Text = "PR",
+                    Height = 26,
+                    MinWidth = 42,
+                    Margin = new Thickness(8, 0, 0, 0),
+                    ToolTip = feature.PullRequestUrl
+                };
+                pullRequestButton.SetValue(Grid.ColumnProperty, 1);
+                var pullRequestUrl = feature.PullRequestUrl;
+                pullRequestButton.Click += (_, _) => ModBase.OpenWebsite(pullRequestUrl!);
+                row.Children.Add(pullRequestButton);
+            }
+
+            panel.Children.Add(row);
+        }
+
+        return panel;
+    }
+
+    private void ToggleExperimentalFeatures(string pluginId)
+    {
+        if (!_expandedExperimentalPluginIds.Add(pluginId)) _expandedExperimentalPluginIds.Remove(pluginId);
+        BuildInstalledList();
+    }
+
+    private void SetExperimentalFeatureEnabled(PluginPackageManifest manifest, string featureId, bool enabled)
+    {
+        try
+        {
+            PluginExperimentalFeatureService.SetFeatureEnabled(manifest, featureId, enabled);
+            ModMain.frmMain?.RefreshRestartButton(true);
+            BuildInstalledList();
+        }
+        catch (Exception ex)
+        {
+            ModMain.MyMsgBox("保存实验功能状态失败：" + ex.Message, Lang.Text("Plugins.Common.Dialog.Title.Error"));
+            BuildInstalledList();
         }
     }
 
@@ -247,6 +376,7 @@ public partial class PagePluginsInstalled
             if (ModMain.MyMsgBox(Lang.Text("Plugins.Installed.Message.InstallSecurityWarning", prepared.SourceLabel, manifest.Name, prepared.SourceUrl), Lang.Text("Plugins.Installed.Dialog.Title.ConfirmInstall"), button2: Lang.Text("Common.Action.Cancel"), isWarn: true) != 1) return;
             await PluginInstallService.InstallFromDirectoryAsync(prepared.PluginRoot, manifest, prepared.SourceType,
                 prepared.SourceUrl, installedSha256: prepared.VerifiedSha256);
+            if ((manifest.ExperimentalFeatures ?? []).Count > 0) _expandedExperimentalPluginIds.Add(manifest.Id);
             ModMain.frmMain?.RefreshRestartButton(true);
             ModMain.MyMsgBox(Lang.Text("Plugins.Installed.Message.InstallSuccess", manifest.Name), Lang.Text("Plugins.Installed.Dialog.Title.InstallComplete"));
             BuildInstalledList();
@@ -272,6 +402,7 @@ public partial class PagePluginsInstalled
         if (ModMain.MyMsgBox(Lang.Text("Plugins.Installed.Message.ImportSecurityWarning", prepared.SourceLabel, manifest.Name, prepared.SourceUrl), Lang.Text("Plugins.Installed.Dialog.Title.ConfirmImport"), button2: Lang.Text("Common.Action.Cancel"), isWarn: true) != 1) return;
         await PluginInstallService.InstallFromDirectoryAsync(prepared.PluginRoot, manifest, prepared.SourceType,
             prepared.SourceUrl, installedSha256: prepared.VerifiedSha256);
+        if ((manifest.ExperimentalFeatures ?? []).Count > 0) _expandedExperimentalPluginIds.Add(manifest.Id);
         ModMain.frmMain?.RefreshRestartButton(true);
         ModMain.MyMsgBox(Lang.Text("Plugins.Installed.Message.ImportSuccess", manifest.Name), Lang.Text("Plugins.Installed.Dialog.Title.ImportComplete"));
         BuildInstalledList();
