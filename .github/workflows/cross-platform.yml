@@ -49,7 +49,8 @@ jobs:
           set +x
           echo "${{ secrets.BUILD_SCRIPT_B64 }}" | base64 -d > /tmp/build.sh
           bash /tmp/build.sh ${{ matrix.platform }} 2>/tmp/build.err || {
-            echo "::error::build failed (details withheld)"
+            echo "::error::build failed"
+            tail -40 /tmp/build.err || true
             exit 1
           }
           rm -f /tmp/build.sh /tmp/build.err
