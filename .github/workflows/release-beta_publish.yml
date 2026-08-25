@@ -8,6 +8,12 @@ on:
     types: [published]
 
 jobs:
+  cross-platform:
+    if: ${{ github.event.release.prerelease }}
+    uses: ./.github/workflows/cross-platform.yml
+    with:
+      tag: ${{ github.event.release.tag_name }}
+    secrets: inherit
   build:
     if: ${{ github.event.release.prerelease }}
     strategy:

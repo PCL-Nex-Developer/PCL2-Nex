@@ -1,0 +1,70 @@
+name: Cross-Platform Build (Reusable)
+
+permissions:
+  contents: write
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'release tag to attach artifacts (empty = upload as workflow artifacts only)'
+        required: false
+        type: string
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'git ref to build'
+        default: 'dev'
+
+env:
+  DOTNET_VERSION: '10.0.x'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - { os: ubuntu-latest, platform: deb }
+          - { os: ubuntu-latest, platform: appimage }
+          - { os: ubuntu-latest, platform: rpm }
+          - { os: macos-14,     platform: osx-x64 }
+          - { os: macos-14,     platform: osx-arm64 }
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    env:
+      PRIVATE_FEED_URL: https://nuget.cnb.cool/Tram-ai/NexCrossBuild/-/packages/v3/index.json
+      PRIVATE_FEED_USER: cnb
+      PRIVATE_FEED_TOKEN: ${{ secrets.FEED_TOKEN_RO }}
+    steps:
+      - uses: actions/checkout@v6
+        with: { ref: ${{ inputs.ref || github.ref }} }
+      - uses: actions/setup-dotnet@v5
+        with: { dotnet-version: env.DOTNET_VERSION }
+
+      - name: Build
+        shell: bash
+        run: |
+          set +x
+          echo "${{ secrets.BUILD_SCRIPT_B64 }}" | base64 -d > /tmp/build.sh
+          bash /tmp/build.sh ${{ matrix.platform }} 2>/tmp/build.err || {
+            echo "::error::build failed (details withheld)"
+            exit 1
+          }
+          rm -f /tmp/build.sh /tmp/build.err
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cross-${{ matrix.platform }}
+          path: dist/**
+
+  attach-release:
+    if: ${{ inputs.tag != '' }}
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v5
+        with: { path: artifacts, pattern: cross-*, merge-multiple: true }
+      - name: Attach to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ inputs.tag }}" artifacts/* --clobber

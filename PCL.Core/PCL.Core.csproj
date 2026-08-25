@@ -15,7 +15,7 @@
         <Platforms>AnyCPU;x64;ARM64</Platforms>
         <ProjectGuid>{A0C2209D-64FB-4C11-9459-8E86304B6F94}</ProjectGuid>
         <RootNamespace>PCL.Core</RootNamespace>
-        <TargetFrameworks>net10.0-windows;net8.0-windows</TargetFrameworks>
+        <TargetFramework>net10.0-windows</TargetFramework>
         <UseWPF>true</UseWPF>
         <EnableWindowsTargeting>true</EnableWindowsTargeting>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -69,9 +69,6 @@
         <PackageReference Include="FluentValidation" Version="12.1.1" />
         <!-- PCL.Mixin 内部 IL Patch 实现；公共 API 不暴露 Harmony 类型。 -->
         <PackageReference Include="Lib.Harmony" Version="2.4.2" />
-        <!-- 跨平台构建 (net8.0-windows) 所需的补充包 -->
-        <PackageReference Include="System.Text.Json" Version="10.0.3" Condition="'$(TargetFramework)' == 'net8.0-windows'" />
-        <PackageReference Include="System.Drawing.Common" Version="9.0.7" Condition="'$(TargetFramework)' == 'net8.0-windows'" />
     </ItemGroup>
     <!-- 信不过巨硬的智障代码，手动包含需要的文件 -->
     <PropertyGroup>
