@@ -1,6 +1,3 @@
-using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
@@ -113,7 +110,7 @@ public partial class MySkin
             var fileAddress = SystemDialogs.SelectSaveFile(Lang.Text("Launch.Skin.SaveDialog.Title"),
                 ModBase.GetFileNameFromPath(address),
                 Lang.Text("Launch.Skin.SaveDialog.Filter"));
-            if (!fileAddress.Contains(@"\")) return;
+            if (!Path.IsPathFullyQualified(fileAddress)) return;
             File.Delete(fileAddress);
             if (address.StartsWith(ModBase.pathImage))
             {
@@ -166,30 +163,29 @@ public partial class MySkin
 
             ImgBack.Tag = Address;
             // 大小检查
-            var scale = (int)Math.Round(image.pic.Width / 64d);
-            if (image.pic.Width < 32 || image.pic.Height < 32)
+            var scale = (int)Math.Round(image.PixelWidth / 64d);
+            if (image.PixelWidth < 32 || image.PixelHeight < 32)
             {
                 ImgFore.Source = null;
                 ImgBack.Source = null;
-                throw new Exception("图片大小不足，长为 " + image.pic.Height + "，宽为 " + image.pic.Width);
+                throw new Exception("图片大小不足，长为 " + image.PixelHeight + "，宽为 " + image.PixelWidth);
             }
 
-            MyBitmap skinHead = null;
+            MyBitmap? overlayHead = null;
             // 头发层（附加层）
-            if (image.pic.Width >= 64 && image.pic.Height >= 32)
+            if (image.PixelWidth >= 64 && image.PixelHeight >= 32)
             {
-                if (image.pic.GetPixel(1, 1).A == 0 ||
-                    image.pic.GetPixel(image.pic.Width - 1, image.pic.Height - 1).A == 0 ||
-                    image.pic.GetPixel(image.pic.Width - 2, (int)Math.Round(image.pic.Height / 2d - 2d)).A == 0 ||
-                    (image.pic.GetPixel(1, 1) != image.pic.GetPixel(scale * 41, scale * 9) &&
-                     image.pic.GetPixel(image.pic.Width - 1, image.pic.Height - 1) !=
-                     image.pic.GetPixel(scale * 41, scale * 9) &&
-                     image.pic.GetPixel(image.pic.Width - 2, (int)Math.Round(image.pic.Height / 2d - 2d)) !=
-                     image.pic.GetPixel(scale * 41, scale * 9))) // 如果图片中有任何透明像素（避免纯色白底）
+                var topLeft = image.GetPixel(1, 1);
+                var bottomRight = image.GetPixel(image.PixelWidth - 1, image.PixelHeight - 1);
+                var middleRight = image.GetPixel(image.PixelWidth - 2, (int)Math.Round(image.PixelHeight / 2d - 2d));
+                var overlayReference = image.GetPixel(scale * 41, scale * 9);
+                if (topLeft.A == 0 || bottomRight.A == 0 || middleRight.A == 0 ||
+                    (topLeft != overlayReference && bottomRight != overlayReference && middleRight != overlayReference))
+                    // 如果图片中有任何透明像素（避免纯色白底）
                     // 或是头部颜色和透明区均不一样
                 {
-                    ImgFore.Source = image.Clip(scale * 40, scale * 8, scale * 8, scale * 8);
-                    skinHead = image.Clip(scale * 40, scale * 8, scale * 8, scale * 8);
+                    overlayHead = image.Clip(scale * 40, scale * 8, scale * 8, scale * 8);
+                    ImgFore.Source = overlayHead;
                 }
                 else
                 {
@@ -204,48 +200,29 @@ public partial class MySkin
             // 脸层
             ImgBack.Source = image.Clip(scale * 8, scale * 8, scale * 8, scale * 8);
             // 用于显示档案列表头像的图片
-            var skinHeadId = Address.Between(new[] { Address.Contains("Images/Skins/") ? "Skins/" : @"Skin\" }[0],
-                ".png");
-            var cachePath = ModBase.pathTemp + $@"Cache\Skin\Head\{skinHeadId}.png";
+            var normalizedAddress = Address.Replace('\\', '/');
+            var skinPathMarker = normalizedAddress.Contains("Images/Skins/", StringComparison.OrdinalIgnoreCase)
+                ? "Skins/"
+                : "Skin/";
+            var skinHeadId = normalizedAddress.Between(skinPathMarker, ".png");
+            var cachePath = Path.Combine(ModBase.pathTemp, "Cache", "Skin", "Head", skinHeadId + ".png");
             ModProfile.selectedProfile.SkinHeadId = skinHeadId;
             ModProfile.SaveProfile();
-            var completeHead = new Bitmap(56, 56);
-            using (var g = Graphics.FromImage(completeHead))
-            {
-                g.InterpolationMode = InterpolationMode.NearestNeighbor;
-                g.PixelOffsetMode = PixelOffsetMode.Half;
-                using (Bitmap faceBitmap = image.Clip(scale * 8, scale * 8, scale * 8, scale * 8))
-                {
-                    g.DrawImage(faceBitmap, new Rectangle(4, 4, 48, 48));
-                }
+            var completeHead = MyBitmap.Create(56, 56)
+                .Overlay(image.Clip(scale * 8, scale * 8, scale * 8, scale * 8).Scale(48, 48), 4, 4);
+            if (overlayHead is not null)
+                completeHead = completeHead.Overlay(overlayHead.Scale(56, 56), 0, 0);
 
-                if (ImgFore.Source is not null)
-                {
-                    using Bitmap hairBitmap = image.Clip(scale * 40, scale * 8, scale * 8, scale * 8);
-                    g.DrawImage(hairBitmap, new Rectangle(0, 0, 56, 56));
-                }
-            }
-
-            if (!Directory.Exists(ModBase.pathTemp + @"Cache\Skin\Head"))
-                Directory.CreateDirectory(ModBase.pathTemp + @"Cache\Skin\Head");
-            completeHead.Save(cachePath, ImageFormat.Png);
+            var skinHeadDirectory = Path.Combine(ModBase.pathTemp, "Cache", "Skin", "Head");
+            if (!Directory.Exists(skinHeadDirectory))
+                Directory.CreateDirectory(skinHeadDirectory);
+            completeHead.Save(cachePath);
             ModBase.Log("[Skin] 载入头像成功：" + loader.name);
         }
         catch (Exception ex)
         {
             ModBase.Log(ex, Lang.Text("Launch.Skin.Load.Error.Avatar", (Address ?? "null") + "," + loader.name), ModBase.LogLevel.Hint);
         }
-    }
-
-    private object ScaleToSize(Bitmap bitmap, int width, int height)
-    {
-        var scaledBitmap = new Bitmap(width, height);
-        using var g = Graphics.FromImage(scaledBitmap);
-        g.InterpolationMode = InterpolationMode.NearestNeighbor;
-        g.PixelOffsetMode = PixelOffsetMode.Half;
-        g.DrawImage(bitmap, 0, 0, width, height);
-
-        return scaledBitmap;
     }
 
     /// <summary>
@@ -284,13 +261,15 @@ public partial class MySkin
                 {
                     HintService.Hint(Lang.Text("Launch.Skin.Refreshing"));
                     ModBase.Log("[Skin] 正在清空皮肤缓存");
-                    if (Directory.Exists(ModBase.pathTemp + @"Cache\Skin"))
-                        ModBase.DeleteDirectory(ModBase.pathTemp + @"Cache\Skin");
-                    if (Directory.Exists(ModBase.pathTemp + @"Cache\Uuid"))
-                        ModBase.DeleteDirectory(ModBase.pathTemp + @"Cache\Uuid");
-                    ModBase.IniClearCache(ModBase.pathTemp + @"Cache\Skin\IndexMs.ini");
-                    ModBase.IniClearCache(ModBase.pathTemp + @"Cache\Skin\IndexAuth.ini");
-                    ModBase.IniClearCache(ModBase.pathTemp + @"Cache\Uuid\Mojang.ini");
+                    var skinCacheDirectory = Path.Combine(ModBase.pathTemp, "Cache", "Skin");
+                    var uuidCacheDirectory = Path.Combine(ModBase.pathTemp, "Cache", "Uuid");
+                    if (Directory.Exists(skinCacheDirectory))
+                        ModBase.DeleteDirectory(skinCacheDirectory);
+                    if (Directory.Exists(uuidCacheDirectory))
+                        ModBase.DeleteDirectory(uuidCacheDirectory);
+                    ModBase.IniClearCache(Path.Combine(skinCacheDirectory, "IndexMs.ini"));
+                    ModBase.IniClearCache(Path.Combine(skinCacheDirectory, "IndexAuth.ini"));
+                    ModBase.IniClearCache(Path.Combine(uuidCacheDirectory, "Mojang.ini"));
                     foreach (var SkinLoader in sender is not null
                                  ? new[] { sender }
                                  : new[] { PageLaunchLeft.skinLegacy, PageLaunchLeft.skinMs })
@@ -317,7 +296,7 @@ public partial class MySkin
         {
             try
             {
-                ModBase.WriteIni(ModBase.pathTemp + @"Cache\Skin\IndexMs.ini", ModProfile.selectedProfile.Uuid,
+                ModBase.WriteIni(Path.Combine(ModBase.pathTemp, "Cache", "Skin", "IndexMs.ini"), ModProfile.selectedProfile.Uuid,
                     skinAddress);
                 ModBase.Log($"[Skin] 已写入皮肤地址缓存 {ModProfile.selectedProfile.Uuid} -> {skinAddress}");
                 PageLaunchLeft.skinMs.WaitForExit(isForceRestart: true);
@@ -368,8 +347,9 @@ public partial class MySkin
                 {
                     if (itemSkin["url"] is null)
                         continue;
-                    var localFile = $@"{ModBase.pathTemp}Cache\Capes\{itemSkin["alias"]}.png";
-                    var capeFrontFile = $@"{ModBase.pathTemp}Cache\Capes\{itemSkin["alias"]}-front.png";
+                    var capeAlias = itemSkin["alias"]!.ToString();
+                    var localFile = Path.Combine(ModBase.pathTemp, "Cache", "Capes", capeAlias + ".png");
+                    var capeFrontFile = Path.Combine(ModBase.pathTemp, "Cache", "Capes", capeAlias + "-front.png");
                     if (File.Exists(localFile) && File.Exists(capeFrontFile))
                     {
                         itemSkin["url"] = capeFrontFile;
@@ -377,12 +357,7 @@ public partial class MySkin
                     }
 
                     FileDownloader.DownloadByLoader(itemSkin["url"].ToString(), localFile);
-                    var capeFrontRegion = new Rectangle(1, 0, 11, 17);
-                    var capeFront = new Bitmap(capeFrontRegion.Width, capeFrontRegion.Height);
-                    var capeImage = Image.FromFile(localFile);
-                    var gra = Graphics.FromImage(capeFront);
-                    gra.DrawImage(capeImage, capeFrontRegion, capeFrontRegion, GraphicsUnit.Pixel);
-                    capeFront.Save(capeFrontFile);
+                    new MyBitmap(localFile).Clip(1, 0, 11, 17).Save(capeFrontFile);
                     itemSkin["url"] = capeFrontFile;
                 }
 

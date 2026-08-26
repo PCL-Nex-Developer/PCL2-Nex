@@ -15,7 +15,7 @@ namespace PCL;
 public static class ModFolder
 {
     /// <summary>
-    ///     当前的 Minecraft 文件夹路径，以"\"结尾。
+    ///     当前的 Minecraft 文件夹路径，以目录分隔符结尾。
     /// </summary>
     public static string mcFolderSelected;
 
@@ -23,6 +23,53 @@ public static class ModFolder
     ///     当前的 Minecraft 文件夹列表。
     /// </summary>
     public static List<McFolder> mcFolderList = new();
+
+    /// <summary>
+    /// Gets the folder created when the launcher has no configured Minecraft folder.
+    /// Windows keeps the portable layout; Unix-like platforms use Minecraft's standard user data directory.
+    /// </summary>
+    public static string GetDefaultMinecraftFolder()
+    {
+        if (OperatingSystem.IsWindows())
+            return FileSystemPath.EnsureTrailingSeparator(Path.Combine(ModBase.exePath, ".minecraft"));
+        return GetOfficialMinecraftFolder();
+    }
+
+    /// <summary>
+    /// Expands the legacy '$' marker used for portable Windows installations and normalizes old separators.
+    /// </summary>
+    public static string ResolveMinecraftFolderPath(string value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+        var path = value.StartsWith('$')
+            ? FileSystemPath.Combine(ModBase.exePath, value[1..])
+            : value;
+        return FileSystemPath.EnsureTrailingSeparator(path);
+    }
+
+    /// <summary>
+    /// Stores portable paths compactly on Windows without making Unix user directories depend on the executable path.
+    /// </summary>
+    public static string StoreMinecraftFolderPath(string value)
+    {
+        var path = FileSystemPath.EnsureTrailingSeparator(value);
+        if (!OperatingSystem.IsWindows() || !FileSystemPath.IsWithinDirectory(path, ModBase.exePath, allowEqual: true))
+            return path;
+
+        var relativePath = Path.GetRelativePath(ModBase.exePath, path);
+        return relativePath == "." ? "$" : "$" + relativePath;
+    }
+
+    private static string GetOfficialMinecraftFolder()
+    {
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var folder = OperatingSystem.IsWindows()
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".minecraft")
+            : OperatingSystem.IsMacOS()
+                ? Path.Combine(home, "Library", "Application Support", "minecraft")
+                : Path.Combine(home, ".minecraft");
+        return FileSystemPath.EnsureTrailingSeparator(folder);
+    }
 
     public class McFolder // 必须是 Class，否则不是引用类型，在 ForEach 中不会得到刷新
     {
@@ -35,7 +82,7 @@ public static class ModFolder
 
         /// <summary>
         ///     文件夹路径。
-        ///     以 \ 结尾，例如 "D:\Game\MC\.minecraft\"。
+        ///     以当前平台的目录分隔符结尾。
         /// </summary>
         public string Location;
 
@@ -127,10 +174,7 @@ public static class ModFolder
             }
 
             // 扫描官启文件夹
-            var minecraftDataRoot = OperatingSystem.IsWindows()
-                ? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
-                : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            var mojangPath = FileSystemPath.EnsureTrailingSeparator(Path.Combine(minecraftDataRoot, ".minecraft"));
+            var mojangPath = GetOfficialMinecraftFolder();
             if ((!currentMcFolderList.Any() || (mojangPath ?? "") != (currentMcFolderList[0].Location ?? "")) &&
                 Directory.Exists(Path.Combine(mojangPath, "versions"))) // 当前文件夹不是官启文件夹
                 // 具有权限且存在 versions 文件夹
@@ -173,9 +217,10 @@ public static class ModFolder
             // 若没有可用文件夹，则创建 .minecraft
             if (!cacheMcFolderList.Any())
             {
-                Directory.CreateDirectory(ModBase.exePath + @".minecraft\versions\");
+                var defaultMinecraftFolder = GetDefaultMinecraftFolder();
+                Directory.CreateDirectory(Path.Combine(defaultMinecraftFolder, "versions"));
                 cacheMcFolderList.Add(new McFolder
-                    { Name = Lang.Text("Select.Folder.CurrentFolder"), Location = ModBase.exePath + @".minecraft\", type = McFolder.Types.Original });
+                    { Name = Lang.Text("Select.Folder.CurrentFolder"), Location = defaultMinecraftFolder, type = McFolder.Types.Original });
             }
 
             foreach (var Folder in cacheMcFolderList) McFolderLauncherProfilesJsonCreate(Folder.Location);

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
+using PCL.Core.IO;
 using PCL.Core.UI;
 using PCL.Core.Utils;
 using PCL.Core.Utils.Exts;
@@ -181,28 +182,30 @@ public static class ModInstanceList
         var results = new Dictionary<McInstanceCardType, List<PCL.McInstance>>();
         try
         {
-            var cardCount = int.Parse(ModBase.ReadIni(path + "PCL.ini", "CardCount", (-1).ToString()));
+            var cardCount = int.Parse(ModBase.ReadIni(Path.Combine(path, "PCL.ini"), "CardCount", (-1).ToString()));
             if (cardCount == -1)
                 return null;
             for (int i = 0, loopTo = cardCount - 1; i <= loopTo; i++)
             {
                 var cardType =
-                    (McInstanceCardType)int.Parse(ModBase.ReadIni(path + "PCL.ini", "CardKey" + (i + 1),
+                    (McInstanceCardType)int.Parse(ModBase.ReadIni(Path.Combine(path, "PCL.ini"), "CardKey" + (i + 1),
                         "0"));
                 var instanceList = new List<PCL.McInstance>();
 
                 // 循环读取实例
-                foreach (var folder in ModBase.ReadIni(path + "PCL.ini", "CardValue" + (i + 1), ":").Split(":"))
+                foreach (var folder in ModBase.ReadIni(Path.Combine(path, "PCL.ini"), "CardValue" + (i + 1), ":").Split(":"))
                 {
                     if (string.IsNullOrEmpty(folder))
                         continue;
-                    var versionFolder = $@"{path}versions\{folder}\";
-                    if (File.Exists(versionFolder + ".pclignore"))
+                    var versionFolder = FileSystemPath.EnsureTrailingSeparator(
+                        Path.Combine(path, "versions", folder));
+                    var ignorePath = Path.Combine(versionFolder, ".pclignore");
+                    if (File.Exists(ignorePath))
                     {
                         if (_isFirstMcInstanceListLoad)
                         {
                             ModBase.Log("[Minecraft] 清理残留的忽略项目：" + versionFolder); // #2781
-                            File.Delete(versionFolder + ".pclignore");
+                            File.Delete(ignorePath);
                         }
                         else
                         {
@@ -312,7 +315,7 @@ public static class ModInstanceList
 
         #region 循环加载每个实例的信息
 
-        foreach (var folder in new DirectoryInfo(path + "versions").GetDirectories())
+        foreach (var folder in new DirectoryInfo(Path.Combine(path, "versions")).GetDirectories())
         {
             if (!folder.Exists || !folder.EnumerateFiles().Any())
             {
@@ -327,15 +330,16 @@ public static class ModInstanceList
                 continue;
             }
 
-            var instanceFolder = folder.FullName + @"\";
-            if (File.Exists(instanceFolder + ".pclignore"))
+            var instanceFolder = FileSystemPath.EnsureTrailingSeparator(folder.FullName);
+            var ignorePath = Path.Combine(instanceFolder, ".pclignore");
+            if (File.Exists(ignorePath))
             {
                 if (_isFirstMcInstanceListLoad)
                 {
                     ModBase.Log("[Minecraft] 清理残留的忽略项目：" + instanceFolder); // #2781
                     try
                     {
-                        File.Delete(instanceFolder + ".pclignore");
+                        File.Delete(ignorePath);
                     }
                     catch (Exception ex)
                     {
@@ -571,15 +575,15 @@ public static class ModInstanceList
 
         #region 保存卡片缓存
 
-        ModBase.WriteIni(path + "PCL.ini", "CardCount", results.Count.ToString());
+        ModBase.WriteIni(Path.Combine(path, "PCL.ini"), "CardCount", results.Count.ToString());
         for (int i = 0, loopTo = results.Count - 1; i <= loopTo; i++)
         {
-            ModBase.WriteIni(path + "PCL.ini", "CardKey" + (i + 1),
+            ModBase.WriteIni(Path.Combine(path, "PCL.ini"), "CardKey" + (i + 1),
                 ((int)results.Keys.ElementAtOrDefault(i)).ToString());
             var value = "";
             foreach (var Instance in results.Values.ElementAtOrDefault(i))
                 value += Instance.Name + ":";
-            ModBase.WriteIni(path + "PCL.ini", "CardValue" + (i + 1), value);
+            ModBase.WriteIni(Path.Combine(path, "PCL.ini"), "CardValue" + (i + 1), value);
         }
 
         #endregion

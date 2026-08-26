@@ -29,6 +29,7 @@ internal static class Program
         {
             var app = new Application();
             app.InitializeComponent();
+            app.ConfigureShutdownBehavior();
             return app;
         };
         MainWindowService.Loading = static () =>

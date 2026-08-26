@@ -33,7 +33,7 @@ public static class ModSkin
         try
         {
             var image = new MyBitmap(fileName);
-            if (image.pic.Width != 64 || !(image.pic.Height == 32 || image.pic.Height == 64))
+            if (image.PixelWidth != 64 || !(image.PixelHeight == 32 || image.PixelHeight == 64))
             {
                 HintService.Hint(Lang.Text("Launch.Skin.InvalidSize"), HintType.Error);
                 return new McSkinInfo { IsVaild = false };
@@ -144,7 +144,7 @@ public static class ModSkin
     public static string McSkinDownload(string address)
     {
         var skinName = ModBase.GetFileNameFromPath(address);
-        var fileAddress = ModBase.pathTemp + @"Cache\Skin\" + ModBase.GetHash(address) + ".png";
+        var fileAddress = Path.Combine(ModBase.pathTemp, "Cache", "Skin", ModBase.GetHash(address) + ".png");
         lock (mcSkinDownloadLock)
         {
             if (!File.Exists(fileAddress))

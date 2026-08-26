@@ -96,22 +96,21 @@ public partial class PageLaunchLeft
             if (packInstallPath is not null)
             {
                 ModBase.Log("[Launch] 需自动安装整合包：" + packInstallPath, ModBase.LogLevel.Debug);
-                States.Game.SelectedFolder = @"$.minecraft\";
-                if (!Directory.Exists(ModBase.exePath + @".minecraft\"))
+                var defaultMinecraftFolder = ModFolder.GetDefaultMinecraftFolder();
+                States.Game.SelectedFolder = ModFolder.StoreMinecraftFolderPath(defaultMinecraftFolder);
+                if (!Directory.Exists(defaultMinecraftFolder))
                 {
-                    Directory.CreateDirectory(ModBase.exePath + @".minecraft\");
-                    Directory.CreateDirectory(ModBase.exePath + @".minecraft\versions\");
-                    ModFolder.McFolderLauncherProfilesJsonCreate(ModBase.exePath + @".minecraft\");
+                    Directory.CreateDirectory(Path.Combine(defaultMinecraftFolder, "versions"));
+                    ModFolder.McFolderLauncherProfilesJsonCreate(defaultMinecraftFolder);
                 }
 
-                PageSelectLeft.AddFolder(ModBase.exePath + @".minecraft\",
+                PageSelectLeft.AddFolder(defaultMinecraftFolder,
                     ModBase.GetFolderNameFromPath(ModBase.exePath), false);
                 ModFolder.mcFolderListLoader.WaitForExit();
             }
 
             // 确认 Minecraft 文件夹存在
-            ModFolder.mcFolderSelected =
-                States.Game.SelectedFolder.ToString().Replace("$", ModBase.exePath);
+            ModFolder.mcFolderSelected = ModFolder.ResolveMinecraftFolderPath(States.Game.SelectedFolder.ToString());
             if (string.IsNullOrEmpty(ModFolder.mcFolderSelected) || !Directory.Exists(ModFolder.mcFolderSelected))
             {
                 // 无效的文件夹
@@ -121,7 +120,7 @@ public partial class PageLaunchLeft
                     ModBase.Log("[Launch] Minecraft 文件夹无效，该文件夹已不存在：" + ModFolder.mcFolderSelected,
                         ModBase.LogLevel.Debug);
                 ModFolder.mcFolderListLoader.WaitForExit(isForceRestart: true);
-                States.Game.SelectedFolder = ModFolder.mcFolderList[0].Location.Replace(ModBase.exePath, "$");
+                States.Game.SelectedFolder = ModFolder.StoreMinecraftFolderPath(ModFolder.mcFolderList[0].Location);
             }
 
             ModBase.Log("[Launch] Minecraft 文件夹：" + ModFolder.mcFolderSelected);
@@ -161,7 +160,7 @@ public partial class PageLaunchLeft
                     instance is null ? ModBase.LogLevel.Normal : ModBase.LogLevel.Debug);
                 if (ModInstanceList.mcInstanceListLoader.State != ModBase.LoadState.Finished)
                     ModLoader.LoaderFolderRun(ModInstanceList.mcInstanceListLoader, ModFolder.mcFolderSelected,
-                        ModLoader.LoaderFolderRunType.ForceRun, 1, @"versions\", true);
+                        ModLoader.LoaderFolderRunType.ForceRun, 1, "versions", true);
                 if (ModInstanceList.mcInstanceList.Count == 0 ||
                     ModInstanceList.mcInstanceList.First().Value[0].Logo.Contains("RedstoneBlock"))
                 {
@@ -225,7 +224,7 @@ public partial class PageLaunchLeft
         {
             case LaunchButtonAction.Launch:
             {
-                if (File.Exists(ModInstanceList.McMcInstanceSelected.PathInstance + ".pclignore"))
+                if (File.Exists(Path.Combine(ModInstanceList.McMcInstanceSelected.PathInstance, ".pclignore")))
                 {
                     HintService.Hint(Lang.Text("Launch.Home.Instance.InstallingCannotLaunch"), HintType.Error);
                     return;
@@ -365,7 +364,7 @@ public partial class PageLaunchLeft
             return;
         ModInstanceList.McMcInstanceSelected.Load();
         PageInstanceLeft.McInstance = ModInstanceList.McMcInstanceSelected;
-        if (File.Exists(ModInstanceList.McMcInstanceSelected.PathInstance + ".pclignore"))
+        if (File.Exists(Path.Combine(ModInstanceList.McMcInstanceSelected.PathInstance, ".pclignore")))
         {
             HintService.Hint(Lang.Text("Launch.Home.Instance.InstallingCannotSetup"), HintType.Error);
             return;

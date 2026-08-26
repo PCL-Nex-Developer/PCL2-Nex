@@ -17,7 +17,7 @@
     <UseWPF>true</UseWPF>
   </PropertyGroup>
   <PropertyGroup>
-    <OutputPath>bin\$(Configuration)-$(Platform)\</OutputPath>
+    <OutputPath>bin/$(Configuration)-$(Platform)/</OutputPath>
     <PlatformTarget>$(Platform)</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)' == 'Debug' Or '$(Configuration)' == 'CI'">
@@ -57,18 +57,18 @@
     <PackageReference Include="System.Text.Json" Version="10.0.9" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\PCL.Core\PCL.Core.csproj" />
+    <ProjectReference Include="../PCL.Core/PCL.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Remove="Net\**" />
+    <Compile Remove="Net/**" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Remove="Net\**" />
+    <EmbeddedResource Remove="Net/**" />
   </ItemGroup>
   <ItemGroup>
-    <Page Remove="Net\**" />
+    <Page Remove="Net/**" />
   </ItemGroup>
   <ItemGroup>
-    <None Remove="Net\**" />
+    <None Remove="Net/**" />
   </ItemGroup>
 </Project>

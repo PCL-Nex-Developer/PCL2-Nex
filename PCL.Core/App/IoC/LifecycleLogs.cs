@@ -18,7 +18,7 @@ partial class Lifecycle
         service.OnLog(item);
     }
 
-    public static string PendingLogDirectory { get; set; } = @"PCL\Log";
+    public static string PendingLogDirectory { get; set; } = Path.Combine("PCL", "Log");
     public static string PendingLogFileName { get; set; } = "LastPending.log";
 
     /// <summary>

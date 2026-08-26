@@ -597,8 +597,8 @@ public partial class MyListItem : IMyRadio
                     HorizontalAlignment = HorizontalAlignment.Stretch,
                     VerticalAlignment = VerticalAlignment.Stretch
                 };
-                if (logo.Contains(ModBase.pathTemp + @"Cache\Skin\Head") ||
-                    logo.Contains(ModBase.pathTemp + @"Cache\Cape"))
+                if (logo.Contains(System.IO.Path.Combine(ModBase.pathTemp, "Cache", "Skin", "Head")) ||
+                    logo.Contains(System.IO.Path.Combine(ModBase.pathTemp, "Cache", "Cape")))
                     RenderOptions.SetBitmapScalingMode(pathLogo, BitmapScalingMode.NearestNeighbor);
                 else
                     RenderOptions.SetBitmapScalingMode(pathLogo, BitmapScalingMode.Linear);

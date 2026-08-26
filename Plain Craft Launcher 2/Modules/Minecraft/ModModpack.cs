@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
+using PCL.Core.IO;
 using PCL.Core.Minecraft.Java;
 using PCL.Core.UI;
 using PCL.Core.Utils.Validate;
@@ -17,6 +18,17 @@ namespace PCL;
 
 public static class ModModpack
 {
+    private static string GetInstanceFolder(string instanceName)
+    {
+        return FileSystemPath.EnsureTrailingSeparator(
+            Path.Combine(ModFolder.mcFolderSelected, "versions", instanceName));
+    }
+
+    private static string GetInstancePath(string instanceName, params string[] segments)
+    {
+        return FileSystemPath.Combine(GetInstanceFolder(instanceName), segments);
+    }
+
     // 触发整合包安装的外部接口
     /// <summary>
     ///     弹窗要求选择一个整合包文件并进行安装。
@@ -57,7 +69,7 @@ public static class ModModpack
         try
         {
             // 字符校验
-            var targetFolder = $@"{ModFolder.mcFolderSelected}versions\{instanceName}\";
+            var targetFolder = GetInstanceFolder(instanceName ?? "");
             if (targetFolder.Contains("!") || targetFolder.Contains(";"))
             {
                 HintService.Hint(Lang.Text("Minecraft.Download.Modpack.InvalidGamePathChars", targetFolder),
@@ -297,15 +309,13 @@ public static class ModModpack
 
     /// <summary>
     ///     从整合包的 override 目录复制文件，同时设置 PCL 的配置文件与版本隔离。
-    ///     对路径末尾是否为 \ 没有要求。
+    ///     对路径末尾是否带有目录分隔符没有要求。
     /// </summary>
     private static void CopyOverrideDirectory(string overridesFolder, string versionFolder, LoaderBase loader,
         double progressIncrement)
     {
-        if (!overridesFolder.EndsWithF(@"\"))
-            overridesFolder += @"\";
-        if (!versionFolder.EndsWithF(@"\"))
-            versionFolder += @"\";
+        overridesFolder = FileSystemPath.EnsureTrailingSeparator(overridesFolder);
+        versionFolder = FileSystemPath.EnsureTrailingSeparator(versionFolder);
         // 复制文件
         if (Directory.Exists(overridesFolder))
         {
@@ -320,8 +330,8 @@ public static class ModModpack
         }
 
         // 设置 ini
-        var overridesIni = $@"{overridesFolder}PCL\Setup.ini";
-        var versionIni = $@"{versionFolder}PCL\Setup.ini";
+        var overridesIni = Path.Combine(overridesFolder, "PCL", "Setup.ini");
+        var versionIni = Path.Combine(versionFolder, "PCL", "Setup.ini");
         if (File.Exists(overridesIni))
         {
             ModBase.WriteIni(overridesIni, "VersionArgumentIndie", 1.ToString()); // 开启版本隔离
@@ -424,7 +434,7 @@ public static class ModModpack
                 ExtractModpackFiles(installTemp, fileAddress, task, 0.6d);
                 CopyOverrideDirectory(
                     Path.Combine(installTemp, archiveBaseFolder, overrideHome == "." || overrideHome == "./" ? "" : overrideHome),
-                    $@"{ModFolder.mcFolderSelected}versions\{instanceName}", task, 0.4d);
+                    GetInstanceFolder(instanceName), task, 0.4d);
             })
             {
                 ProgressWeight = new FileInfo(fileAddress).Length / 1024d / 1024d / 6d,
@@ -540,7 +550,8 @@ public static class ModModpack
                         continue;
                     // 实际的添加
                     fileList.Add(id,
-                        file.ToNetFile($@"{ModFolder.mcFolderSelected}versions\{instanceName}\{targetFolder}\"));
+                        file.ToNetFile(FileSystemPath.EnsureTrailingSeparator(
+                            Path.Combine(GetInstanceFolder(instanceName), targetFolder))));
                     task.Progress += 1d / (1 + modList.Count);
                 }
 
@@ -564,7 +575,7 @@ public static class ModModpack
         var request = new ModDownloadLib.McInstallRequest
         {
             targetInstanceName = instanceName,
-            targetInstanceFolder = $@"{ModFolder.mcFolderSelected}versions\{instanceName}\",
+            targetInstanceFolder = GetInstanceFolder(instanceName),
             minecraftName = json["minecraft"]["version"].ToString(),
             forgeVersion = forgeVersion,
             neoForgeVersion = neoForgeVersion,
@@ -581,11 +592,11 @@ public static class ModModpack
         loaders.Add(new LoaderTask<string, string>(Lang.Text("Minecraft.Download.Modpack.Stage.FinalizeFiles"), task =>
         {
             // 设置图标
-            var versionFolder = $@"{ModFolder.mcFolderSelected}versions\{instanceName}\";
+            var versionFolder = GetInstanceFolder(instanceName);
             if (logo is not null && File.Exists(logo))
             {
                 File.Copy(logo, Path.Combine(versionFolder, "PCL", "Logo.png"), true);
-                States.Instance.LogoPath[versionFolder] = @"PCL\Logo.png";
+                States.Instance.LogoPath[versionFolder] = Path.Combine("PCL", "Logo.png");
                 States.Instance.IsLogoCustom[versionFolder] = true;
                 ModBase.Log("[ModPack] 已设置整合包 Logo：" + logo);
             }
@@ -776,9 +787,9 @@ public static class ModModpack
                 .ToList();
             // 镜像源
             urls = urls.SelectMany(x => ModDownload.DlSourceModDownloadGet(x)).ToList();
-            var targetPath = $@"{ModFolder.mcFolderSelected}versions\{instanceName}\{File["path"]}";
-            if (!Path.GetFullPath(targetPath)
-                    .StartsWithF($@"{ModFolder.mcFolderSelected}versions\{instanceName}\", true))
+            var targetInstanceFolder = GetInstanceFolder(instanceName);
+            var targetPath = FileSystemPath.Combine(targetInstanceFolder, File["path"].ToString());
+            if (!FileSystemPath.IsWithinDirectory(targetPath, targetInstanceFolder))
             {
                 ModMain.MyMsgBox(Lang.Text("Minecraft.Download.Modpack.PathOutsideInstance.Message", targetPath),
                     Lang.Text("Minecraft.Download.Modpack.PathOutsideInstance.Title"), isWarn: true);
@@ -799,7 +810,7 @@ public static class ModModpack
         var request = new ModDownloadLib.McInstallRequest
         {
             targetInstanceName = instanceName,
-            targetInstanceFolder = $@"{ModFolder.mcFolderSelected}versions\{instanceName}\",
+            targetInstanceFolder = GetInstanceFolder(instanceName),
             minecraftName = minecraftVersion,
             forgeVersion = forgeVersion,
             neoForgeVersion = neoForgeVersion,
@@ -816,11 +827,11 @@ public static class ModModpack
         loaders.Add(new LoaderTask<string, string>(Lang.Text("Minecraft.Download.Modpack.Stage.FinalizeFiles"), task =>
         {
             // 设置图标
-            var versionFolder = $@"{ModFolder.mcFolderSelected}versions\{instanceName}\";
+            var versionFolder = GetInstanceFolder(instanceName);
             if (logo is not null && File.Exists(logo))
             {
                 File.Copy(logo, Path.Combine(versionFolder, "PCL", "Logo.png"), true);
-                States.Instance.LogoPath[versionFolder] = @"PCL\Logo.png";
+                States.Instance.LogoPath[versionFolder] = Path.Combine("PCL", "Logo.png");
                 States.Instance.IsLogoCustom[versionFolder] = true;
                 ModBase.Log("[ModPack] 已设置整合包 Logo：" + logo);
             }
@@ -930,7 +941,7 @@ public static class ModModpack
         var request = new ModDownloadLib.McInstallRequest
         {
             targetInstanceName = instanceName,
-            targetInstanceFolder = $@"{ModFolder.mcFolderSelected}versions\{instanceName}\",
+            targetInstanceFolder = GetInstanceFolder(instanceName),
             minecraftName = json["gameVersion"].ToString()
         };
         var mergeLoaders = ModDownloadLib.McInstallLoader(request);
@@ -1000,7 +1011,7 @@ public static class ModModpack
 
         // 解压与路径准备
         var installTemp = ModMain.RequestTaskTempFolder();
-        var versionFolder = $"{ModFolder.mcFolderSelected}versions\\{instanceName}";
+        var versionFolder = GetInstanceFolder(instanceName);
         var installLoaders = new List<LoaderBase>();
 
         // 解压整合包文件任务
@@ -1049,7 +1060,7 @@ public static class ModModpack
         var request = new ModDownloadLib.McInstallRequest
         {
             targetInstanceName = instanceName,
-            targetInstanceFolder = $"{ModFolder.mcFolderSelected}versions\\{instanceName}\\",
+            targetInstanceFolder = GetInstanceFolder(instanceName),
             minecraftName = addons["game"],
             optiFineVersion = addons.ContainsKey("optifine") ? addons["optifine"] : null,
             forgeVersion = addons.ContainsKey("forge") ? addons["forge"] : null,
@@ -1174,7 +1185,7 @@ public static class ModModpack
                     Path.Combine(targetFolder, ".minecraft",
                         archiveBaseFolder.Replace('/', Path.DirectorySeparatorChar)
                             .TrimStart(Path.DirectorySeparatorChar)), instanceName,
-                    false); // 格式例如：包裹文件夹\.minecraft\（最短为空字符串）
+                    false); // 格式例如：包裹文件夹/.minecraft/（最短为空字符串）
                 // 调用 modpack 文件进行安装
                 var modpackFile = Directory.GetFiles(targetFolder, "modpack.*", SearchOption.AllDirectories).First();
                 ModBase.Log("[Modpack] 调用 modpack 文件继续安装：" + modpackFile);
@@ -1210,7 +1221,7 @@ public static class ModModpack
         if (match is null)
             throw new Exception(Lang.Text("Minecraft.Download.Modpack.UnknownArchiveStructure")); // 没有匹配
         var archiveBaseFolder = match.Value.Replace('/', Path.DirectorySeparatorChar)
-            .TrimStart(Path.DirectorySeparatorChar); // 格式例如：包裹文件夹\.minecraft\（最短为空字符串）
+            .TrimStart(Path.DirectorySeparatorChar); // 格式例如：包裹文件夹/.minecraft/（最短为空字符串）
         var instanceName = match.Groups[1].Value;
         ModBase.Log("[ModPack] 检测到压缩包的 .minecraft 根目录：" + archiveBaseFolder + "，命中的实例名：" + instanceName);
         // 获取解压路径
@@ -1529,7 +1540,7 @@ public static class ModModpack
             throw new ModBase.CancelledException();
         // 解压
         var installTemp = ModMain.RequestTaskTempFolder();
-        var versionFolder = $@"{ModFolder.mcFolderSelected}versions\{instanceName}";
+        var versionFolder = GetInstanceFolder(instanceName);
         var installLoaders = new List<LoaderBase>();
         installLoaders.Add(new LoaderTask<string, int>(Lang.Text("Minecraft.Download.Modpack.Stage.ExtractModpack"),
             task =>
@@ -1593,12 +1604,12 @@ public static class ModModpack
                     }
 
                     var logo = Path.GetFileName(ModBase.ReadIni(mMCSetupFile, "iconKey"));
-                    if (!string.IsNullOrEmpty(logo) && File.Exists($"{installTemp}{archiveBaseFolder}{logo}.png"))
+                    var logoSource = FileSystemPath.Combine(installTemp, archiveBaseFolder, logo + ".png");
+                    if (!string.IsNullOrEmpty(logo) && File.Exists(logoSource))
                     {
                         States.Instance.IsLogoCustom[versionFolder] = true;
-                        States.Instance.LogoPath[versionFolder] = @"PCL\Logo.png";
-                        ModBase.CopyFile($"{installTemp}{archiveBaseFolder}{logo}.png",
-                            $@"{ModFolder.mcFolderSelected}versions\{instanceName}\PCL\Logo.png");
+                        States.Instance.LogoPath[versionFolder] = Path.Combine("PCL", "Logo.png");
+                        ModBase.CopyFile(logoSource, GetInstancePath(instanceName, "PCL", "Logo.png"));
                         ModBase.Log($"[ModPack] 迁移 MultiMC 实例独立设置：实例图标（{logo}.png）");
                     }
 
@@ -1640,7 +1651,7 @@ public static class ModModpack
         var request = new ModDownloadLib.McInstallRequest
         {
             targetInstanceName = instanceName,
-            targetInstanceFolder = $@"{ModFolder.mcFolderSelected}versions\{instanceName}\"
+            targetInstanceFolder = GetInstanceFolder(instanceName)
         };
         foreach (var Component in packJson["components"].AsArray())
             switch ((Component["uid"] ?? "").ToString() ?? "")

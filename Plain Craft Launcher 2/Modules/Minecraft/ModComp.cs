@@ -15,6 +15,7 @@ using System.Windows.Media;
 using Dapper;
 using Microsoft.Data.Sqlite;
 using PCL.Core.App;
+using PCL.Core.IO;
 using PCL.Core.Logging;
 using PCL.Core.Utils;
 using PCL.Core.Utils.Hash;
@@ -1441,7 +1442,7 @@ public static class ModComp
             string result = null;
 
             var descHash = $"{Id}{ModBase.GetStringMD5(Description)}";
-            var cacheFilePath = $@"{ModBase.pathTemp}Cache\CompTranslation.ini";
+            var cacheFilePath = Path.Combine(ModBase.pathTemp, "Cache", "CompTranslation.ini");
             var cacheTranslation = ModBase.ReadIni(cacheFilePath, descHash);
             if (!string.IsNullOrWhiteSpace(cacheTranslation))
             {
@@ -3107,7 +3108,11 @@ public static class ModComp
         /// <param name="localAddress">目标本地文件夹，或完整的文件路径。会自动判断类型。</param>
         public DownloadFile ToNetFile(string localAddress)
         {
-            return new DownloadFile(DownloadUrls, localAddress + (localAddress.EndsWithF(@"\") ? CompFileNameSanitize(FileName) : ""),
+            localAddress = FileSystemPath.NormalizeSeparators(localAddress);
+            var targetPath = Path.EndsInDirectorySeparator(localAddress)
+                ? Path.Combine(localAddress, CompFileNameSanitize(FileName))
+                : localAddress;
+            return new DownloadFile(DownloadUrls, targetPath,
                 new ModBase.FileChecker(hash: Hash), true);
         }
 

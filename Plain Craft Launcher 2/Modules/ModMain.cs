@@ -867,7 +867,7 @@ public static class ModMain
     {
         if (s is null) return "";
         if (escapeHandler is null) return s;
-        if (s.Contains(":\\")) s = ModBase.ShortenPath(s);
+        if (Path.IsPathFullyQualified(FileSystemPath.NormalizeSeparators(s))) s = ModBase.ShortenPath(s);
         return escapeHandler(s);
     };
     
@@ -1001,7 +1001,7 @@ public static class ModMain
     }
 
     /// <summary>
-    ///     申请一个可用于任务缓存的临时文件夹，以 \ 结尾。这些文件夹无需进行后续清理。
+    ///     申请一个可用于任务缓存的临时文件夹，以当前平台的目录分隔符结尾。这些文件夹无需进行后续清理。
     ///     若所有缓存位置均没有权限，会抛出异常。
     /// </summary>
     /// <param name="requireNonSpace">是否要求路径不包含空格。</param>

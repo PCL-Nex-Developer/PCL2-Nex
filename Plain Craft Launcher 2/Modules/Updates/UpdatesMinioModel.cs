@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Text.Json.Serialization;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
+using PCL.Core.IO;
 using PCL.Core.Utils;
 using PCL.Core.Utils.Diff;
 using PCL.Network;
@@ -73,7 +74,8 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
         var loaders = new List<ModLoader.LoaderBase>();
         var patchUpdate = true;
         var expectedSha256 = string.Empty;
-        var tempPath = $@"{ModBase.pathTemp}Cache\Update\Download\";
+        var tempPath = FileSystemPath.EnsureTrailingSeparator(
+            Path.Combine(ModBase.pathTemp, "Cache", "Update", "Download"));
         loaders.Add(new ModLoader.LoaderTask<int, List<DownloadFile>>(Lang.Text("Update.Task.GetVersionInfo"), load =>
         {
             var channelName = GetChannelName(channel, arch);

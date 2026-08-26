@@ -1,4 +1,5 @@
 using System.Net;
+using System.IO;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
@@ -164,13 +165,13 @@ public class ModSetup
     public static void LaunchInstanceSelect(string value)
     {
         ModBase.Log("[Setup] 当前选择的 Minecraft 版本：" + value);
-        ModBase.WriteIni(ModFolder.mcFolderSelected + "PCL.ini", "Version", value);
+        ModBase.WriteIni(Path.Combine(ModFolder.mcFolderSelected, "PCL.ini"), "Version", value);
     }
 
     public static void LaunchFolderSelect(string value)
     {
-        ModBase.Log("[Setup] 当前选择的 Minecraft 文件夹：" + value.Replace("$", ModBase.exePath));
-        ModFolder.mcFolderSelected = FileSystemPath.EnsureTrailingSeparator(value.Replace("$", ModBase.exePath));
+        ModBase.Log("[Setup] 当前选择的 Minecraft 文件夹：" + ModFolder.ResolveMinecraftFolderPath(value));
+        ModFolder.mcFolderSelected = ModFolder.ResolveMinecraftFolderPath(value);
     }
 
     // 游戏内存
@@ -649,12 +650,12 @@ public class ModSetup
         if (ModMain.frmInstanceSetup is null)
             return;
         // 为第三方登录清空缓存以更新描述
-        ModBase.WriteIni(ModFolder.mcFolderSelected + "PCL.ini", "InstanceCache", "");
+        ModBase.WriteIni(Path.Combine(ModFolder.mcFolderSelected, "PCL.ini"), "InstanceCache", "");
         if (PageInstanceLeft.McInstance is null)
             return;
         PageInstanceLeft.McInstance = new McInstance(PageInstanceLeft.McInstance.Name).Load();
         ModLoader.LoaderFolderRun(ModInstanceList.mcInstanceListLoader, ModFolder.mcFolderSelected,
-            ModLoader.LoaderFolderRunType.ForceRun, 1, @"versions\");
+            ModLoader.LoaderFolderRunType.ForceRun, 1, "versions");
     }
 
     #endregion

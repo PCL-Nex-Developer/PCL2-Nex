@@ -236,7 +236,7 @@ public partial class PageSetupUI
     // 背景图片
     private void BtnUIBgOpen_Click(object sender, MouseButtonEventArgs e)
     {
-        ModBase.OpenExplorer(ModBase.pathPCLData + "Pictures" + System.IO.Path.DirectorySeparatorChar);
+        ModBase.OpenExplorer(Path.Combine(ModBase.pathPCLData, "Pictures"));
     }
 
     private void BtnBackgroundRefresh_Click(object sender, MouseButtonEventArgs e)
@@ -292,8 +292,9 @@ public partial class PageSetupUI
         try
         {
             // 获取可用的图片文件
-            Directory.CreateDirectory(ModBase.pathPCLData + "Pictures" + System.IO.Path.DirectorySeparatorChar);
-            var pic = ModBase.EnumerateFiles(ModBase.pathPCLData + "Pictures" + System.IO.Path.DirectorySeparatorChar).Where(file =>
+            var picturesFolder = Path.Combine(ModBase.pathPCLData, "Pictures");
+            Directory.CreateDirectory(picturesFolder);
+            var pic = ModBase.EnumerateFiles(picturesFolder).Where(file =>
                     !(file.Extension.Equals(".ini", StringComparison.OrdinalIgnoreCase) ||
                       file.Extension.Equals(".db", StringComparison.OrdinalIgnoreCase))).Select(file => file.FullName)
                 .ToList();
@@ -495,7 +496,7 @@ public partial class PageSetupUI
     // 背景音乐
     private void BtnMusicOpen_Click(object sender, MouseButtonEventArgs e)
     {
-        ModBase.OpenExplorer(ModBase.pathPCLData + "Musics" + System.IO.Path.DirectorySeparatorChar);
+        ModBase.OpenExplorer(Path.Combine(ModBase.pathPCLData, "Musics"));
     }
 
     private void BtnMusicRefresh_Click(object sender, MouseButtonEventArgs e)
@@ -512,7 +513,8 @@ public partial class PageSetupUI
             PanMusicVolume.Visibility = Visibility.Visible;
             PanMusicDetail.Visibility = Visibility.Visible;
             BtnMusicClear.Visibility = Visibility.Visible;
-            CardMusic.Title = Lang.Text("Setup.Ui.Music.TitleWithCount", ModBase.EnumerateFiles(ModBase.pathPCLData + "Musics" + System.IO.Path.DirectorySeparatorChar).Count());
+            CardMusic.Title = Lang.Text("Setup.Ui.Music.TitleWithCount",
+                ModBase.EnumerateFiles(Path.Combine(ModBase.pathPCLData, "Musics")).Count());
         }
         else
         {

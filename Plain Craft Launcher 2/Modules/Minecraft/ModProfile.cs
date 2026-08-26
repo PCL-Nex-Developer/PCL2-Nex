@@ -50,7 +50,7 @@ public static class ModProfile
         if (name.Trim().Length == 0)
             return ModBase.StrFill("", "0", 32);
         // 从缓存获取
-        var uuid = ModBase.ReadIni(ModBase.pathTemp + @"Cache\Uuid\Mojang.ini", name);
+        var uuid = ModBase.ReadIni(Path.Combine(ModBase.pathTemp, "Cache", "Uuid", "Mojang.ini"), name);
         if ((uuid?.Length ?? 0) == 32)
             return uuid;
         // 从官网获取
@@ -91,7 +91,7 @@ public static class ModProfile
         // 写入缓存
         if ((uuid?.Length ?? 0) != 32)
             throw new Exception("获取的正版 UUID 长度不足（" + uuid + "）");
-        ModBase.WriteIni(ModBase.pathTemp + @"Cache\Uuid\Mojang.ini", name, uuid);
+        ModBase.WriteIni(Path.Combine(ModBase.pathTemp, "Cache", "Uuid", "Mojang.ini"), name, uuid);
         return uuid;
     }
 

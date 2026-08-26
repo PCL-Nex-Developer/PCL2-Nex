@@ -8,6 +8,7 @@ using Microsoft.VisualBasic.FileIO;
 using PCL.Core.App;
 using PCL.Core.App.Configuration;
 using PCL.Core.App.Configuration.Storage;
+using PCL.Core.IO;
 using PCL.Core.Minecraft;
 using PCL.Core.UI;
 using PCL.Core.Utils.Validate;
@@ -53,7 +54,7 @@ public partial class PageInstanceOverall
         PanBack.ScrollToHome();
 
         // 更新设置
-        ItemDisplayLogoCustom.Tag = @"PCL\Logo.png";
+        ItemDisplayLogoCustom.Tag = Path.Combine("PCL", "Logo.png");
         Reload();
 
         // 非重复加载部分
@@ -90,8 +91,9 @@ public partial class PageInstanceOverall
         if (logoCustom)
             foreach (MyComboBoxItem Selection in ComboDisplayLogo.Items)
                 if (Equals(Selection.Tag, logo) ||
-                    (Equals(Selection.Tag, @"PCL\Logo.png") &&
-                     logo.EndsWith(@"PCL\Logo.png")))
+                    (Equals(Selection.Tag, Path.Combine("PCL", "Logo.png")) &&
+                     FileSystemPath.NormalizeSeparators(logo).EndsWith(Path.Combine("PCL", "Logo.png"),
+                         FileSystemPath.Comparison)))
                 {
                     ComboDisplayLogo.SelectedItem = Selection;
                     break;
@@ -241,9 +243,9 @@ public partial class PageInstanceOverall
                 PageInstanceLeft.McInstance.displayType = (McInstanceCardType)States.Instance.CardType[PageInstanceLeft.McInstance.PathInstance];
                 ModMain.frmInstanceLeft.RefreshModDisabled();
 
-                ModBase.WriteIni(ModFolder.mcFolderSelected + "PCL.ini", "InstanceCache", ""); // 要求刷新缓存
+                ModBase.WriteIni(Path.Combine(ModFolder.mcFolderSelected, "PCL.ini"), "InstanceCache", ""); // 要求刷新缓存
                 ModLoader.LoaderFolderRun(ModInstanceList.mcInstanceListLoader, ModFolder.mcFolderSelected,
-                    ModLoader.LoaderFolderRunType.ForceRun, 1, @"versions\");
+                    ModLoader.LoaderFolderRunType.ForceRun, 1, "versions");
             }
             catch (Exception ex)
             {
@@ -271,9 +273,9 @@ public partial class PageInstanceOverall
 
                 States.Instance.CardType[PageInstanceLeft.McInstance.PathInstance] =
                     (int)McInstanceCardType.Hidden;
-                ModBase.WriteIni(ModFolder.mcFolderSelected + "PCL.ini", "InstanceCache", ""); // 要求刷新缓存
+                ModBase.WriteIni(Path.Combine(ModFolder.mcFolderSelected, "PCL.ini"), "InstanceCache", ""); // 要求刷新缓存
                 ModLoader.LoaderFolderRun(ModInstanceList.mcInstanceListLoader, ModFolder.mcFolderSelected,
-                    ModLoader.LoaderFolderRunType.ForceRun, 1, @"versions\");
+                    ModLoader.LoaderFolderRunType.ForceRun, 1, "versions");
             }
             catch (Exception ex)
             {
@@ -295,7 +297,7 @@ public partial class PageInstanceOverall
             PageInstanceLeft.McInstance = new McInstance(PageInstanceLeft.McInstance.Name).Load();
             Reload();
             ModLoader.LoaderFolderRun(ModInstanceList.mcInstanceListLoader, ModFolder.mcFolderSelected,
-                ModLoader.LoaderFolderRunType.ForceRun, 1, @"versions\");
+                ModLoader.LoaderFolderRunType.ForceRun, 1, "versions");
         }
         catch (Exception ex)
         {
@@ -313,7 +315,7 @@ public partial class PageInstanceOverall
             var oldPath = PageInstanceLeft.McInstance.PathInstance;
             // 修改此部分的同时修改快速安装的实例名检测*
             var newName = ModMain.MyMsgBoxInput(Lang.Text("Instance.Overall.Name.EditTitle"), "", oldName,
-                [new FolderNameValidator(ModFolder.mcFolderSelected + "versions", ignoreCase: false)]);
+                [new FolderNameValidator(Path.Combine(ModFolder.mcFolderSelected, "versions"), ignoreCase: false)]);
             if (string.IsNullOrWhiteSpace(newName))
                 return;
             var newPath = Path.Combine(ModFolder.mcFolderSelected, "versions", newName);
@@ -325,8 +327,8 @@ public partial class PageInstanceOverall
             JsonObject jsonObject;
             try
             {
-                jsonObject = (JsonObject)ModBase.GetJson(ModBase.ReadFile(PageInstanceLeft.McInstance.PathInstance +
-                                                                       PageInstanceLeft.McInstance.Name + ".json"));
+                jsonObject = (JsonObject)ModBase.GetJson(ModBase.ReadFile(Path.Combine(
+                    PageInstanceLeft.McInstance.PathInstance, PageInstanceLeft.McInstance.Name + ".json")));
             }
             catch (Exception ex)
             {
@@ -374,8 +376,8 @@ public partial class PageInstanceOverall
                 ModBase.WriteFile(Path.Combine(newPath, "PCL", "Setup.ini"),
                     ModBase.ReadFile(Path.Combine(newPath, "PCL", "Setup.ini")).Replace(oldPath, newPath));
             // 更改已选中的实例
-            if ((ModBase.ReadIni(ModFolder.mcFolderSelected + "PCL.ini", "Version") ?? "") == (oldName ?? ""))
-                ModBase.WriteIni(ModFolder.mcFolderSelected + "PCL.ini", "Version", newName);
+            if ((ModBase.ReadIni(Path.Combine(ModFolder.mcFolderSelected, "PCL.ini"), "Version") ?? "") == (oldName ?? ""))
+                ModBase.WriteIni(Path.Combine(ModFolder.mcFolderSelected, "PCL.ini"), "Version", newName);
             // 写入实例 Json，并删除旧的 Json
             try
             {
@@ -394,10 +396,10 @@ public partial class PageInstanceOverall
             PageInstanceLeft.McInstance = new McInstance(newName).Load();
             if (ModInstanceList.McMcInstanceSelected is not null &&
                 ModInstanceList.McMcInstanceSelected.Equals(PageInstanceLeft.McInstance))
-                ModBase.WriteIni(ModFolder.mcFolderSelected + "PCL.ini", "Version", newName);
+                ModBase.WriteIni(Path.Combine(ModFolder.mcFolderSelected, "PCL.ini"), "Version", newName);
             Reload();
             ModLoader.LoaderFolderRun(ModInstanceList.mcInstanceListLoader, ModFolder.mcFolderSelected,
-                ModLoader.LoaderFolderRunType.ForceRun, 1, @"versions\");
+                ModLoader.LoaderFolderRunType.ForceRun, 1, "versions");
         }
         catch (Exception ex)
         {
@@ -422,11 +424,11 @@ public partial class PageInstanceOverall
                     return;
                 }
 
-                ModBase.CopyFile(fileName, PageInstanceLeft.McInstance.PathInstance + @"PCL\Logo.png");
+                ModBase.CopyFile(fileName, Path.Combine(PageInstanceLeft.McInstance.PathInstance, "PCL", "Logo.png"));
             }
             else
             {
-                File.Delete(PageInstanceLeft.McInstance.PathInstance + @"PCL\Logo.png");
+                File.Delete(Path.Combine(PageInstanceLeft.McInstance.PathInstance, "PCL", "Logo.png"));
             }
         }
         catch (Exception ex)
@@ -441,11 +443,11 @@ public partial class PageInstanceOverall
             States.Instance.LogoPath[PageInstanceLeft.McInstance.PathInstance] = newLogo;
             States.Instance.IsLogoCustom[PageInstanceLeft.McInstance.PathInstance] = !string.IsNullOrEmpty(newLogo);
             // 刷新显示
-            ModBase.WriteIni(ModFolder.mcFolderSelected + "PCL.ini", "InstanceCache", ""); // 要求刷新缓存
+            ModBase.WriteIni(Path.Combine(ModFolder.mcFolderSelected, "PCL.ini"), "InstanceCache", ""); // 要求刷新缓存
             PageInstanceLeft.McInstance = new McInstance(PageInstanceLeft.McInstance.Name).Load();
             Reload();
             ModLoader.LoaderFolderRun(ModInstanceList.mcInstanceListLoader, ModFolder.mcFolderSelected,
-                ModLoader.LoaderFolderRunType.ForceRun, 1, @"versions\");
+                ModLoader.LoaderFolderRunType.ForceRun, 1, "versions");
         }
         catch (Exception ex)
         {
@@ -463,7 +465,7 @@ public partial class PageInstanceOverall
             Reload();
             ModInstanceList.mcInstanceListForceRefresh = true;
             ModLoader.LoaderFolderRun(ModInstanceList.mcInstanceListLoader, ModFolder.mcFolderSelected,
-                ModLoader.LoaderFolderRunType.ForceRun, 1, @"versions\");
+                ModLoader.LoaderFolderRunType.ForceRun, 1, "versions");
         }
         catch (Exception ex)
         {
@@ -489,7 +491,7 @@ public partial class PageInstanceOverall
     // 存档文件夹
     private void BtnFolderSaves_Click(object sender, MouseButtonEventArgs mouseButtonEventArgs)
     {
-        var folderPath = PageInstanceLeft.McInstance.PathIndie + @"saves\";
+        var folderPath = Path.Combine(PageInstanceLeft.McInstance.PathIndie, "saves");
         Directory.CreateDirectory(folderPath);
         ModBase.OpenExplorer(folderPath);
     }
@@ -497,7 +499,7 @@ public partial class PageInstanceOverall
     // Mod 文件夹
     private void BtnFolderMods_Click(object sender, MouseButtonEventArgs mouseButtonEventArgs)
     {
-        var folderPath = PageInstanceLeft.McInstance.PathIndie + @"mods\";
+        var folderPath = Path.Combine(PageInstanceLeft.McInstance.PathIndie, "mods");
         Directory.CreateDirectory(folderPath);
         ModBase.OpenExplorer(folderPath);
     }
@@ -622,17 +624,20 @@ public partial class PageInstanceOverall
                 return;
 
             // 备份实例核心文件
-            ModBase.CopyFile(PageInstanceLeft.McInstance.PathInstance + PageInstanceLeft.McInstance.Name + ".json",
-                PageInstanceLeft.McInstance.PathInstance + @"PCLInstallBackups\" + PageInstanceLeft.McInstance.Name +
-                ".json");
-            ModBase.CopyFile(PageInstanceLeft.McInstance.PathInstance + PageInstanceLeft.McInstance.Name + ".jar",
-                PageInstanceLeft.McInstance.PathInstance + @"PCLInstallBackups\" + PageInstanceLeft.McInstance.Name +
-                ".jar");
+            ModBase.CopyFile(Path.Combine(PageInstanceLeft.McInstance.PathInstance,
+                    PageInstanceLeft.McInstance.Name + ".json"),
+                Path.Combine(PageInstanceLeft.McInstance.PathInstance, "PCLInstallBackups",
+                    PageInstanceLeft.McInstance.Name + ".json"));
+            ModBase.CopyFile(Path.Combine(PageInstanceLeft.McInstance.PathInstance,
+                    PageInstanceLeft.McInstance.Name + ".jar"),
+                Path.Combine(PageInstanceLeft.McInstance.PathInstance, "PCLInstallBackups",
+                    PageInstanceLeft.McInstance.Name + ".jar"));
             // 提交安装申请
             var request = new ModDownloadLib.McInstallRequest
             {
                 targetInstanceName = PageInstanceLeft.McInstance.Name,
-                targetInstanceFolder = $@"{ModFolder.mcFolderSelected}versions\{PageInstanceLeft.McInstance.Name}\",
+                targetInstanceFolder = FileSystemPath.EnsureTrailingSeparator(
+                    Path.Combine(ModFolder.mcFolderSelected, "versions", PageInstanceLeft.McInstance.Name)),
                 minecraftName = currentVersion.VanillaName,
                 optiFineEntry = currentVersion.HasOptiFine
                     ? new ModDownload.DlOptiFineListEntry
@@ -743,7 +748,7 @@ public partial class PageInstanceOverall
             }
 
             ModLoader.LoaderFolderRun(ModInstanceList.mcInstanceListLoader, ModFolder.mcFolderSelected,
-                ModLoader.LoaderFolderRunType.ForceRun, 1, @"versions\");
+                ModLoader.LoaderFolderRunType.ForceRun, 1, "versions");
             ModMain.frmMain.PageBack();
         }
         catch (OperationCanceledException ex)
@@ -771,8 +776,8 @@ public partial class PageInstanceOverall
                 HintService.Hint(Lang.Text("Instance.Overall.Patch.Patching"));
                 ModBase.RunInNewThread(() =>
                 {
-                    var core = new GameCore(PageInstanceLeft.McInstance.PathInstance + PageInstanceLeft.McInstance.Name +
-                                            ".jar");
+                    var core = new GameCore(Path.Combine(PageInstanceLeft.McInstance.PathInstance,
+                        PageInstanceLeft.McInstance.Name + ".jar"));
                     core.AddToCore(userInput);
                     HintService.Hint(Lang.Text("Instance.Overall.Patch.Success"), HintType.Success);
                     Config.Instance.DisableAssetVerifyV2[PageInstanceLeft.McInstance.PathInstance] = true;

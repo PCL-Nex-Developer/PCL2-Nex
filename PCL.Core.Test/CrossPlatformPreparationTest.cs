@@ -100,4 +100,17 @@ public sealed class CrossPlatformPreparationTest
         var systemRoot = Path.GetPathRoot(Path.GetFullPath(root))!;
         Assert.IsTrue(FileSystemPath.IsWithinDirectory(Path.Combine(systemRoot, "pcl-child"), systemRoot));
     }
+
+    [TestMethod]
+    public void FileSystemPath_NormalizesLegacyAndPortableSeparators()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pcl-root");
+        var expected = Path.Combine(root, "PCL", "Pictures");
+        var legacyPath = expected.Replace(Path.DirectorySeparatorChar, '\\');
+
+        Assert.AreEqual(expected, FileSystemPath.NormalizeSeparators(legacyPath));
+        Assert.AreEqual(expected, FileSystemPath.Combine(root, @"PCL\Pictures"));
+        Assert.AreEqual(expected, FileSystemPath.Combine(root, "PCL/Pictures"));
+        Assert.IsTrue(FileSystemPath.IsWithinDirectory(legacyPath, root));
+    }
 }

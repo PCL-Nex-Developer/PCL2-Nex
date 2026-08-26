@@ -458,7 +458,7 @@ public partial class PageInstanceSetup
             if (version is not null && version.Modable)
             {
                 // 可安装 Mod 的实例
-                var modDir = new DirectoryInfo(version.PathIndie + @"mods\");
+                var modDir = new DirectoryInfo(Path.Combine(version.PathIndie, "mods"));
                 var modCount = modDir.Exists ? modDir.GetFiles().Length : 0;
                 ramMininum = 0.5d + modCount / 150d;
                 ramTarget1 = 1.5d + modCount / 90d;
@@ -753,7 +753,7 @@ public partial class PageInstanceSetup
             relativePathItem = new MyComboBoxItem
             {
                 Content = Lang.Text("Instance.Setup.Java.SelectRelative"),
-                Tag = new UseRelativePath(@"jre\bin\java.exe"),
+                Tag = new UseRelativePath(Path.Combine("jre", "bin", PCL.Core.Minecraft.Java.JavaPlatform.ExecutableName)),
                 ToolTip = Lang.Text("Instance.Setup.Java.SelectRelativeToolTip")
             };
         }

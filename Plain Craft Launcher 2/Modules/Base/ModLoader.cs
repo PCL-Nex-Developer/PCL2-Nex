@@ -1,5 +1,6 @@
 using Microsoft.VisualBasic.CompilerServices;
 using PCL.Core.App;
+using PCL.Core.IO;
 using PCL.Core.Utils;
 using System.Collections;
 using System.IO;
@@ -121,12 +122,15 @@ public static class ModLoader
     public static bool LoaderFolderRun(LoaderBase loader, string folderPath, LoaderFolderRunType type, int maxDepth = 0,
         string extraPath = "", bool waitForExit = false, object loaderInput = null)
     {
+        folderPath = FileSystemPath.NormalizeSeparators(folderPath);
+        extraPath = FileSystemPath.NormalizeSeparators(extraPath);
+        var checkPath = Path.Combine(folderPath, extraPath);
         DirectoryInfo folderInfo;
-        var value = new LoaderFolderDictionaryEntry { folderPath = folderPath + extraPath, lastCheckTime = default };
+        var value = new LoaderFolderDictionaryEntry { folderPath = checkPath, lastCheckTime = default };
         try
         {
             // 获取数据
-            folderInfo = new DirectoryInfo(folderPath + extraPath);
+            folderInfo = new DirectoryInfo(checkPath);
             value.lastCheckTime = folderInfo.Exists ? GetActualLastWriteTimeUtc(folderInfo, maxDepth) : null;
             // 如果已经检查过，则跳过
             if (type == LoaderFolderRunType.RunOnUpdated && loaderFolderDictionary.ContainsKey(loader))

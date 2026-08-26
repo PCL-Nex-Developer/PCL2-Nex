@@ -70,7 +70,7 @@ public partial class PageLoginProfile
         {
             Profile = profile;
             Info = (string)ModProfile.GetProfileInfo(profile);
-            var logoPath = ModBase.pathTemp + $@"Cache\Skin\Head\{profile.SkinHeadId}.png";
+            var logoPath = Path.Combine(ModBase.pathTemp, "Cache", "Skin", "Head", $"{profile.SkinHeadId}.png");
             if (File.Exists(logoPath) && new FileInfo(logoPath).Length != 0L)
             {
                 Logo = logoPath;

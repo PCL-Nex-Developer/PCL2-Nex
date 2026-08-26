@@ -8,6 +8,7 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
+using PCL.Core.IO;
 using PCL.Core.UI;
 using PCL.Core.Utils;
 
@@ -127,12 +128,16 @@ public partial class PageInstanceInstall
             PageInstanceLeft.McInstance.Info.HasLabyMod)
             Directory.Delete(System.IO.Path.Combine(PageInstanceLeft.McInstance.PathIndie, "labymod-neo"), true);
         // 备份实例核心文件
-        ModBase.CopyFile(PageInstanceLeft.McInstance.PathInstance + PageInstanceLeft.McInstance.Name + ".json",
-            PageInstanceLeft.McInstance.PathInstance + @"PCLInstallBackups\" + PageInstanceLeft.McInstance.Name + ".json");
-        if (File.Exists(PageInstanceLeft.McInstance.PathInstance + PageInstanceLeft.McInstance.Name + ".jar"))
-            ModBase.CopyFile(PageInstanceLeft.McInstance.PathInstance + PageInstanceLeft.McInstance.Name + ".jar",
-                PageInstanceLeft.McInstance.PathInstance + @"PCLInstallBackups\" + PageInstanceLeft.McInstance.Name +
-                ".jar");
+        ModBase.CopyFile(System.IO.Path.Combine(PageInstanceLeft.McInstance.PathInstance,
+                PageInstanceLeft.McInstance.Name + ".json"),
+            System.IO.Path.Combine(PageInstanceLeft.McInstance.PathInstance, "PCLInstallBackups",
+                PageInstanceLeft.McInstance.Name + ".json"));
+        if (File.Exists(System.IO.Path.Combine(PageInstanceLeft.McInstance.PathInstance,
+                PageInstanceLeft.McInstance.Name + ".jar")))
+            ModBase.CopyFile(System.IO.Path.Combine(PageInstanceLeft.McInstance.PathInstance,
+                    PageInstanceLeft.McInstance.Name + ".jar"),
+                System.IO.Path.Combine(PageInstanceLeft.McInstance.PathInstance, "PCLInstallBackups",
+                    PageInstanceLeft.McInstance.Name + ".jar"));
         // 确认独立 API (如 Fabric API 等) 是否需要被修改
         if (selectedFabricApi?.Equals(_currentFabricApi) == true)
             selectedFabricApi = null;
@@ -144,7 +149,8 @@ public partial class PageInstanceInstall
         var request = new ModDownloadLib.McInstallRequest
         {
             targetInstanceName = PageInstanceLeft.McInstance.Name,
-            targetInstanceFolder = $@"{ModFolder.mcFolderSelected}versions\{PageInstanceLeft.McInstance.Name}\",
+            targetInstanceFolder = FileSystemPath.EnsureTrailingSeparator(
+                System.IO.Path.Combine(ModFolder.mcFolderSelected, "versions", PageInstanceLeft.McInstance.Name)),
             minecraftJson = _vanillaData?["url"].ToString(),
             minecraftName = _vanillaName,
             optiFineEntry = selectedOptiFine,

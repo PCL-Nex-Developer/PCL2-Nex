@@ -10,6 +10,7 @@ using System.Text.Json.Nodes;
 using System.Windows;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
+using PCL.Core.IO;
 using PCL.Core.Minecraft;
 using PCL.Core.Minecraft.Java;
 using PCL.Core.Minecraft.Launch.Utils;
@@ -2620,7 +2621,7 @@ public static class ModLaunch
         if (McLaunchUsesLwjglUnsafeAgent(ModInstanceList.McMcInstanceSelected))
         {
             ModBase.Log($"获取到的 LWJGL 版本：{McLaunchGetLwjglVersion(ModInstanceList.McMcInstanceSelected)}");
-            dataList.Insert(0, $"-javaagent:\"{ModBase.pathPure}lwjgl-unsafe-agent.jar\"");
+            dataList.Insert(0, $"-javaagent:\"{Path.Combine(ModBase.pathPure, "lwjgl-unsafe-agent.jar")}\"");
         }
 
         if (Config.Instance.UseDebugLof4j2Config[instance.PathIndie])
@@ -2852,10 +2853,10 @@ public static class ModLaunch
         var gameArguments = new Dictionary<string, string>();
 
         // 基础参数
-        gameArguments.Add("${classpath_separator}", ";");
+        gameArguments.Add("${classpath_separator}", Path.PathSeparator.ToString());
         gameArguments.Add("${natives_directory}", ModBase.ShortenPath(GetNativesFolder()));
-        gameArguments.Add("${library_directory}", ModBase.ShortenPath(ModFolder.mcFolderSelected + "libraries"));
-        gameArguments.Add("${libraries_directory}", ModBase.ShortenPath(ModFolder.mcFolderSelected + "libraries"));
+        gameArguments.Add("${library_directory}", ModBase.ShortenPath(Path.Combine(ModFolder.mcFolderSelected, "libraries")));
+        gameArguments.Add("${libraries_directory}", ModBase.ShortenPath(Path.Combine(ModFolder.mcFolderSelected, "libraries")));
         gameArguments.Add("${launcher_name}", "PCLNex");
         gameArguments.Add("${launcher_version}", Basics.VersionName);
         gameArguments.Add("${version_name}", instance.Name);
@@ -2865,8 +2866,8 @@ public static class ModLaunch
                 ? Config.Launch.TypeInfo
                 : argumentInfo);
         gameArguments.Add("${game_directory}",
-            ModBase.ShortenPath(ModInstanceList.McMcInstanceSelected.PathIndie[..^1]));
-        gameArguments.Add("${assets_root}", ModBase.ShortenPath(ModFolder.mcFolderSelected + "assets"));
+            ModBase.ShortenPath(Path.TrimEndingDirectorySeparator(ModInstanceList.McMcInstanceSelected.PathIndie)));
+        gameArguments.Add("${assets_root}", ModBase.ShortenPath(Path.Combine(ModFolder.mcFolderSelected, "assets")));
         gameArguments.Add("${user_properties}", "{}");
         gameArguments.Add("${auth_player_name}", mcLoginLoader.output.Name);
         gameArguments.Add("${auth_uuid}", mcLoginLoader.output.Uuid);
@@ -2918,8 +2919,7 @@ public static class ModLaunch
 
         // Assets 相关参数
         gameArguments.Add("${game_assets}",
-            ModBase.ShortenPath(ModFolder.mcFolderSelected +
-                                @"assets\virtual\legacy")); // 1.5.2 的 pre-1.6 资源索引应与 legacy 合并
+            ModBase.ShortenPath(Path.Combine(ModFolder.mcFolderSelected, "assets", "virtual", "legacy"))); // 1.5.2 的 pre-1.6 资源索引应与 legacy 合并
         gameArguments.Add("${assets_index_name}", ModAssets.McAssetsGetIndexName(instance));
 
         // 支持库参数
@@ -3078,7 +3078,7 @@ public static class ModLaunch
     }
 
     /// <summary>
-    ///     获取 Natives 文件夹路径，不以 \ 结尾。
+    ///     获取 Natives 文件夹路径，不以目录分隔符结尾。
     /// </summary>
     private static string GetNativesFolder()
     {
@@ -3165,9 +3165,9 @@ public static class ModLaunch
                 // 更新文件
                 var profiles =
                     (JsonObject)ModBase.GetJson(
-                        ModBase.ReadFile(ModFolder.mcFolderSelected + "launcher_profiles.json"));
+                        ModBase.ReadFile(Path.Combine(ModFolder.mcFolderSelected, "launcher_profiles.json")));
                 profiles.Merge(replaceJson);
-                ModBase.WriteFile(ModFolder.mcFolderSelected + "launcher_profiles.json", profiles.ToString(),
+                ModBase.WriteFile(Path.Combine(ModFolder.mcFolderSelected, "launcher_profiles.json"), profiles.ToString(),
                     encoding: Encoding.GetEncoding("GB18030"));
                 McLaunchLog("已更新 launcher_profiles.json");
             }
@@ -3176,7 +3176,7 @@ public static class ModLaunch
                 ModBase.Log(ex, "更新 launcher_profiles.json 失败，将在删除文件后重试");
                 try
                 {
-                    File.Delete(ModFolder.mcFolderSelected + "launcher_profiles.json");
+                    File.Delete(Path.Combine(ModFolder.mcFolderSelected, "launcher_profiles.json"));
                     ModFolder.McFolderLauncherProfilesJsonCreate(ModFolder.mcFolderSelected);
                     // 构建需要替换的 Json 对象
                     var replaceJsonString = @"
@@ -3201,9 +3201,9 @@ public static class ModLaunch
                     // 更新文件
                     var profiles =
                         (JsonObject)ModBase.GetJson(
-                            ModBase.ReadFile(ModFolder.mcFolderSelected + "launcher_profiles.json"));
+                            ModBase.ReadFile(Path.Combine(ModFolder.mcFolderSelected, "launcher_profiles.json")));
                     profiles.Merge(replaceJson);
-                    ModBase.WriteFile(ModFolder.mcFolderSelected + "launcher_profiles.json", profiles.ToString(),
+                    ModBase.WriteFile(Path.Combine(ModFolder.mcFolderSelected, "launcher_profiles.json"), profiles.ToString(),
                         encoding: Encoding.GetEncoding("GB18030"));
                     McLaunchLog("已在删除后更新 launcher_profiles.json");
                 }
@@ -3671,7 +3671,7 @@ public static class ModLaunch
                 return "";
             if (escapeHandler is null)
                 return s;
-            if (s.Contains(@":\"))
+            if (Path.IsPathFullyQualified(FileSystemPath.NormalizeSeparators(s)))
                 s = ModBase.ShortenPath(s);
             return escapeHandler(s);
         }

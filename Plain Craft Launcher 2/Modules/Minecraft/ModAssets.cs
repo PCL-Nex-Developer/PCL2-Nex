@@ -138,12 +138,13 @@ namespace PCL
             try
             {
                 // 初始化
-                if (!File.Exists($@"{ModFolder.mcFolderSelected}assets\indexes\{indexName}.json"))
+                var assetIndexPath = Path.Combine(ModFolder.mcFolderSelected, "assets", "indexes", indexName + ".json");
+                if (!File.Exists(assetIndexPath))
                     throw new FileNotFoundException(Lang.Text("Minecraft.Error.AssetIndexNotFound"),
-                        Path.Combine(ModFolder.mcFolderSelected, "assets", "indexes", indexName + ".json"));
+                        assetIndexPath);
                 var result = new List<McAssetsToken>();
                 var json = (JsonObject)ModBase.GetJson(
-                    ModBase.ReadFile($@"{ModFolder.mcFolderSelected}assets\indexes\{indexName}.json"));
+                    ModBase.ReadFile(assetIndexPath));
 
                 // 读取列表
                 foreach (var file in json["objects"].AsObject())

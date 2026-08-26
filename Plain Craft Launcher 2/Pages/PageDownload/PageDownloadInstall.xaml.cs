@@ -7,6 +7,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using PCL.Core.App;
+using PCL.Core.IO;
 using PCL.Core.Utils.Validate;
 using PCL.Core.App.Localization;
 
@@ -102,7 +103,7 @@ public partial class PageDownloadInstall
         ModDownload.dlLegacyFabricListLoader.Start();
 
         // 重载预览
-        TextSelectName.ValidateRules = [new FolderNameValidator(ModFolder.mcFolderSelected + "versions")];
+        TextSelectName.ValidateRules = [new FolderNameValidator(System.IO.Path.Combine(ModFolder.mcFolderSelected, "versions"))];
         TextSelectName.Validate();
         ReloadSelected();
 
@@ -2234,7 +2235,8 @@ public partial class PageDownloadInstall
         var request = new ModDownloadLib.McInstallRequest
         {
             targetInstanceName = instanceName,
-            targetInstanceFolder = $@"{ModFolder.mcFolderSelected}versions\{instanceName}\",
+            targetInstanceFolder = FileSystemPath.EnsureTrailingSeparator(
+                System.IO.Path.Combine(ModFolder.mcFolderSelected, "versions", instanceName)),
             minecraftJson = _vanillaData?["url"].ToString(),
             minecraftName = _vanillaName,
             optiFineEntry = selectedOptiFine,

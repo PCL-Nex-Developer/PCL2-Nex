@@ -23,7 +23,7 @@
         <Nullable>enable</Nullable>
         <ErrorReport>prompt</ErrorReport>
         <WarningLevel>4</WarningLevel>
-        <OutputPath>bin\$(Configuration)-$(Platform)\</OutputPath>
+        <OutputPath>bin/$(Configuration)-$(Platform)/</OutputPath>
         <PlatformTarget>$(Platform)</PlatformTarget>
         <NoWarn>$(NoWarn);CS9113;CS8600;CS8601;CS8602;CS8603;CS8604;CS8605;CS8618;CS8619;CS8620;CS8622;CS8625;CS8629;CS8714;CS8765;CS8767;CS9264</NoWarn>
     </PropertyGroup>
@@ -80,15 +80,15 @@
         <EnableDefaultPageItems>false</EnableDefaultPageItems>
     </PropertyGroup>
     <ItemGroup>
-        <Compile Include="**\*.cs" Exclude="bin\**;obj\**;publish\**;**\*.g.cs;SourceGenerators\**;Link\Lobby\**;Link\Scaffolding\**" />
-        <Page Include="**\*.xaml" Exclude="bin\**;obj\**;publish\**" />
-        <Resource Include="UI\Assets\*" />
-        <Resource Include="UI\Assets\Shaders\*.ps" />
-        <Resource Include="UI\Assets\IconPacks\**\*.svg" />
+        <Compile Include="**/*.cs" Exclude="bin/**;obj/**;publish/**;**/*.g.cs;SourceGenerators/**;Link/Lobby/**;Link/Scaffolding/**" />
+        <Page Include="**/*.xaml" Exclude="bin/**;obj/**;publish/**" />
+        <Resource Include="UI/Assets/*" />
+        <Resource Include="UI/Assets/Shaders/*.ps" />
+        <Resource Include="UI/Assets/IconPacks/**/*.svg" />
     </ItemGroup>
     <!-- 项目自定义源生成器 -->
     <ItemGroup>
-        <AdditionalFiles Include="App\IoC\LifecycleState.cs" />
-        <ProjectReference Include="..\PCL.Core.SourceGenerators\PCL.Core.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+        <AdditionalFiles Include="App/IoC/LifecycleState.cs" />
+        <ProjectReference Include="../PCL.Core.SourceGenerators/PCL.Core.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     </ItemGroup>
 </Project>

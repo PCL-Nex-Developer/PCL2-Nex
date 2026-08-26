@@ -51,7 +51,7 @@ public static class ModBase
 
     // 龙猫味石山小记: 用最不靠谱的实现写出能跑的代码 (AppDomain.CurrentDomain.SetupInformation.ApplicationBase 获取到的是当前工作目录而不是可执行文件所在目录)
     /// <summary>
-    ///     程序可执行文件所在目录，以“\”结尾。
+    ///     程序可执行文件所在目录，以当前平台的目录分隔符结尾。
     /// </summary>
     public static readonly string exePath = FileSystemPath.EnsureTrailingSeparator(Basics.ExecutableDirectory);
 
@@ -91,18 +91,18 @@ public static class ModBase
     public static bool isProgramEnded = false;
 
     /// <summary>
-    ///     程序的缓存文件夹路径，以 \ 结尾。
+    ///     程序的缓存文件夹路径，以当前平台的目录分隔符结尾。
     /// </summary>
     public static string pathTemp = FileSystemPath.EnsureTrailingSeparator(Paths.Temp);
 
     /// <summary>
-    ///     AppData 中的 PCL 文件夹路径，以 \ 结尾。
+    ///     AppData 中的 PCL 文件夹路径，以当前平台的目录分隔符结尾。
     /// </summary>
     public static string pathAppdata = FileSystemPath.EnsureTrailingSeparator(
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PCL"));
 
     /// <summary>
-    ///     AppData 中的 PCLNex 配置文件夹路径，以 \ 结尾。
+    ///     AppData 中的 PCLNex 配置文件夹路径，以当前平台的目录分隔符结尾。
     /// </summary>
     public static string pathAppdataConfig = FileSystemPath.EnsureTrailingSeparator(Path.Combine(
                                              Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -628,14 +628,27 @@ public static class ModBase
 
     private static readonly ConcurrentDictionary<string, ConcurrentDictionary<string, string>> iniCache = new();
 
+    private static string ResolveFileSystemPath(string path)
+    {
+        path = FileSystemPath.NormalizeSeparators(path);
+        return Path.IsPathFullyQualified(path) ? path : Path.Combine(exePath, path);
+    }
+
+    private static string ResolveIniPath(string fileName)
+    {
+        fileName = FileSystemPath.NormalizeSeparators(fileName);
+        return Path.IsPathFullyQualified(fileName)
+            ? fileName
+            : Path.Combine(pathPCLData, fileName + ".ini");
+    }
+
     /// <summary>
     ///     清除某 ini 文件的运行时缓存。
     /// </summary>
-    /// <param name="fileName">文件完整路径或简写文件名。简写将会使用“ApplicationName\文件名.ini”作为路径。</param>
+    /// <param name="fileName">文件完整路径或简写文件名。简写会使用程序数据目录中的同名 ini 文件。</param>
     public static void IniClearCache(string fileName)
     {
-        if (!fileName.Contains(@":\"))
-            fileName = Path.Combine(pathPCLData, fileName + ".ini");
+        fileName = ResolveIniPath(fileName);
         if (iniCache.ContainsKey(fileName))
             iniCache.Remove(fileName, out _);
     }
@@ -644,14 +657,13 @@ public static class ModBase
     ///     获取 ini 文件缓存。如果没有，则新读取 ini 文件内容。
     ///     在文件不存在或读取失败时返回 Nothing。
     /// </summary>
-    /// <param name="fileName">文件完整路径或简写文件名。简写将会使用“ApplicationName\文件名.ini”作为路径。</param>
+    /// <param name="fileName">文件完整路径或简写文件名。简写将会使用程序数据目录中的同名 ini 文件。</param>
     private static ConcurrentDictionary<string, string> IniGetContent(string fileName)
     {
         try
         {
             // 还原文件路径
-            if (!fileName.Contains(@":\"))
-                fileName = Path.Combine(pathPCLData, fileName + ".ini");
+            fileName = ResolveIniPath(fileName);
             // 检索缓存
             if (iniCache.ContainsKey(fileName))
                 return iniCache[fileName];
@@ -680,7 +692,7 @@ public static class ModBase
     /// <summary>
     ///     读取 ini 文件。这可能会使用到缓存。
     /// </summary>
-    /// <param name="fileName">文件完整路径或简写文件名。简写将会使用“ApplicationName\文件名.ini”作为路径。</param>
+    /// <param name="fileName">文件完整路径或简写文件名。简写将会使用程序数据目录中的同名 ini 文件。</param>
     /// <param name="key">键。</param>
     /// <param name="defaultValue">没有找到键时返回的默认值。</param>
     public static string ReadIni(string fileName, string key, string defaultValue = "")
@@ -712,7 +724,7 @@ public static class ModBase
     ///     写入 ini 文件，这会更新缓存。
     ///     若 Value 为 Nothing，则删除该键。
     /// </summary>
-    /// <param name="fileName">文件完整路径或简写文件名。简写将会使用“ApplicationName\文件名.ini”作为路径。</param>
+    /// <param name="fileName">文件完整路径或简写文件名。简写将会使用程序数据目录中的同名 ini 文件。</param>
     /// <param name="key">键。</param>
     /// <param name="value">值。</param>
     /// <remarks></remarks>
@@ -756,8 +768,7 @@ public static class ModBase
                     fileContent.Append("\r\n");
                 }
 
-                if (!fileName.Contains(@":\"))
-                    fileName = Path.Combine(pathPCLData, fileName + ".ini");
+                fileName = ResolveIniPath(fileName);
                 WriteFile(fileName, fileContent.ToString());
             }
         }
@@ -772,31 +783,43 @@ public static class ModBase
     // 路径处理
     /// <summary>
     ///     从文件路径或者 Url 获取不包含文件名的路径，或获取文件夹的父文件夹路径。
-    ///     取决于原路径格式，路径以 / 或 \ 结尾。
+    ///     文件夹路径以目录分隔符结尾。
     ///     不包含路径将会抛出异常。
     /// </summary>
     public static string GetPathFromFullPath(string filePath)
     {
-        string getPathFromFullPathRet = default;
-        if (!(filePath.Contains(@"\") || filePath.Contains("/")))
-            throw new Exception("不包含路径：" + filePath);
-        if (filePath.EndsWithF(@"\") || filePath.EndsWithF("/"))
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+
+        if (Uri.TryCreate(filePath, UriKind.Absolute, out var uri) && !uri.IsFile)
         {
-            // 是文件夹路径
-            var isRight = filePath.EndsWithF(@"\");
-            filePath = filePath.Substring(0, filePath.Length - 1);
-            getPathFromFullPathRet = filePath.Substring(0, filePath.LastIndexOfAny(new[] { '\\', '/' })) +
-                                     (isRight ? @"\" : "/");
-        }
-        else
-        {
-            // 是文件路径
-            getPathFromFullPathRet = filePath.Substring(0, filePath.LastIndexOfAny(new[] { '\\', '/' }) + 1);
-            if (string.IsNullOrEmpty(getPathFromFullPathRet))
-                throw new Exception("不包含路径：" + filePath);
+            var queryIndex = filePath.IndexOf('?');
+            var pathWithoutQuery = queryIndex < 0 ? filePath : filePath[..queryIndex];
+
+            var pathToSearch = pathWithoutQuery.EndsWith("/", StringComparison.Ordinal)
+                ? pathWithoutQuery.TrimEnd('/')
+                : pathWithoutQuery;
+            var lastSeparator = pathToSearch.LastIndexOf('/');
+            var authorityEnd = uri.Scheme.Length + 2;
+            return lastSeparator < authorityEnd
+                ? uri.GetLeftPart(UriPartial.Authority) + "/"
+                : pathToSearch[..(lastSeparator + 1)];
         }
 
-        return getPathFromFullPathRet;
+        var normalizedPath = FileSystemPath.NormalizeSeparators(filePath);
+        if (!normalizedPath.Contains(Path.DirectorySeparatorChar) &&
+            !normalizedPath.Contains(Path.AltDirectorySeparatorChar))
+            throw new Exception("不包含路径：" + filePath);
+
+        var targetPath = Path.EndsInDirectorySeparator(normalizedPath)
+            ? Path.TrimEndingDirectorySeparator(normalizedPath)
+            : normalizedPath;
+        var parentPath = Path.GetDirectoryName(targetPath);
+        if (string.IsNullOrEmpty(parentPath))
+            throw new Exception("不包含路径：" + filePath);
+
+        return Path.EndsInDirectorySeparator(parentPath)
+            ? parentPath
+            : parentPath + Path.DirectorySeparatorChar;
     }
 
     /// <summary>
@@ -804,19 +827,22 @@ public static class ModBase
     /// </summary>
     public static string GetFileNameFromPath(string filePath)
     {
-        filePath = filePath.Replace("/", @"\");
-        if (filePath.EndsWithF(@"\"))
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+        var queryIndex = filePath.IndexOf('?');
+        if (queryIndex >= 0)
+            filePath = filePath[..queryIndex]; // 去掉网络参数后的 ?
+
+        var normalizedPath = FileSystemPath.NormalizeSeparators(filePath);
+        if (Path.EndsInDirectorySeparator(normalizedPath))
             throw new Exception("不包含文件名：" + filePath);
-        if (filePath.Contains("?"))
-            filePath = filePath.Substring(0, filePath.IndexOfF("?")); // 去掉网络参数后的 ?
-        if (filePath.Contains(@"\"))
-            filePath = filePath.Substring(filePath.LastIndexOfF(@"\") + 1);
-        var length = filePath.Length;
+
+        var result = Path.GetFileName(normalizedPath);
+        var length = result.Length;
         if (length == 0)
             throw new Exception("不包含文件名：" + filePath);
         if (length > 250)
             throw new PathTooLongException("文件名过长：" + filePath);
-        return filePath;
+        return result;
     }
 
     /// <summary>
@@ -824,7 +850,7 @@ public static class ModBase
     /// </summary>
     public static string GetFileNameWithoutExtentionFromPath(string filePath)
     {
-        return Path.GetFileNameWithoutExtension(filePath);
+        return Path.GetFileNameWithoutExtension(GetFileNameFromPath(filePath));
     }
 
     /// <summary>
@@ -832,11 +858,12 @@ public static class ModBase
     /// </summary>
     public static string GetFolderNameFromPath(string folderPath)
     {
-        if (folderPath.EndsWithF(@":\") || folderPath.EndsWithF(@":\\"))
+        folderPath = FileSystemPath.NormalizeSeparators(folderPath);
+        if (OperatingSystem.IsWindows() && folderPath.Length >= 2 && folderPath[1] == ':' &&
+            string.Equals(Path.GetPathRoot(folderPath), folderPath, StringComparison.OrdinalIgnoreCase))
             return folderPath.Substring(0, 1);
-        if (folderPath.EndsWithF(@"\") || folderPath.EndsWithF("/"))
-            folderPath = folderPath.Substring(0, folderPath.Length - 1);
-        return GetFileNameFromPath(folderPath);
+        var trimmedPath = Path.TrimEndingDirectorySeparator(folderPath);
+        return string.IsNullOrEmpty(trimmedPath) ? Path.GetPathRoot(folderPath) ?? "" : Path.GetFileName(trimmedPath);
     }
 
     // 读取、写入、复制文件
@@ -848,10 +875,8 @@ public static class ModBase
         try
         {
             // 还原文件路径
-            if (!fromPath.Contains(@":\"))
-                fromPath = exePath + fromPath;
-            if (!toPath.Contains(@":\"))
-                toPath = exePath + toPath;
+            fromPath = ResolveFileSystemPath(fromPath);
+            toPath = ResolveFileSystemPath(toPath);
             // 如果复制同一个文件则跳过
             if ((fromPath ?? "") == (toPath ?? ""))
                 return;
@@ -874,8 +899,7 @@ public static class ModBase
         try
         {
             // 还原文件路径
-            if (!filePath.Contains(@":\"))
-                filePath = exePath + filePath;
+            filePath = ResolveFileSystemPath(filePath);
             if (File.Exists(filePath))
                 using (var readStream =
                        new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
@@ -937,8 +961,7 @@ public static class ModBase
     public static void WriteFile(string filePath, string text, bool append = false, Encoding? encoding = null)
     {
         // 处理相对路径
-        if (!filePath.Contains(@":\"))
-            filePath = exePath + filePath;
+        filePath = ResolveFileSystemPath(filePath);
         // 确保目录存在
         Directory.CreateDirectory(GetPathFromFullPath(filePath));
         // 写入文件
@@ -969,8 +992,7 @@ public static class ModBase
     public static void WriteFile(string filePath, byte[] content, bool append = false)
     {
         // 处理相对路径
-        if (!filePath.Contains(@":\"))
-            filePath = exePath + filePath;
+        filePath = ResolveFileSystemPath(filePath);
         // 确保目录存在
         Directory.CreateDirectory(GetPathFromFullPath(filePath));
         // 写入文件
@@ -986,8 +1008,7 @@ public static class ModBase
         try
         {
             // 还原文件路径
-            if (!filePath.Contains(@":\"))
-                filePath = exePath + filePath;
+            filePath = ResolveFileSystemPath(filePath);
             // 确保目录存在
             Directory.CreateDirectory(GetPathFromFullPath(filePath));
             // 读取流
@@ -1328,7 +1349,7 @@ public static class ModBase
     /// <param name="requireJson">是否要求文件为合法 JSON。</param>
     public static void WaitForFileReady(string filePath, int timeoutMs, bool requireJson)
     {
-        filePath = filePath.Contains(@":\") ? filePath : exePath + filePath;
+        filePath = ResolveFileSystemPath(filePath);
         var start = Environment.TickCount;
         long lastSize = -1;
         while (Environment.TickCount - start < timeoutMs)
@@ -1370,9 +1391,7 @@ public static class ModBase
         Action<double> progressIncrementHandler = null)
     {
         Directory.CreateDirectory(destDirectory);
-        destDirectory = Path.GetFullPath(destDirectory);
-        if (!destDirectory.EndsWith(Path.DirectorySeparatorChar.ToString()))
-            destDirectory += Path.DirectorySeparatorChar.ToString();
+        destDirectory = FileSystemPath.EnsureTrailingSeparator(destDirectory);
         if (compressFilePath.EndsWithF(".gz", true))
             // 以 gz 方式解压
             using (var compressedFile = new FileStream(compressFilePath, FileMode.Open, FileAccess.Read))
@@ -1399,11 +1418,12 @@ public static class ModBase
                 {
                     if (progressIncrementHandler is not null)
                         progressIncrementHandler(1d / totalCount);
-                    var destinationPath = Path.GetFullPath(Path.Combine(destDirectory, entry.FullName));
-                    if (!destinationPath.StartsWithF(destDirectory))
+                    var destinationPath = Path.GetFullPath(
+                        FileSystemPath.Combine(destDirectory, entry.FullName));
+                    if (!FileSystemPath.IsWithinDirectory(destinationPath, destDirectory))
                         throw new Exception(
                             $"解压文件 {entry.FullName} 错误：解压文件路径 {destinationPath} 不在目标目录 {destDirectory} 内");
-                    if (destinationPath.EndsWithF(@"\") || destinationPath.EndsWithF("/"))
+                    if (Path.EndsInDirectorySeparator(FileSystemPath.NormalizeSeparators(entry.FullName)))
                     {
                     }
                     else
@@ -1420,6 +1440,7 @@ public static class ModBase
     /// </summary>
     public static int DeleteDirectory(string path, bool ignoreIssue = false)
     {
+        path = FileSystemPath.NormalizeSeparators(path);
         if (!Directory.Exists(path))
             return 0;
         var deletedCount = 0;
@@ -1495,17 +1516,14 @@ public static class ModBase
     /// </summary>
     public static void CopyDirectory(string fromPath, string toPath, Action<double> progressIncrementHandler = null)
     {
-        fromPath = fromPath.Replace("/", @"\");
-        if (!fromPath.EndsWithF(@"\"))
-            fromPath += @"\";
-        toPath = toPath.Replace("/", @"\");
-        if (!toPath.EndsWithF(@"\"))
-            toPath += @"\";
+        fromPath = FileSystemPath.EnsureTrailingSeparator(fromPath);
+        toPath = FileSystemPath.EnsureTrailingSeparator(toPath);
         var allFiles = EnumerateFiles(fromPath).ToList();
         var fileCount = allFiles.Count;
         foreach (var file in allFiles)
         {
-            CopyFile(file.FullName, file.FullName.Replace(fromPath, toPath));
+            var relativePath = Path.GetRelativePath(fromPath, file.FullName);
+            CopyFile(file.FullName, Path.Combine(toPath, relativePath));
             if (progressIncrementHandler is not null)
                 progressIncrementHandler(1d / fileCount);
         }
@@ -1516,7 +1534,7 @@ public static class ModBase
     /// </summary>
     public static IEnumerable<FileInfo> EnumerateFiles(string directory)
     {
-        var info = new DirectoryInfo(ShortenPath(directory));
+        var info = new DirectoryInfo(ShortenPath(FileSystemPath.NormalizeSeparators(directory)));
         if (!info.Exists)
             return new List<FileInfo>();
         return info.EnumerateFiles("*", SearchOption.AllDirectories);
@@ -1527,6 +1545,7 @@ public static class ModBase
     /// </summary>
     public static string ShortenPath(string longPath, int shortenThreshold = 247)
     {
+        longPath = FileSystemPath.NormalizeSeparators(longPath);
         if (!OperatingSystem.IsWindows()) return longPath;
         if (longPath.Length <= shortenThreshold)
             return longPath;
@@ -1537,6 +1556,8 @@ public static class ModBase
 
     public static void MoveDirectory(string sourceDir, string targetDir)
     {
+        sourceDir = FileSystemPath.NormalizeSeparators(sourceDir);
+        targetDir = FileSystemPath.NormalizeSeparators(targetDir);
         if (!Directory.Exists(targetDir))
             Directory.CreateDirectory(targetDir);
         foreach (var filePath in Directory.GetFiles(sourceDir))
@@ -2385,7 +2406,7 @@ public static class ModBase
     }
 
     /// <summary>
-    ///     可用于临时存放文件的，不含任何特殊字符的文件夹路径，以“\”结尾。
+    ///     可用于临时存放文件的，不含任何特殊字符的文件夹路径，以当前平台的目录分隔符结尾。
     /// </summary>
     public static string pathPure = GetPureASCIIDir();
 
@@ -2847,13 +2868,13 @@ public static class ModBase
 
     /// <summary>
     ///     打开 explorer。
-    ///     若不以 \ 结尾，则将视作文件路径，打开并选中此文件。
+    ///     若不以目录分隔符结尾，则将视作文件路径，打开并选中此文件。
     /// </summary>
     public static void OpenExplorer(string location)
     {
         try
         {
-            location = location.Trim(' ', '"');
+            location = FileSystemPath.NormalizeSeparators(location.Trim(' ', '"'));
             var isDirectory = Directory.Exists(location) || Path.EndsInDirectorySeparator(location);
             location = Path.GetFullPath(location);
             Log("[System] 正在打开资源管理器：" + location);
@@ -3009,17 +3030,18 @@ public static class ModBase
         {
             if (string.IsNullOrEmpty(path))
                 return false;
-            if (!path.EndsWithF(@"\"))
-                path += @"\";
-            if (path.EndsWithF(@":\System Volume Information\") || path.EndsWithF(@":\$RECYCLE.BIN\"))
+            path = FileSystemPath.EnsureTrailingSeparator(path);
+            if (OperatingSystem.IsWindows() &&
+                (path.EndsWithF(@":\System Volume Information\") || path.EndsWithF(@":\$RECYCLE.BIN\")))
                 return false;
             if (!Directory.Exists(path))
                 return false;
             var fileName = "CheckPermission" + GetUuid();
-            if (File.Exists(path + fileName))
-                File.Delete(path + fileName);
-            File.Create(path + fileName).Dispose();
-            File.Delete(path + fileName);
+            var filePath = Path.Combine(path, fileName);
+            if (File.Exists(filePath))
+                File.Delete(filePath);
+            File.Create(filePath).Dispose();
+            File.Delete(filePath);
             return true;
         }
         catch (Exception ex)
@@ -3036,14 +3058,14 @@ public static class ModBase
     {
         if (string.IsNullOrWhiteSpace(path))
             throw new ArgumentNullException("文件夹名不能为空！");
-        if (!path.EndsWithF(@"\"))
-            path += @"\";
+        path = FileSystemPath.EnsureTrailingSeparator(path);
         if (!Directory.Exists(path))
             throw new DirectoryNotFoundException("文件夹不存在！");
-        if (File.Exists(path + "CheckPermission"))
-            File.Delete(path + "CheckPermission");
-        File.Create(path + "CheckPermission").Dispose();
-        File.Delete(path + "CheckPermission");
+        var filePath = Path.Combine(path, "CheckPermission");
+        if (File.Exists(filePath))
+            File.Delete(filePath);
+        File.Create(filePath).Dispose();
+        File.Delete(filePath);
     }
 
     #region UI
@@ -3624,7 +3646,7 @@ public static class ModBase
                              ModMain.MyMsgBox(
                                  "若你在汇报一个 Bug，请点击 打开文件夹 按钮，并上传 Launch-" + currentDate + "-[一串数字].log 中包含错误信息的文件。" +
                                  "\r\n" + "游戏崩溃一般与启动器无关，请不要因为游戏崩溃而提交反馈。", "反馈提交提醒", Lang.Text("Common.Action.OpenFolder"), "不需要") ==
-                             1)) OpenExplorer(pathPCLData + "Log" + Path.DirectorySeparatorChar);
+                             1)) OpenExplorer(Path.Combine(pathPCLData, "Log"));
         OpenWebsite("https://github.com/PCL-Nex-Developer/PCL2-Nex/issues/");
     }
 

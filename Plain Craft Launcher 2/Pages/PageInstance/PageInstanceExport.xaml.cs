@@ -6,6 +6,7 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using DotNet.Globbing;
 using PCL.Core.App;
+using PCL.Core.IO;
 using PCL.Core.UI;
 using PCL.Core.App.Localization;
 using PCL.Core.Utils;
@@ -228,7 +229,7 @@ public partial class PageInstanceExport : IRefreshable
         panel.Children.Clear();
         foreach (var Folder in folders)
         {
-            var targetFolder = new DirectoryInfo(PageInstanceLeft.McInstance.PathIndie + Folder);
+            var targetFolder = new DirectoryInfo(Path.Combine(PageInstanceLeft.McInstance.PathIndie, Folder));
             if (!targetFolder.Exists)
                 continue;
             // 查找文件夹下的对应项
@@ -333,10 +334,10 @@ public partial class PageInstanceExport : IRefreshable
         allEntries.AddRange(pathInfo.EnumerateFiles().Select(f => f.Name));
         foreach (var SubFolder in pathInfo.EnumerateDirectories().Where(IsValidDirectory))
         {
-            allEntries.Add($@"{SubFolder.Name}\");
-            allEntries.AddRange(SubFolder.EnumerateFiles().Select(f => $@"{SubFolder.Name}\{f.Name}"));
+            allEntries.Add(SubFolder.Name + Path.DirectorySeparatorChar);
+            allEntries.AddRange(SubFolder.EnumerateFiles().Select(f => $"{SubFolder.Name}{Path.DirectorySeparatorChar}{f.Name}"));
             allEntries.AddRange(SubFolder.EnumerateDirectories().Where(IsValidDirectory)
-                .Select(d => $@"{SubFolder.Name}\{d.Name}\"));
+                .Select(d => $"{SubFolder.Name}{Path.DirectorySeparatorChar}{d.Name}{Path.DirectorySeparatorChar}"));
         }
 
         ModBase.Log($"[Export] 共发现 {allEntries.Count} 个可行的二级文件/文件夹");
@@ -371,12 +372,12 @@ public partial class PageInstanceExport : IRefreshable
 
                 // 粗略检查所有级
                 rule = rule.Trim("*?".ToCharArray());
-                if (rule.Split(new[] { '\\' }, StringSplitOptions.RemoveEmptyEntries).Count() >= 3)
+                if (rule.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries).Length >= 3)
                 {
-                    if (rule.EndsWithF(@"\"))
-                        return IsValidDirectory(new DirectoryInfo(PageInstanceLeft.McInstance.PathIndie + rule)); // 文件夹有效
+                    if (Path.EndsInDirectorySeparator(rule))
+                        return IsValidDirectory(new DirectoryInfo(FileSystemPath.Combine(PageInstanceLeft.McInstance.PathIndie, rule))); // 文件夹有效
 
-                    return File.Exists(PageInstanceLeft.McInstance.PathIndie + rule);
+                    return File.Exists(FileSystemPath.Combine(PageInstanceLeft.McInstance.PathIndie, rule));
                     // 文件有效
                 }
 
@@ -420,8 +421,8 @@ public partial class PageInstanceExport : IRefreshable
             ignoreLine = ignoreLine.Trim();
             if (string.IsNullOrEmpty(ignoreLine) || ignoreLine.StartsWithF("#") || ignoreLine.StartsWithF("="))
                 continue;
-            ignoreLine = ignoreLine.Replace("/", @"\");
-            yield return ignoreLine + (ignoreLine.EndsWithF(@"\") && addSuffixStarToFolderPath ? "**" : "");
+            ignoreLine = FileSystemPath.NormalizeSeparators(ignoreLine);
+            yield return ignoreLine + (Path.EndsInDirectorySeparator(ignoreLine) && addSuffixStarToFolderPath ? "**" : "");
         }
     }
 
@@ -800,8 +801,8 @@ public partial class PageInstanceExport : IRefreshable
 
         // 确认导出位置
         string packPath = null;
-        if (!string.IsNullOrWhiteSpace(configPackPath) && !configPackPath.EndsWithF(@"\") &&
-            !configPackPath.EndsWithF("/"))
+        if (!string.IsNullOrWhiteSpace(configPackPath) &&
+            !Path.EndsInDirectorySeparator(FileSystemPath.NormalizeSeparators(configPackPath)))
             try
             {
                 Directory.CreateDirectory(ModBase.GetPathFromFullPath(configPackPath));
@@ -891,7 +892,7 @@ public partial class PageInstanceExport : IRefreshable
                 // 文件：检查规则并复制
                 foreach (var Entry in folder.EnumerateFiles("*", SearchOption.TopDirectoryOnly))
                 {
-                    var relativePath = Entry.FullName.AfterFirst(pathIndie);
+                    var relativePath = Path.GetRelativePath(pathIndie, Entry.FullName);
                     // 检查规则
                     var shouldKeep = false;
                     foreach (var Rule in allRules)
@@ -931,10 +932,10 @@ public partial class PageInstanceExport : IRefreshable
             // 复制追加内容到根目录
             var baseFolder = includePCL ? cacheFolder : Path.Combine(cacheFolder, "modpack");
             foreach (var Line in allExtraFiles)
-                if (Line.EndsWithF(@"\") || Line.EndsWithF("/"))
+                if (Path.EndsInDirectorySeparator(Line))
                 {
                     if (Directory.Exists(Line))
-                        ModBase.CopyDirectory(Line, Path.Combine(baseFolder, ModBase.GetFolderNameFromPath(Line)) + @"\");
+                        ModBase.CopyDirectory(Line, Path.Combine(baseFolder, ModBase.GetFolderNameFromPath(Line)));
                     else
                         HintService.Hint(Lang.Text("Instance.Export.ConfigFolderNotFound", Line), HintType.Error);
                 }
@@ -1117,7 +1118,7 @@ public partial class PageInstanceExport : IRefreshable
                     var modFile = Pair.Key;
                     files.Add(new JsonObject
                     {
-                        { "path", Path.GetRelativePath(overridesFolder, modFile.path).Replace(@"\", "/") },
+                        { "path", Path.GetRelativePath(overridesFolder, modFile.path).Replace(Path.DirectorySeparatorChar, '/') },
                         {
                             "hashes",
                             new JsonObject

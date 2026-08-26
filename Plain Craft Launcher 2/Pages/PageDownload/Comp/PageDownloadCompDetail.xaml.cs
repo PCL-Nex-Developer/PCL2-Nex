@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using FluentValidation;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
+using PCL.Core.IO;
 using PCL.Core.Minecraft.ResourceProject;
 using PCL.Core.UI;
 using PCL.Core.Utils;
@@ -72,7 +73,7 @@ public partial class PageDownloadCompDetail
             var packName = _project.TranslatedName.Replace(".zip", "").Replace(".rar", "").Replace(".mrpack", "")
                 .Replace(@"\", "＼").Replace("/", "／").Replace("|", "｜").Replace(":", "：").Replace("<", "＜")
                     .Replace(">", "＞").Replace("*", "＊").Replace("?", "？").Replace("\"", "").Replace("： ", "：");
-            var validate = new FolderNameValidator(ModFolder.mcFolderSelected + "versions");
+            var validate = new FolderNameValidator(Path.Combine(ModFolder.mcFolderSelected, "versions"));
             if (!validate.Validate(packName).IsValid)
                 packName = "";
             var instanceName = ModMain.MyMsgBoxInput(Lang.Text("Download.Comp.Detail.InputInstanceName"), "", packName, [validate]);
@@ -81,8 +82,8 @@ public partial class PageDownloadCompDetail
 
             // 构造步骤加载器
             var loaders = new List<ModLoader.LoaderBase>();
-            var target =
-                $@"{ModFolder.mcFolderSelected}versions\{instanceName}\原始整合包.{(_project.FromCurseForge ? "zip" : "mrpack")}";
+            var target = Path.Combine(ModFolder.mcFolderSelected, "versions", instanceName,
+                "原始整合包." + (_project.FromCurseForge ? "zip" : "mrpack"));
             var logoFileAddress = MyImage.GetTempPath(_compItem.Logo);
             loaders.Add(new LoaderDownload(Lang.Text("Download.Comp.Detail.DownloadModpackFile"), new List<DownloadFile> { file.ToNetFile(target) })
                 { ProgressWeight = 10d, block = true });
@@ -140,7 +141,7 @@ public partial class PageDownloadCompDetail
 
             // 确认默认保存位置
             string defaultFolder = null;
-            var subFolder = @"saves\";
+            const string subFolder = "saves";
             Func<McInstance, bool> isVersionSuitable = null;
             // 获取资源所需的加载器
             var allowedLoaders = new List<ModComp.CompLoaderType>();
@@ -172,7 +173,7 @@ public partial class PageDownloadCompDetail
             }
             else if (ModInstanceList.McMcInstanceSelected is not null && isVersionSuitable(ModInstanceList.McMcInstanceSelected))
             {
-                defaultFolder = $"{ModInstanceList.McMcInstanceSelected.PathIndie}{subFolder}";
+                defaultFolder = Path.Combine(ModInstanceList.McMcInstanceSelected.PathIndie, subFolder);
                 Directory.CreateDirectory(defaultFolder);
                 ModBase.Log($"[Comp] 使用当前实例作为默认下载位置：{defaultFolder}");
             }
@@ -184,11 +185,11 @@ public partial class PageDownloadCompDetail
                 {
                     HintService.Hint(Lang.Text("Download.Comp.Detail.FindingApplicableInstance"));
                     ModLoader.LoaderFolderRun(ModInstanceList.mcInstanceListLoader, ModFolder.mcFolderSelected,
-                        ModLoader.LoaderFolderRunType.ForceRun, 1, @"versions\", true);
+                        ModLoader.LoaderFolderRunType.ForceRun, 1, "versions", true);
                 }
 
                 var suitableVersions = ModInstanceList.mcInstanceList.Values.SelectMany(l => l)
-                    .Where(v => isVersionSuitable(v)).Select(v => new DirectoryInfo($"{v.PathIndie}{subFolder}"));
+                    .Where(v => isVersionSuitable(v)).Select(v => new DirectoryInfo(Path.Combine(v.PathIndie, subFolder)));
                 if (suitableVersions.Any())
                 {
                     var selectedVersion = suitableVersions
@@ -216,7 +217,7 @@ public partial class PageDownloadCompDetail
 
             // 构造步骤加载器
             var loaders = new List<ModLoader.LoaderBase>();
-            var targetPath = target.BeforeLast(@"\");
+            var targetPath = Path.GetDirectoryName(target)!;
             var logoFileAddress = MyImage.GetTempPath(_compItem.Logo);
             loaders.Add(new LoaderDownload(Lang.Text("Download.Comp.Detail.DownloadWorldFile"),
                 new List<DownloadFile> { file.ToNetFile(target) }) { ProgressWeight = 10d, block = true });
@@ -274,10 +275,10 @@ public partial class PageDownloadCompDetail
                     var subFolder = "";
                     switch (file.Type)
                     {
-                        case ModComp.CompType.Mod: subFolder = "mods\\"; break;
-                        case ModComp.CompType.ResourcePack: subFolder = "resourcepacks\\"; break;
-                        case ModComp.CompType.Shader: subFolder = "shaderpacks\\"; break;
-                        case ModComp.CompType.World: subFolder = "saves\\"; break;
+                        case ModComp.CompType.Mod: subFolder = "mods"; break;
+                        case ModComp.CompType.ResourcePack: subFolder = "resourcepacks"; break;
+                        case ModComp.CompType.Shader: subFolder = "shaderpacks"; break;
+                        case ModComp.CompType.World: subFolder = "saves"; break;
                         case ModComp.CompType.DataPack: subFolder = ""; break; // 导航到版本根目录
                     }
 
@@ -324,7 +325,7 @@ public partial class PageDownloadCompDetail
                     else if (ModInstanceList.McMcInstanceSelected is not null &&
                              isVersionSuitable(ModInstanceList.McMcInstanceSelected))
                     {
-                        defaultFolder = $"{ModInstanceList.McMcInstanceSelected.PathIndie}{subFolder}";
+                        defaultFolder = Path.Combine(ModInstanceList.McMcInstanceSelected.PathIndie, subFolder);
                         Directory.CreateDirectory(defaultFolder);
                         ModBase.Log($"[Comp] 使用当前实例作为默认下载位置：{defaultFolder}");
                     }
@@ -336,12 +337,12 @@ public partial class PageDownloadCompDetail
                         {
                             HintService.Hint(Lang.Text("Download.Comp.Detail.FindingApplicableInstance"));
                             ModLoader.LoaderFolderRun(ModInstanceList.mcInstanceListLoader, ModFolder.mcFolderSelected,
-                                ModLoader.LoaderFolderRunType.ForceRun, 1, "versions\\", true);
+                                ModLoader.LoaderFolderRunType.ForceRun, 1, "versions", true);
                         }
 
                         var suitableVersions = ModInstanceList.mcInstanceList.Values.SelectMany(l => l)
                             .Where(v => isVersionSuitable(v))
-                            .Select(v => new DirectoryInfo($"{v.PathIndie}{subFolder}"));
+                            .Select(v => new DirectoryInfo(Path.Combine(v.PathIndie, subFolder)));
 
                         if (suitableVersions.Any())
                         {
@@ -377,7 +378,7 @@ public partial class PageDownloadCompDetail
                                           : "*.zip"),
                         defaultFolder);
 
-                    if (!target.Contains("\\")) return;
+                    if (string.IsNullOrWhiteSpace(target)) return;
 
                     // 记录缓存路径
                     var targetDir = ModBase.GetPathFromFullPath(target);
@@ -406,7 +407,7 @@ public partial class PageDownloadCompDetail
                             targetInstance = knownInstances
                                 .Distinct()
                                 .FirstOrDefault(instance =>
-                                    targetDir.StartsWith(instance.PathIndie, StringComparison.OrdinalIgnoreCase));
+                                    FileSystemPath.IsWithinDirectory(targetDir, instance.PathIndie, allowEqual: true));
                             if (targetInstance is not null && !targetInstance.IsLoaded)
                             {
                                 targetInstance.Load();

@@ -134,6 +134,7 @@ public sealed partial class RpcService
                 app.Dispatcher.BeginInvoke(() =>
                 {
                     var window = app.MainWindow!;
+                    if (!window.IsVisible) window.Show();
                     if (window.WindowState == WindowState.Minimized) window.WindowState = WindowState.Normal;
                     if (!window.Topmost)
                     {

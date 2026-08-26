@@ -11,6 +11,7 @@ using Microsoft.VisualBasic.FileIO;
 using PCL.Core.App;
 using PCL.Core.App.Configuration;
 using PCL.Core.App.Configuration.Storage;
+using PCL.Core.IO;
 using FileSystem = Microsoft.VisualBasic.FileIO.FileSystem;
 using PCL.Core.App.Localization;
 using PCL.Core.UI;
@@ -45,7 +46,7 @@ public partial class PageSelectRight
     private void PageSelectRight_Loaded(object sender, RoutedEventArgs e)
     {
         ModLoader.LoaderFolderRun(ModInstanceList.mcInstanceListLoader, ModFolder.mcFolderSelected,
-            ModLoader.LoaderFolderRunType.RunOnUpdated, 1, @"versions\");
+            ModLoader.LoaderFolderRunType.RunOnUpdated, 1, "versions");
         PanBack.ScrollToHome();
         PanVerSearchBox.TextChanged += (a, b) => PanVerSearchBox_TextChanged(a, (TextChangedEventArgs)b);
 
@@ -118,7 +119,7 @@ public partial class PageSelectRight
     {
         if (ModInstanceList.mcInstanceListLoader.State == ModBase.LoadState.Failed)
             ModLoader.LoaderFolderRun(ModInstanceList.mcInstanceListLoader, ModFolder.mcFolderSelected,
-                ModLoader.LoaderFolderRunType.ForceRun, 1, @"versions\");
+                ModLoader.LoaderFolderRunType.ForceRun, 1, "versions");
     }
 
     #region 结果 UI 化
@@ -398,8 +399,10 @@ public partial class PageSelectRight
         newItem.Tags = tags;
         try
         {
-            if (mcInstance.Logo.EndsWith(@"PCL\Logo.png"))
-                newItem.Logo = mcInstance.PathInstance + @"PCL\Logo.png"; // 修复老版本中，存储的自定义 Logo 使用完整路径，导致移动后无法加载的 Bug
+            var customLogoRelativePath = Path.Combine("PCL", "Logo.png");
+            if (FileSystemPath.NormalizeSeparators(mcInstance.Logo)
+                .EndsWith(customLogoRelativePath, FileSystemPath.Comparison))
+                newItem.Logo = Path.Combine(mcInstance.PathInstance, customLogoRelativePath); // 修复老版本中，存储的自定义 Logo 使用完整路径，导致移动后无法加载的 Bug
             else
                 newItem.Logo = mcInstance.Logo;
         }
@@ -444,7 +447,7 @@ public partial class PageSelectRight
             States.Instance.Starred[version.PathInstance] = !version.IsStar;
             ModInstanceList.mcInstanceListForceRefresh = true;
             ModLoader.LoaderFolderRun(ModInstanceList.mcInstanceListLoader, ModFolder.mcFolderSelected,
-                ModLoader.LoaderFolderRunType.ForceRun, 1, @"versions\");
+                ModLoader.LoaderFolderRunType.ForceRun, 1, "versions");
         };
         var btnOpenFolder = new MyIconButton { LogoScale = 1.1d, SvgIcon = "lucide/folder-open" };
         btnOpenFolder.ToolTip = Lang.Text("Select.Instance.OpenFolder");
@@ -577,20 +580,20 @@ public partial class PageSelectRight
                         // 删除当前实例就更改选择
                         ModInstanceList.McMcInstanceSelected = (McInstance)((MyListItem)parent.Children[0]).Tag;
                     ModLoader.LoaderFolderRun(ModInstanceList.mcInstanceListLoader, ModFolder.mcFolderSelected,
-                        ModLoader.LoaderFolderRunType.UpdateOnly, 1, @"versions\");
+                        ModLoader.LoaderFolderRunType.UpdateOnly, 1, "versions");
                 }
                 else
                 {
                     // 删除后没剩了
                     ModLoader.LoaderFolderRun(ModInstanceList.mcInstanceListLoader, ModFolder.mcFolderSelected,
-                        ModLoader.LoaderFolderRunType.ForceRun, 1, @"versions\");
+                        ModLoader.LoaderFolderRunType.ForceRun, 1, "versions");
                 }
             }
             else
             {
                 // 同时出现在当前卡片与收藏夹
                 ModLoader.LoaderFolderRun(ModInstanceList.mcInstanceListLoader, ModFolder.mcFolderSelected,
-                    ModLoader.LoaderFolderRunType.ForceRun, 1, @"versions\");
+                    ModLoader.LoaderFolderRunType.ForceRun, 1, "versions");
             }
         }
         catch (OperationCanceledException ex)

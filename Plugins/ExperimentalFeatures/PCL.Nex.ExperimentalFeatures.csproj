@@ -9,7 +9,7 @@
     <RootNamespace>PclNex.ExperimentalFeatures</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\PCL.Core\PCL.Core.csproj" Private="false" />
-    <ProjectReference Include="..\..\Plain Craft Launcher 2\Plain Craft Launcher 2.csproj" Private="false" />
+    <ProjectReference Include="../../PCL.Core/PCL.Core.csproj" Private="false" />
+    <ProjectReference Include="../../Plain Craft Launcher 2/Plain Craft Launcher 2.csproj" Private="false" />
   </ItemGroup>
 </Project>

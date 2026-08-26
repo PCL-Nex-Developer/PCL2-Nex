@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
@@ -20,14 +21,83 @@ namespace PCL;
 
 public partial class Application
 {
+    private static bool macOSApplicationQuitRequested;
+    private static bool macOSShutdownHooksConfigured;
+
+    internal static bool IsMacOSApplicationQuitRequested => macOSApplicationQuitRequested;
+
     public Application()
     {
         // 注册生命周期事件
         Lifecycle.When(LifecycleState.Loaded, _ApplicationStartup);
+        Lifecycle.When(LifecycleState.WindowCreated, ConfigureShutdownBehavior);
         PluginCompatibility.ConfirmationAsync = ConfirmPluginCompatibilityAsync;
         Lifecycle.When(LifecycleState.WindowCreated, _ShowEnvironmentWarning);
         Lifecycle.When(LifecycleState.WindowCreated, UriActionService.Register);
         SessionEnding += _ApplicationSessionEnding;
+    }
+
+    internal void ConfigureShutdownBehavior()
+    {
+        ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown;
+        if (!OperatingSystem.IsMacOS() || macOSShutdownHooksConfigured) return;
+
+        try
+        {
+            // XPF owns the macOS desktop lifetime, without a compile-time Avalonia dependency here.
+            var avaloniaApplicationType = Type.GetType("Avalonia.Application, Avalonia.Controls");
+            var avaloniaApplication = avaloniaApplicationType?
+                .GetProperty("Current", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
+            var lifetime = avaloniaApplicationType?
+                .GetProperty("ApplicationLifetime", BindingFlags.Public | BindingFlags.Instance)?.GetValue(avaloniaApplication);
+            if (lifetime is null) return;
+
+            var lifetimeType = lifetime.GetType();
+            var shutdownMode = lifetimeType.GetProperty("ShutdownMode");
+            if (shutdownMode?.CanWrite == true)
+                shutdownMode.SetValue(lifetime, Enum.Parse(shutdownMode.PropertyType, "OnExplicitShutdown"));
+
+            var shutdownRequested = lifetimeType.GetEvent("ShutdownRequested");
+            if (shutdownRequested?.EventHandlerType is null) return;
+
+            var handler = Delegate.CreateDelegate(shutdownRequested.EventHandlerType,
+                typeof(Application).GetMethod(nameof(_MacOSShutdownRequested), BindingFlags.NonPublic | BindingFlags.Static)!);
+            shutdownRequested.AddEventHandler(lifetime, handler);
+            macOSShutdownHooksConfigured = true;
+
+            var activatableLifetimeType = Type.GetType(
+                "Avalonia.Controls.ApplicationLifetimes.IActivatableLifetime, Avalonia.Controls");
+            var activatableLifetime = activatableLifetimeType is null
+                ? null
+                : avaloniaApplicationType.GetMethod("TryGetFeature", [typeof(Type)])?
+                    .Invoke(avaloniaApplication, [activatableLifetimeType]);
+            var activated = activatableLifetime?.GetType().GetEvent("Activated");
+            if (activated?.EventHandlerType is not null)
+            {
+                handler = Delegate.CreateDelegate(activated.EventHandlerType,
+                    typeof(Application).GetMethod(nameof(_MacOSApplicationActivated), BindingFlags.NonPublic | BindingFlags.Static)!);
+                activated.AddEventHandler(activatableLifetime, handler);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[Platform] Failed to configure macOS shutdown behavior: {ex.Message}");
+        }
+    }
+
+    private static void _MacOSShutdownRequested(object? sender, EventArgs e)
+    {
+        macOSApplicationQuitRequested = true;
+    }
+
+    private static void _MacOSApplicationActivated(object? sender, EventArgs e)
+    {
+        System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
+        {
+            if (macOSApplicationQuitRequested) return;
+            if (System.Windows.Application.Current?.MainWindow is FormMain { Hidden: true } window)
+                window.Hidden = false;
+        });
     }
 
     private static Task<bool> ConfirmPluginCompatibilityAsync(
@@ -76,9 +146,9 @@ public partial class Application
                         Environment.Exit((int)ModBase.ProcessReturnValues.Fail);
                     }
 
-            // 初始化文件结构
-            Directory.CreateDirectory(ModBase.exePath + @"PCL\Pictures");
-            Directory.CreateDirectory(ModBase.exePath + @"PCL\Musics");
+            // 初始化文件结构。非 Windows 平台的安装目录通常是只读的，用户数据必须写入平台数据目录。
+            Directory.CreateDirectory(Path.Combine(Paths.Data, "Pictures"));
+            Directory.CreateDirectory(Path.Combine(Paths.Data, "Musics"));
             Directory.CreateDirectory(Path.Combine(ModBase.pathTemp, "Cache"));
             Directory.CreateDirectory(Path.Combine(ModBase.pathTemp, "Download"));
             Directory.CreateDirectory(ModBase.pathAppdata);
@@ -91,7 +161,7 @@ public partial class Application
             // 设置初始窗口
             if (Config.Preference.ShowStartupLogo)
             {
-                ModMain.frmStart = new ResourceStartupSplash(@"Images\icon.png");
+                ModMain.frmStart = new ResourceStartupSplash("Images/icon.png");
                 ModMain.frmStart.Show(false, true);
             }
 
@@ -104,14 +174,6 @@ public partial class Application
             _ = Config.Download.ThreadLimit;
             _ = Config.Download.SpeedLimit;
             _ = Config.Preference.Font;
-            // 删除旧日志
-            for (var i = 1; i <= 5; i++)
-            {
-                var oldLogFile = $@"{ModBase.exePath}PCL\Log-Nex{i}.log";
-                if (File.Exists(oldLogFile))
-                    File.Delete(oldLogFile);
-            }
-
             // 计时
             ModBase.Log("[Start] 第一阶段加载用时：" + (TimeUtils.GetTimeTick() - ModBase.applicationStartTick) + " ms");
             ModBase.applicationStartTick = TimeUtils.GetTimeTick();
@@ -146,7 +208,9 @@ public partial class Application
             problemList.Add(Lang.Text("Application.EnvironmentWarning.WindowsVersion"));
         if (SystemInfo.Is32BitSystem)
             problemList.Add(Lang.Text("Application.EnvironmentWarning.System32Bit"));
-        if (ModBase.exePath.Contains(Path.GetTempPath()) || ModBase.exePath.Contains(@"AppData\Local\Temp\"))
+        if (ModBase.exePath.Contains(Path.GetTempPath()) ||
+            (OperatingSystem.IsWindows() &&
+             ModBase.exePath.Contains(Path.Combine("AppData", "Local", "Temp") + Path.DirectorySeparatorChar)))
             problemList.Add(Lang.Text("Application.EnvironmentWarning.TempFolder"));
         if (ModBase.exePath.ContainsF("wechat_files", true) || ModBase.exePath.ContainsF("WeChat Files", true) ||
             ModBase.exePath.ContainsF("Tencent Files", true))

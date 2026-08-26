@@ -387,7 +387,7 @@ public partial class PageLaunchRight : IRefreshable
                 ModBase.Log($"[Page] 已联网下载主页，内容长度：{fileContent.Length}，来源：{address}");
                 States.UI.SavedHomepageUrl = address;
                 States.UI.SavedHomepageVersion = version;
-                ModBase.WriteFile(ModBase.pathTemp + @"Cache\Custom.xaml", fileContent);
+                ModBase.WriteFile(Path.Combine(ModBase.pathTemp, "Cache", "Custom.xaml"), fileContent);
             }
 
             // 要求刷新

@@ -20,6 +20,8 @@ public partial class DragHelper
 
     public void AddHook()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         if (HwndSource is null)
             throw new InvalidOperationException("HwndSource 未设置");
 
@@ -37,6 +39,8 @@ public partial class DragHelper
 
     public void RemoveHook()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         if (HwndSource is null)
             return;
 

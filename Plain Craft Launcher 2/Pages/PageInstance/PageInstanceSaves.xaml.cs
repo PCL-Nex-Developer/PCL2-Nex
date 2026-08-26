@@ -58,7 +58,7 @@ public partial class PageInstanceSaves : IRefreshable
     {
         // 重复加载部分
         PanBack.ScrollToHome();
-        worldPath = PageInstanceLeft.McInstance.PathIndie + @"saves\";
+        worldPath = Path.Combine(PageInstanceLeft.McInstance.PathIndie, "saves");
         if (!Directory.Exists(worldPath))
             Directory.CreateDirectory(worldPath);
         Reload();
@@ -77,8 +77,9 @@ public partial class PageInstanceSaves : IRefreshable
 
     private string GetFolderNameFromPath(string fullPath)
     {
-        return string.IsNullOrEmpty(fullPath) ? "" :
-            fullPath.EndsWith(@"\") ? new DirectoryInfo(fullPath).Parent?.Name : new DirectoryInfo(fullPath).Name;
+        return string.IsNullOrEmpty(fullPath)
+            ? ""
+            : Path.GetFileName(Path.TrimEndingDirectorySeparator(fullPath));
     }
 
     private string GetFileNameFromPath(string fullPath)
@@ -190,8 +191,8 @@ public partial class PageInstanceSaves : IRefreshable
                     var tmpCurFolder = curFolder;
                     if (File.Exists(saveLogo))
                     {
-                        var target =
-                            $@"{PageInstanceLeft.McInstance.PathInstance}PCL\ImgCache\{ModBase.GetStringMD5(saveLogo)}.png";
+                        var target = Path.Combine(PageInstanceLeft.McInstance.PathInstance, "PCL", "ImgCache",
+                            ModBase.GetStringMD5(saveLogo) + ".png");
                         ModBase.CopyFile(saveLogo, target);
                         saveLogo = target;
                     }
@@ -378,13 +379,14 @@ public partial class PageInstanceSaves : IRefreshable
                 {
                     if (Directory.Exists(i))
                     {
-                        if (Directory.Exists(worldPath + GetFolderNameFromPath(i)))
+                        var targetPath = Path.Combine(worldPath, GetFolderNameFromPath(i));
+                        if (Directory.Exists(targetPath))
                         {
                             HintService.Hint(Lang.Text("Instance.Saves.DuplicateFolder", GetFolderNameFromPath(i)));
                         }
                         else
                         {
-                            ModBase.CopyDirectory(i, worldPath + GetFolderNameFromPath(i));
+                            ModBase.CopyDirectory(i, targetPath);
                             copied += 1;
                         }
                     }

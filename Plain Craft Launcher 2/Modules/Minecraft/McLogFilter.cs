@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using PCL;
 
 namespace PCL
@@ -30,7 +31,7 @@ namespace PCL
         public static string FilterUserName(string raw, char filterChar)
         {
             var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            var userName = userProfile.Split(@"\").Last();
+            var userName = Path.GetFileName(Path.TrimEndingDirectorySeparator(userProfile));
             var maskedProfile = userProfile.Replace(userName, new string(filterChar, userName.Length));
             return raw.Replace(userProfile, maskedProfile);
         }

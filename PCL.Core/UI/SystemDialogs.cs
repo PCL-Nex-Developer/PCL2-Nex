@@ -91,7 +91,7 @@ public static class SystemDialogs {
     /// </summary>
     /// <param name="title">对话框标题，默认为 "选择文件夹"</param>
     /// <param name="initialDirectory">初始目录，默认为桌面</param>
-    /// <returns>用户选择的文件夹路径（以 \ 结尾），如果取消则返回空字符串</returns>
+    /// <returns>用户选择的文件夹路径（以当前平台的目录分隔符结尾），如果取消则返回空字符串</returns>
     public static string SelectFolder(string title = "选择文件夹", string? initialDirectory = null) {
         var folderDialog = new OpenFolderDialog {
             Title = title,

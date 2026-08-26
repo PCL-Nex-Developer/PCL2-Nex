@@ -38,6 +38,8 @@ public static class ToastNotification
     /// <param name="xml">Toast 模板</param>
     public static unsafe void SendToastFromTemplate(string xml)
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         // 定义 Toast 模板
         var toastXml = HStringHelper.ToHString(xml);
 
@@ -144,6 +146,8 @@ public static class ToastNotification
     /// </summary>
     public static void UninstallToasts()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         // TODO: 更改这里的逻辑
         AumidHelper.UnregisterAumid();
     }

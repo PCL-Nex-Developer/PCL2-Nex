@@ -40,11 +40,12 @@ public static class ModDownload
         // 检查文件
         var checker = new ModBase.FileChecker(1024L, (long)(version.JsonObject["downloads"]["client"]["size"] ?? -1),
             (string)version.JsonObject["downloads"]["client"]["sha1"]);
-        if (returnNothingOnFileUseable && checker.Check(version.PathInstance + version.Name + ".jar") is null)
+        var jarPath = Path.Combine(version.PathInstance, version.Name + ".jar");
+        if (returnNothingOnFileUseable && checker.Check(jarPath) is null)
             return null; // 通过校验
         // 返回下载信息
         var jarUrl = (string)version.JsonObject["downloads"]["client"]["url"];
-        return new DownloadFile(DlSourceLauncherOrMetaGet(jarUrl), version.PathInstance + version.Name + ".jar",
+        return new DownloadFile(DlSourceLauncherOrMetaGet(jarUrl), jarPath,
             checker);
     }
 
@@ -144,7 +145,7 @@ public static class ModDownload
                 {
                     var backAssetsFile = DlClientAssetIndexGet(version);
                     realAddress = backAssetsFile.LocalPath;
-                    tempAddress = ModBase.pathTemp + @"Cache\" + backAssetsFile.LocalName;
+                    tempAddress = Path.Combine(ModBase.pathTemp, "Cache", backAssetsFile.LocalName);
                     backAssetsFile.LocalPath = tempAddress;
                     task.output = new List<DownloadFile> { backAssetsFile };
                     // 检查是否需要更新：每天只更新一次
@@ -341,7 +342,7 @@ public static class ModDownload
             if (versions.Count < 200)
                 throw new Exception(Lang.Text("Minecraft.Download.Error.VersionListOperationFailed", "Mojang", json));
             // 添加 UVMC 项
-            var cacheFilePath = ModBase.pathTemp + @"Cache\uvmc-download.json";
+            var cacheFilePath = Path.Combine(ModBase.pathTemp, "Cache", "uvmc-download.json");
             if (!File.Exists(cacheFilePath))
                 try
                 {
@@ -374,7 +375,6 @@ public static class ModDownload
 
             // 添加 PCL 特供项
             // 这个 Nex 版下不了
-            // If File.Exists(PathTemp & "Cache\download.json") Then Versions.Merge(GetJson(ReadFile(PathTemp & "Cache\download.json")))
             // 返回
             loader.output = new DlClientListResult
                 { IsOfficial = true, SourceName = Lang.Text("Download.Source.MojangOfficial"), Value = json };
@@ -426,7 +426,7 @@ public static class ModDownload
             if (versions.Count < 200)
                 throw new Exception(Lang.Text("Minecraft.Download.Error.VersionListOperationFailed", "BMCLAPI", json));
             // 添加 UVMC 项
-            var cacheFilePath = ModBase.pathTemp + @"Cache\uvmc-download.json";
+            var cacheFilePath = Path.Combine(ModBase.pathTemp, "Cache", "uvmc-download.json");
             if (!File.Exists(cacheFilePath))
                 try
                 {

@@ -186,7 +186,7 @@ public static class ModLibrary
             string clientSHA1;
             // 判断需求的实例是否存在
             // 不能调用 RealVersion.Check()，可能会莫名其妙地触发 CheckPermission 正被另一进程使用，导致误判前置不存在
-            if (!File.Exists(realMcInstance.PathInstance + realMcInstance.Name + ".json"))
+            if (!File.Exists(Path.Combine(realMcInstance.PathInstance, realMcInstance.Name + ".json")))
             {
                 realMcInstance = mcInstance;
                 ModBase.Log("[Minecraft] 可能缺少前置实例 " + realMcInstance.Name + "，找不到对应的 JSON 文件", ModBase.LogLevel.Debug);
@@ -208,7 +208,7 @@ public static class ModLibrary
             // 把所需的原版 Jar 添加进去
             result.Add(new McLibToken
             {
-                LocalPath = realMcInstance.PathInstance + realMcInstance.Name + ".jar", size = 0L, IsNatives = false,
+                LocalPath = Path.Combine(realMcInstance.PathInstance, realMcInstance.Name + ".jar"), size = 0L, IsNatives = false,
                 Url = clientUrl, Sha1 = clientSHA1
             });
         }
@@ -255,8 +255,8 @@ public static class ModLibrary
             {
                 string localPath;
                 if (isLocal && targetMcInstance is not null) // 纯本地项
-                    localPath = targetMcInstance.PathInstance + @"libraries\" +
-                                library["name"].ToString().AfterFirst(":").Replace(":", "-") + ".jar";
+                    localPath = Path.Combine(targetMcInstance.PathInstance, "libraries",
+                        library["name"].ToString().AfterFirst(":").Replace(":", "-") + ".jar");
                 else
                     localPath = McLibGet((string)library["name"], customMcFolder: customMcFolder);
                 var artifactPath = library["downloads"] is not null && library["downloads"]["artifact"] is not null
@@ -493,7 +493,7 @@ public static class ModLibrary
             try
             {
                 var channelType = mcInstance.JsonObject["labymod_data"]["channelType"].ToString();
-                Directory.CreateDirectory($@"{ModFolder.mcFolderSelected}labymod-neo\libraries");
+                Directory.CreateDirectory(Path.Combine(ModFolder.mcFolderSelected, "labymod-neo", "libraries"));
                 ModBase.Log("[Minecraft] 开始获取 LabyMod 信息");
                 var labyManifest = (JsonObject)ModNet.NetGetCodeByRequestRetry(
                     $"https://releases.r2.labymod.net/api/v1/manifest/{channelType}/latest.json", isJson: true);
@@ -503,7 +503,7 @@ public static class ModLibrary
                 {
                     var assetName = Asset.Key;
                     var assetSHA1 = Asset.Value.ToString();
-                    var assetPath = $@"{ModFolder.mcFolderSelected}labymod-neo\assets\{assetName}.jar";
+                    var assetPath = Path.Combine(ModFolder.mcFolderSelected, "labymod-neo", "assets", assetName + ".jar");
                     var assetUrl =
                         $"https://releases.r2.labymod.net/api/v1/download/assets/labymod4/{channelType}/{labyModCommitRef}/{assetName}/{assetSHA1}.jar";
                     var checker = new ModBase.FileChecker(hash: assetSHA1);

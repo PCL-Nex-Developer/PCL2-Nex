@@ -1633,7 +1633,7 @@
     <sys:String x:Key="Setup.Launch.Advanced.GameTail">游戏参数尾部</sys:String>
     <sys:String x:Key="Setup.Launch.Advanced.GameTail.ToolTip">文本框中的内容将会被直接拼合在启动参数的末尾。&#x0a;例如，输入 --demo 则会以试玩模式启动游戏。&#x0a;支持 Minecraft 实例 JSON 中的字符串替换标记，例如 ${library_directory}。</sys:String>
     <sys:String x:Key="Setup.Launch.Advanced.PreLaunchCommand">启动前执行命令</sys:String>
-    <sys:String x:Key="Setup.Launch.Advanced.PreLaunchCommand.ToolTip">在 MC 启动前执行特定命令或程序，语法与 Windows 的命令提示符一致。&#x0a;&#x0a;可以使用以下替换标记实现相对路径（路径均以 \ 结尾）：&#x0a; · {path}：PCL 的 exe 文件所在的文件夹&#x0a; · {minecraft}：.minecraft 文件夹&#x0a; · {verpath}：实例文件夹（.minecraft\versions\实例名\）&#x0a; · {verindie}：开启实例隔离时等同实例文件夹，未开启时等同 .minecraft 文件夹&#x0a; · {java}：游戏运行时的 Java 文件夹&#x0a;&#x0a;除此之外，也支持以下替换标记：&#x0a; · {user}：玩家名字&#x0a; · {login}：玩家的登录方式&#x0a; · {uuid}：玩家的 UUID&#x0a; · {name}：游戏实例名&#x0a; · {date}、{time}：当前的系统时间&#x0a; · {version}：游戏对应的原版版本号&#x0a;&#x0a;例如：&#x0a; · "{verpath}test.exe" ：运行实例文件夹下的 test.exe 程序&#x0a; · "{java}java.exe" -jar "{verpath}test.jar" ：用 Java 运行实例文件夹下的 test.jar&#x0a; · notepad "{verindie}options.txt" ：使用记事本打开该实例的设置文件&#x0a;&#x0a;涉及路径的操作最好都打上双引号，以避免路径中的空格导致运行失败。&#x0a;执行命令时，命令行所在的目录是当前的 .minecraft 文件夹。</sys:String>
+    <sys:String x:Key="Setup.Launch.Advanced.PreLaunchCommand.ToolTip">在 MC 启动前执行特定命令或程序。Windows 使用 cmd.exe；macOS 和 Linux 使用 /bin/sh。&#x0a;&#x0a;可以使用以下替换标记实现相对路径（路径均以当前平台的目录分隔符结尾）：&#x0a; · {path}：PCL 可执行文件所在的文件夹&#x0a; · {minecraft}：.minecraft 文件夹&#x0a; · {verpath}：实例文件夹&#x0a; · {verindie}：开启实例隔离时等同实例文件夹，未开启时等同 .minecraft 文件夹&#x0a; · {java}：游戏运行时的 Java 文件夹&#x0a;&#x0a;除此之外，也支持以下替换标记：&#x0a; · {user}：玩家名字&#x0a; · {login}：玩家的登录方式&#x0a; · {uuid}：玩家的 UUID&#x0a; · {name}：游戏实例名&#x0a; · {date}、{time}：当前的系统时间&#x0a; · {version}：游戏对应的原版版本号&#x0a;&#x0a;例如：&#x0a; · echo &quot;{verpath}&quot;：输出实例文件夹路径&#x0a;&#x0a;涉及路径的操作最好都打上双引号，以避免路径中的空格导致运行失败。执行命令时，命令行所在的目录是当前的 .minecraft 文件夹。</sys:String>
     <sys:String x:Key="Setup.Launch.Advanced.PreLaunchCommand.Wait">等待命令执行完成后再继续启动</sys:String>
     <sys:String x:Key="Setup.Launch.Advanced.DisableJlw">禁用 Java Launch Wrapper</sys:String>
     <sys:String x:Key="Setup.Launch.Advanced.DisableJlw.ToolTip">PCL 会使用 Java Launch Wrapper 来修复老版本 Java 在中文路径下无法启动的问题。&#x0a;如果这被反作弊拦截，或遇到其他问题，也可以将其关闭。</sys:String>
@@ -2118,7 +2118,7 @@
     <sys:String x:Key="Instance.Setup.Advanced.GameArgs.ToolTip">文本框中的内容将会被直接拼合在启动参数的末尾。&#x0a;例如，输入 --demo 则会以试玩模式启动游戏。&#x0a;支持 Minecraft 实例 JSON 中的字符串替换标记，例如 ${library_directory}。&#x0a;&#x0a;若留空，则跟随全局设置的值。</sys:String>
     <sys:String x:Key="Instance.Setup.Advanced.Classpath">Classpath 头部附加</sys:String>
     <sys:String x:Key="Instance.Setup.Advanced.Classpath.ToolTip">文本框中的内容将被作为 Classpath 添加到该实例的启动参数中的 Classpath 头部。&#x0a;需要使用绝对路径。若有多个，请以半角 (英文) 分号分隔。</sys:String>
-    <sys:String x:Key="Instance.Setup.Advanced.PreLaunchCommand.ToolTip">该项不会覆盖全局设置：启动时会先执行全局设置的命令，再执行实例设置的命令。&#x0a;&#x0a;在 MC 启动前执行特定命令或程序，语法与 Windows 的命令提示符一致。&#x0a;&#x0a;可以使用以下替换标记实现相对路径（路径均以 \ 结尾）：&#x0a; · {path}：PCL 的 exe 文件所在的文件夹&#x0a; · {minecraft}：.minecraft 文件夹&#x0a; · {verpath}：实例文件夹（.minecraft\versions\实例名\）&#x0a; · {verindie}：开启实例隔离时等同版本文件夹，未开启时等同 .minecraft 文件夹&#x0a; · {java}：游戏运行时的 Java 文件夹&#x0a;&#x0a;除此之外，也支持以下替换标记：&#x0a; · {user}：玩家名字&#x0a; · {login}：玩家的登录方式&#x0a; · {uuid}：玩家的 UUID&#x0a; · {name}：游戏实例名&#x0a; · {date}、{time}：当前的系统时间&#x0a; · {version}：游戏对应的原版版本号&#x0a;&#x0a;例如：&#x0a; · &quot;{verpath}test.exe&quot; ：运行实例文件夹下的 test.exe 程序&#x0a; · &quot;{java}java.exe&quot; -jar &quot;{verpath}test.jar&quot; ：用 Java 运行实例文件夹下的 test.jar&#x0a; · notepad &quot;{verindie}options.txt&quot; ：使用记事本打开该实例的设置文件&#x0a;&#x0a;涉及路径的操作最好都打上双引号，以避免路径中的空格导致运行失败。&#x0a;执行命令时，命令行所在的目录是当前的 .minecraft 文件夹。</sys:String>
+    <sys:String x:Key="Instance.Setup.Advanced.PreLaunchCommand.ToolTip">该项不会覆盖全局设置：启动时会先执行全局设置的命令，再执行实例设置的命令。&#x0a;&#x0a;在 MC 启动前执行特定命令或程序。Windows 使用 cmd.exe；macOS 和 Linux 使用 /bin/sh。&#x0a;&#x0a;可以使用以下替换标记实现相对路径（路径均以当前平台的目录分隔符结尾）：&#x0a; · {path}：PCL 可执行文件所在的文件夹&#x0a; · {minecraft}：.minecraft 文件夹&#x0a; · {verpath}：实例文件夹&#x0a; · {verindie}：开启实例隔离时等同版本文件夹，未开启时等同 .minecraft 文件夹&#x0a; · {java}：游戏运行时的 Java 文件夹&#x0a;&#x0a;除此之外，也支持以下替换标记：&#x0a; · {user}：玩家名字&#x0a; · {login}：玩家的登录方式&#x0a; · {uuid}：玩家的 UUID&#x0a; · {name}：游戏实例名&#x0a; · {date}、{time}：当前的系统时间&#x0a; · {version}：游戏对应的原版版本号&#x0a;&#x0a;例如：&#x0a; · echo &quot;{verpath}&quot;：输出实例文件夹路径&#x0a;&#x0a;涉及路径的操作最好都打上双引号，以避免路径中的空格导致运行失败。执行命令时，命令行所在的目录是当前的 .minecraft 文件夹。</sys:String>
     <sys:String x:Key="Instance.Setup.Advanced.IgnoreJavaCompatibility">忽略 Java 兼容性警告</sys:String>
     <sys:String x:Key="Instance.Setup.Advanced.IgnoreJavaCompatibility.ToolTip">如果手动选择了与当前实例不兼容的 Java，则自动跳过兼容性警告弹窗，强制使用手动选择的 Java。</sys:String>
     <sys:String x:Key="Instance.Setup.Advanced.DisableFileVerification">关闭文件校验</sys:String>
@@ -2578,7 +2578,7 @@
     <sys:String x:Key="Instance.Export.ConfigComment.ReverseMatch">以 ! 开头以反选。可以使用 *、?、[] 通配符。靠后的行覆盖靠前的。</sys:String>
     <sys:String x:Key="Instance.Export.ConfigComment.ExcludedFiles">排除的文件</sys:String>
     <sys:String x:Key="Instance.Export.ConfigComment.ExtraFiles">如果想将额外的文件自动放到压缩包根目录中，可以将它们的路径写在下方。</sys:String>
-    <sys:String x:Key="Instance.Export.ConfigComment.ExtraFiles2">必须是完整路径。每行中，若以 \ 结尾则代表是文件夹，不以 \ 结尾则代表是文件。</sys:String>
+    <sys:String x:Key="Instance.Export.ConfigComment.ExtraFiles2">必须是完整路径。每行中，若以路径分隔符结尾则代表是文件夹，否则代表是文件。</sys:String>
     <sys:String x:Key="Instance.Export.ShaderConfigSuffix"> (光影配置文件)</sys:String>
     <sys:String x:Key="Instance.Export.ConfigFolderNotFound">未找到配置文件中指定的文件夹：{0}</sys:String>
     <sys:String x:Key="Instance.Export.ConfigFileNotFound">未找到配置文件中指定的单个文件：{0}</sys:String>
@@ -3678,7 +3678,7 @@
     <sys:String x:Key="Instance.Export.Config.Comment.BundleFiles3">二次分发可能违反使用协议，请尽量不要公开发布包含资源文件的整合包！</sys:String>
     <sys:String x:Key="Instance.Export.Config.Comment.ExcludedFiles">排除的文件</sys:String>
     <sys:String x:Key="Instance.Export.Config.Comment.ExtraFiles">如果想将额外的文件自动放到压缩包根目录中，可以将它们的路径写在下方。</sys:String>
-    <sys:String x:Key="Instance.Export.Config.Comment.ExtraFiles2">必须是完整路径。每行中，若以 \ 结尾则代表是文件夹，不以 \ 结尾则代表是文件。</sys:String>
+    <sys:String x:Key="Instance.Export.Config.Comment.ExtraFiles2">必须是完整路径。每行中，若以路径分隔符结尾则代表是文件夹，否则代表是文件。</sys:String>
     <sys:String x:Key="Instance.Export.Config.Comment.IncludeLauncher">是否打包正式版 PCL Nex，以便没有启动器的玩家安装整合包。</sys:String>
     <sys:String x:Key="Instance.Export.Config.Comment.IncludeLauncherCustom">是否打包 PCL Nex 个性化内容，例如功能隐藏设置、主页、背景音乐和图片等。</sys:String>
     <sys:String x:Key="Instance.Export.Config.Comment.ModifyRules">修改下方的规则以控制需要导出的内容。</sys:String>

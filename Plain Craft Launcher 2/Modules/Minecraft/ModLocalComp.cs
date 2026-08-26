@@ -17,7 +17,7 @@ public static class ModLocalComp
     private const int localModCacheVersion = 7;
 
     private static readonly Lazy<HashCache> _hashCache = new(() =>
-        new HashCache(ModBase.pathTemp + @"Cache\HashCache.db"));
+        new HashCache(Path.Combine(ModBase.pathTemp, "Cache", "HashCache.db")));
 
     public class LocalCompFile
     {
@@ -360,7 +360,7 @@ public static class ModLocalComp
         /// <summary>
         ///     是否为文件夹项。
         /// </summary>
-        public bool IsFolder => path.EndsWithF(@"\__FOLDER__", true);
+        public bool IsFolder => string.Equals(Path.GetFileName(path), "__FOLDER__", StringComparison.OrdinalIgnoreCase);
 
         /// <summary>
         ///     获取实际的文件夹路径（去除 __FOLDER__ 标记）。
@@ -369,7 +369,7 @@ public static class ModLocalComp
         {
             get
             {
-                if (IsFolder) return path.Replace(@"\__FOLDER__", "");
+                if (IsFolder) return Path.GetDirectoryName(path) ?? "";
 
                 return path;
             }
@@ -1900,7 +1900,8 @@ public static class ModLocalComp
                         foreach (var File in ModBase.EnumerateFiles(loader.input.compPath))
                             try
                             {
-                                if ((File.DirectoryName.ToLower() ?? "") != (rawName.TrimEnd('\\') ?? ""))
+                                if ((File.DirectoryName.ToLower() ?? "") !=
+                                    (Path.TrimEndingDirectorySeparator(rawName).ToLower() ?? ""))
                                     if (!(PageInstanceLeft.McInstance is not null &&
                                           PageInstanceLeft.McInstance.Info.HasForge &&
                                           PageInstanceLeft.McInstance.Info.Drop < 130 && (File.Directory.Name ?? "") ==
@@ -1931,7 +1932,7 @@ public static class ModLocalComp
                 });
 
             // 获取本地文件缓存
-            var cachePath = ModBase.pathTemp + @"Cache\LocalComp.json";
+            var cachePath = Path.Combine(ModBase.pathTemp, "Cache", "LocalComp.json");
             var cache = new JsonObject();
             try
             {
@@ -2432,7 +2433,7 @@ public static class ModLocalComp
     {
         if (!instance.Modable)
             return null; // 跳过不可安装 Mod 实例
-        var modFolder = $"{instance.PathInstance}mods";
+        var modFolder = Path.Combine(instance.PathInstance, "mods");
         if (!Directory.Exists(modFolder))
             return null; // 确保 mods 目录存在
         foreach (var file in Directory.EnumerateFiles(modFolder, $"*{mainKeyword}*"))

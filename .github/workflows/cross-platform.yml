@@ -66,6 +66,7 @@ jobs:
         shell: bash
         env:
           PRIVATE_FEED_TOKEN: ${{ secrets.FEED_TOKEN_RO }}
+          RuntimeIdentifier: ${{ matrix.platform == 'linux' && 'linux-x64' || matrix.platform }}
           PCL_WRITE_SECRET: '1'
           PCL_MS_CLIENT_ID: ${{ secrets.CLIENT_ID }}
           PCL_CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
@@ -79,6 +80,22 @@ jobs:
             exit 1
           }
           rm -f /tmp/build.sh /tmp/build.err
+
+      - name: Verify Linux SQLite runtime asset
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mapfile -t packages < <(find dist -type f -name '*.deb' -print)
+          if (( ${#packages[@]} == 0 )); then
+            echo 'No Debian package was produced.' >&2
+            exit 1
+          fi
+          for package in "${packages[@]}"; do
+            if ! dpkg-deb --contents "$package" | awk '{print $NF}' | grep -qx './usr/lib/pcl2/libe_sqlite3.so'; then
+              echo "Missing libe_sqlite3.so in $package" >&2
+              exit 1
+            fi
+          done
 
       - uses: actions/upload-artifact@v7
         with:

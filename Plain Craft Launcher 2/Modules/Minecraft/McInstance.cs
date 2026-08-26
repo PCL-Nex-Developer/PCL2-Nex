@@ -49,7 +49,7 @@ public class McInstance
         public McInstanceState state = McInstanceState.Error;
 
         /// <summary></summary>
-        /// <param name="name">实例名，或实例文件夹的完整路径（不规定是否以 \ 结尾）。</param>
+        /// <param name="name">实例名，或实例文件夹的完整路径（不规定是否以目录分隔符结尾）。</param>
         public McInstance(string name)
         {
             var path = Path.IsPathFullyQualified(name)
@@ -59,12 +59,12 @@ public class McInstance
         }
 
         /// <summary>
-        ///     该实例的实例文件夹，以“\”结尾。
+        ///     该实例的实例文件夹，以目录分隔符结尾。
         /// </summary>
         public string PathInstance { get; }
 
         /// <summary>
-        ///     应用版本隔离后，该实例所对应的 Minecraft 根文件夹，以“\”结尾。
+        ///     应用版本隔离后，该实例所对应的 Minecraft 根文件夹，以目录分隔符结尾。
         /// </summary>
         public string PathIndie
         {
@@ -387,7 +387,7 @@ public class McInstance
                 ;
                 if (field is null)
                 {
-                    var jsonPath = PathInstance + Name + ".json";
+                    var jsonPath = Path.Combine(PathInstance, Name + ".json");
                     if (!File.Exists(jsonPath))
                     {
                         // 如果文件夹下只有一个 JSON 文件，则将其作为实例 JSON
@@ -400,7 +400,7 @@ public class McInstance
                         else
                         {
                             throw new Exception(Lang.Text("Minecraft.Error.InstanceJsonNotFound",
-                                $"{PathInstance}{Name}.json"));
+                                Path.Combine(PathInstance, Name + ".json")));
                         }
                     }
 
@@ -561,9 +561,10 @@ public class McInstance
                     {
                         try
                         {
-                            if (!File.Exists(PathInstance + Name + ".jar"))
+                            var jarPath = Path.Combine(PathInstance, Name + ".jar");
+                            if (!File.Exists(jarPath))
                                 break;
-                            using (var jarArchive = new ZipArchive(new FileStream(PathInstance + Name + ".jar",
+                            using (var jarArchive = new ZipArchive(new FileStream(jarPath,
                                        FileMode.Open, FileAccess.Read, FileShare.ReadWrite)))
                             {
                                 var versionJson = jarArchive.GetEntry("version.json");
@@ -576,7 +577,7 @@ public class McInstance
                         }
                         catch (Exception ex)
                         {
-                            ModBase.Log(ex, $"从实例 JAR 中读取 version.json 失败 ({PathInstance}{Name}.jar)");
+                            ModBase.Log(ex, $"从实例 JAR 中读取 version.json 失败 ({Path.Combine(PathInstance, Name + ".jar")})");
                         }
                     } while (false);
                 }
@@ -627,8 +628,9 @@ public class McInstance
             // 检查权限
             try
             {
-                Directory.CreateDirectory(PathInstance + @"PCL\");
-                ModBase.CheckPermissionWithException(PathInstance + @"PCL\");
+                var pclDirectory = Path.Combine(PathInstance, "PCL");
+                Directory.CreateDirectory(pclDirectory);
+                ModBase.CheckPermissionWithException(pclDirectory);
             }
             catch (Exception ex)
             {

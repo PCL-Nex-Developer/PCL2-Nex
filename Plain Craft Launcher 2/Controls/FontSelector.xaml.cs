@@ -148,13 +148,16 @@ public partial class FontSelector
                     {
                         if (font.Source.StartsWith("Global ")) continue;
 
-                        foreach (var typeface in font.GetTypefaces())
+                        if (OperatingSystem.IsWindows())
                         {
-                            if (!typeface.TryGetGlyphTypeface(out var glyph))
-                                throw new NullReferenceException(
-                                    $"字形 {typeface.FaceNames.GetForCurrentUiCulture("(unknown)")} 无法加载");
+                            foreach (var typeface in font.GetTypefaces())
+                            {
+                                if (!typeface.TryGetGlyphTypeface(out var glyph))
+                                    throw new NullReferenceException(
+                                        $"字形 {typeface.FaceNames.GetForCurrentUiCulture("(unknown)")} 无法加载");
 
-                            _ = new GlyphTypeface(glyph.FontUri);
+                                _ = new GlyphTypeface(glyph.FontUri);
+                            }
                         }
 
                         availableFonts.Add((font.FamilyNames.GetForCurrentUiCulture(), font));

@@ -1,6 +1,3 @@
-using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
 using System.IO;
 using System.Net;
 using System.Windows;
@@ -25,8 +22,8 @@ namespace PCL;
 
 public partial class PageToolsTest
 {
-    private Bitmap currentSkinBitmap;
-    private Bitmap generatedHeadBitmap;
+    private MyBitmap? currentSkinBitmap;
+    private MyBitmap? generatedHeadBitmap;
 
     private int headSize = 64;
     private string skinPath = "";
@@ -50,7 +47,7 @@ public partial class PageToolsTest
         TextDownloadFolder.Validate();
 
         if (!string.IsNullOrEmpty(TextDownloadFolder.ValidateResult) || string.IsNullOrEmpty(TextDownloadFolder.Text))
-            TextDownloadFolder.Text = ModBase.exePath + @"PCL\MyDownload\";
+            TextDownloadFolder.Text = Path.Combine(ModBase.exePath, "PCL", "MyDownload");
 
         TextDownloadFolder.Validate();
         TextDownloadName.Validate();
@@ -118,11 +115,12 @@ public partial class PageToolsTest
             if (string.IsNullOrWhiteSpace(folder))
             {
                 folder = SystemDialogs.SelectSaveFile(Lang.Text("Tools.Test.CustomDownload.SelectLocation"), fileName);
-                if (!folder.Contains(@"\")) return;
-                if (folder.EndsWith(fileName)) folder = folder[..^fileName.Length];
+                if (!Path.IsPathFullyQualified(folder)) return;
+                folder = Path.GetDirectoryName(folder);
+                if (string.IsNullOrEmpty(folder)) return;
             }
 
-            folder = folder.Replace("/", @"\").TrimEnd(new[] { '\\' }) + @"\";
+            folder = FileSystemPath.EnsureTrailingSeparator(folder);
             try
             {
                 Directory.CreateDirectory(folder);
@@ -140,10 +138,10 @@ public partial class PageToolsTest
             ModLoader.LoaderBase loaderdownload;
             if (new HttpValidator().Validate(url).IsValid)
                 loaderdownload = new LoaderDownload(Lang.Text("Tools.Test.CustomDownload.LoaderName", fileName),
-                    new List<DownloadFile> { new(new[] { url }, folder + fileName, null, true, userAgent) });
+                    new List<DownloadFile> { new(new[] { url }, Path.Combine(folder, fileName), null, true, userAgent) });
             else // UNC 路径
                 loaderdownload = new LoaderDownloadUnc(Lang.Text("Tools.Test.CustomDownload.LoaderName", fileName),
-                    new Tuple<string, string>(url, folder + fileName));
+                    new Tuple<string, string>(url, Path.Combine(folder, fileName)));
             var loaderCombo = new ModLoader.LoaderCombo<int>(Lang.Text("Tools.Test.CustomDownload.LoaderTitle", uuid), new[] { loaderdownload })
                 { OnStateChanged = a => DownloadState((ModLoader.LoaderCombo<int>)a) };
             loaderCombo.Start();
@@ -223,7 +221,7 @@ public partial class PageToolsTest
                     foreach (var mcFolder in ModFolder.mcFolderList)
                     {
                         cleanMcFolderList.Add(new DirectoryInfo(mcFolder.Location));
-                        var dirInfo = new DirectoryInfo(mcFolder.Location + "versions");
+                        var dirInfo = new DirectoryInfo(Path.Combine(mcFolder.Location, "versions"));
                         if (dirInfo.Exists)
                             foreach (var item in dirInfo.EnumerateDirectories())
                                 cleanMcFolderList.Add(item);
@@ -231,10 +229,8 @@ public partial class PageToolsTest
 
                     foreach (var dirInfo in cleanMcFolderList)
                     {
-                        num += ModBase.DeleteDirectory(
-                            dirInfo.FullName + (dirInfo.FullName.EndsWith(@"\") ? "" : @"\") + @"crash-reports\", true);
-                        num += ModBase.DeleteDirectory(
-                            dirInfo.FullName + (dirInfo.FullName.EndsWith(@"\") ? "" : @"\") + @"logs\", true);
+                        num += ModBase.DeleteDirectory(Path.Combine(dirInfo.FullName, "crash-reports"), true);
+                        num += ModBase.DeleteDirectory(Path.Combine(dirInfo.FullName, "logs"), true);
                         foreach (var fileInfo in dirInfo.EnumerateFiles("*"))
                             if (fileInfo.Name.StartsWith("hs_err_pid") || fileInfo.Name.EndsWith(".log") ||
                                 fileInfo.Name == "WailaErrorOutput.txt")
@@ -453,7 +449,7 @@ public partial class PageToolsTest
         var desktopName = Lang.Text("Tools.Test.Shortcut.Desktop");
         var startName = Lang.Text("Tools.Test.Shortcut.StartMenu");
         var desktop = Paths.GetSpecialPath(Environment.SpecialFolder.Desktop, shortcutName);
-        var start = Paths.GetSpecialPath(Environment.SpecialFolder.StartMenu, @"Programs\" + shortcutName);
+        var start = Paths.GetSpecialPath(Environment.SpecialFolder.StartMenu, Path.Combine("Programs", shortcutName));
         var choice =
             ModMain.MyMsgBox(
                 Lang.Text("Tools.Test.Shortcut.ConfirmMessage", desktopName, desktop, startName, start),
@@ -526,7 +522,7 @@ public partial class PageToolsTest
 
     private async Task DownloadImageToLocalAsync(string imageUrl)
     {
-        var savePath = ModBase.pathTemp + @"Download\" + ModBase.GetHash(imageUrl) + ".png";
+        var savePath = Path.Combine(ModBase.pathTemp, "Download", ModBase.GetHash(imageUrl) + ".png");
         var client = NetworkService.GetClient();
         try
         {
@@ -611,14 +607,11 @@ public partial class PageToolsTest
     {
         try
         {
-            using (var stream = new FileStream(skinPath, FileMode.Open, FileAccess.Read))
-            {
-                currentSkinBitmap = new Bitmap(stream);
-            }
+            currentSkinBitmap = new MyBitmap(skinPath);
 
             this.skinPath = skinPath;
 
-            if (currentSkinBitmap.Width != currentSkinBitmap.Height)
+            if (currentSkinBitmap.PixelWidth != currentSkinBitmap.PixelHeight)
             {
                 HintService.Hint(Lang.Text("Tools.Test.Avatar.InvalidSize"), HintType.Error);
                 SkinPreviewBorder.Visibility = Visibility.Collapsed;
@@ -627,7 +620,7 @@ public partial class PageToolsTest
 
             generatedHeadBitmap = GenerateHeadFromSkin(currentSkinBitmap);
 
-            ImgFace.Source = BitmapToBitmapImage(generatedHeadBitmap);
+            ImgFace.Source = generatedHeadBitmap;
             ImgHair.Source = null;
 
             SkinPreviewBorder.Visibility = Visibility.Visible;
@@ -642,59 +635,17 @@ public partial class PageToolsTest
         }
     }
 
-    private Bitmap GenerateHeadFromSkin(Bitmap skinBitmap)
+    private MyBitmap GenerateHeadFromSkin(MyBitmap skinBitmap)
     {
-        var scale = skinBitmap.Width / 64;
+        var scale = skinBitmap.PixelWidth / 64;
         headSize = GetHeadSize();
-        var headBitmap = new Bitmap(headSize, headSize);
-
-        using (var g = Graphics.FromImage(headBitmap))
-        {
-            g.InterpolationMode = InterpolationMode.NearestNeighbor;
-            g.PixelOffsetMode = PixelOffsetMode.Half;
-
-            DrawFaceLayer(g, skinBitmap, scale);
-            if (skinBitmap.Width >= 64) DrawHairLayer(headBitmap, skinBitmap, scale);
-        }
-
-        return headBitmap;
-    }
-
-    private void DrawFaceLayer(Graphics g, Bitmap skinBitmap, int scale)
-    {
-        var faceRect = new Rectangle(8 * scale, 8 * scale, 8 * scale, 8 * scale);
         var faceSize = headSize - headSize / 8;
-        var faceScaled = new Bitmap(faceSize, faceSize);
-
-        using (var gFace = Graphics.FromImage(faceScaled))
-        {
-            gFace.InterpolationMode = InterpolationMode.NearestNeighbor;
-            gFace.PixelOffsetMode = PixelOffsetMode.Half;
-            gFace.DrawImage(skinBitmap, new Rectangle(0, 0, faceSize, faceSize), faceRect, GraphicsUnit.Pixel);
-        }
-
         var offset = headSize / 16;
-        g.DrawImage(faceScaled, offset, offset, faceSize, faceSize);
-    }
-
-    private void DrawHairLayer(Bitmap headBitmap, Bitmap skinBitmap, int scale)
-    {
-        var hairRect = new Rectangle(40 * scale, 8 * scale, 8 * scale, 8 * scale);
-        var hairScaled = new Bitmap(headSize, headSize);
-
-        using (var gHair = Graphics.FromImage(hairScaled))
-        {
-            gHair.InterpolationMode = InterpolationMode.NearestNeighbor;
-            gHair.PixelOffsetMode = PixelOffsetMode.Half;
-            gHair.DrawImage(skinBitmap, new Rectangle(0, 0, headSize, headSize), hairRect, GraphicsUnit.Pixel);
-        }
-
-        for (int x = 0, loopTo = headSize - 1; x <= loopTo; x++)
-        for (int y = 0, loopTo1 = headSize - 1; y <= loopTo1; y++)
-        {
-            var pixel = hairScaled.GetPixel(x, y);
-            if (pixel.A > 0) headBitmap.SetPixel(x, y, pixel);
-        }
+        var head = MyBitmap.Create(headSize, headSize)
+            .Overlay(skinBitmap.Clip(8 * scale, 8 * scale, 8 * scale, 8 * scale).Scale(faceSize, faceSize), offset, offset);
+        if (skinBitmap.PixelWidth >= 64)
+            head = head.Overlay(skinBitmap.Clip(40 * scale, 8 * scale, 8 * scale, 8 * scale).Scale(headSize, headSize), 0, 0);
+        return head;
     }
 
     private void BtnSaveHead_Click(object sender, MouseButtonEventArgs e)
@@ -710,31 +661,13 @@ public partial class PageToolsTest
         if (string.IsNullOrEmpty(savePath))
             return;
 
-        generatedHeadBitmap.Save(savePath, ImageFormat.Png);
+        generatedHeadBitmap.Save(savePath);
         HintService.Hint(Lang.Text("Tools.Test.Avatar.Saved"), HintType.Success);
     }
 
     private void CmbHeadSize_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (currentSkinBitmap is not null && skinPath is not null) LoadAndGenerateHead(skinPath);
-    }
-
-    private BitmapImage BitmapToBitmapImage(Bitmap bitmap)
-    {
-        using (var memoryStream = new MemoryStream())
-        {
-            bitmap.Save(memoryStream, ImageFormat.Png);
-            memoryStream.Position = 0L;
-
-            var bitmapImage = new BitmapImage();
-            bitmapImage.BeginInit();
-            bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
-            bitmapImage.StreamSource = memoryStream;
-            bitmapImage.EndInit();
-            bitmapImage.Freeze();
-
-            return bitmapImage;
-        }
     }
 
     private void TextDownloadFolder_OnValidatedTextChanged(object sender, RoutedEventArgs e)

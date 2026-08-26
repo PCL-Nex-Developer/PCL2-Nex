@@ -7,13 +7,13 @@
         <MyType>Custom</MyType>
         <IsWebBootstrapper>false</IsWebBootstrapper>
         <StartupObject>PCL.Program</StartupObject>
-        <PublishUrl>publish\</PublishUrl>
+        <PublishUrl>publish/</PublishUrl>
         <PublishSingleFile>true</PublishSingleFile>
         <!-- The SDK only supports bundle compression for self-contained releases. -->
         <EnableCompressionInSingleFile Condition="'$(SelfContained)' == 'true'">true</EnableCompressionInSingleFile>
         <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-        <RuntimeIdentifier Condition="'$(Platform)' == 'x64'">win-x64</RuntimeIdentifier>
-        <RuntimeIdentifier Condition="'$(Platform)' == 'ARM64'">win-arm64</RuntimeIdentifier>
+        <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and '$(Platform)' == 'x64'">win-x64</RuntimeIdentifier>
+        <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and '$(Platform)' == 'ARM64'">win-arm64</RuntimeIdentifier>
         <EnableWindowsTargeting>true</EnableWindowsTargeting>
         <MapFileExtensions>true</MapFileExtensions>
         <TargetCulture>zh-CN</TargetCulture>
@@ -25,7 +25,7 @@
         <Platforms>AnyCPU;x64;ARM64</Platforms>
         <ImplicitUsings>enable</ImplicitUsings>
         <ApplicationManifest>app.manifest</ApplicationManifest>
-        <ApplicationIcon>Images\icon.ico</ApplicationIcon>
+        <ApplicationIcon>Images/icon.ico</ApplicationIcon>
         <AssemblyTitle>Plain Craft Launcher Nex</AssemblyTitle>
         <Description>Minecraft 启动器 (作者: 龙腾猫跃; 经社区二次开发版本)</Description>
         <Product>Plain Craft Launcher Nex</Product>
@@ -37,31 +37,31 @@
             CS0168;CS0162;CS0109;CS0659;CS0661;CS0675;CS1717;
             IL3000
         </NoWarn>
-        <DefaultItemExcludes>$(DefaultItemExcludes);$(ProjectDir)**\*.vb</DefaultItemExcludes>
+        <DefaultItemExcludes>$(DefaultItemExcludes);$(ProjectDir)**/*.vb</DefaultItemExcludes>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
-        <OutputPath>bin\Debug\</OutputPath>
+        <OutputPath>bin/Debug/</OutputPath>
         <DebugSymbols>true</DebugSymbols>
         <DebugType>full</DebugType>
         <Optimize>false</Optimize>
         <DefineConstants>TRACE;DEBUG</DefineConstants>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Configuration)' == 'CI' Or '$(Configuration)' == 'DebugCI'">
-        <OutputPath>bin\CI\</OutputPath>
+        <OutputPath>bin/CI/</OutputPath>
         <DebugSymbols>true</DebugSymbols>
         <DebugType>full</DebugType>
         <Optimize>false</Optimize>
         <DefineConstants>TRACE;DEBUGCI</DefineConstants>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Configuration)' == 'Release'">
-        <OutputPath>bin\Release\</OutputPath>
+        <OutputPath>bin/Release/</OutputPath>
         <DebugSymbols>false</DebugSymbols>
         <DebugType>none</DebugType>
         <Optimize>true</Optimize>
         <DefineConstants>RELEASE</DefineConstants>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Configuration)' == 'Beta'">
-        <OutputPath>bin\Beta\</OutputPath>
+        <OutputPath>bin/Beta/</OutputPath>
         <DebugSymbols>false</DebugSymbols>
         <DebugType>none</DebugType>
         <Optimize>true</Optimize>
@@ -76,9 +76,10 @@
         <PackageReference Include="NAudio" Version="2.3.0" />
         <PackageReference Include="protobuf-net" Version="3.2.56" />
         <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
+        <PackageReference Include="SourceGear.sqlite3" Version="3.50.4.5" GeneratePathProperty="true" />
     </ItemGroup>
     <ItemGroup>
-        <ProjectReference Include="..\PCL.Core\PCL.Core.csproj" />
+        <ProjectReference Include="../PCL.Core/PCL.Core.csproj" />
     </ItemGroup>
     <ItemGroup>
         <Using Include="System.Text.Json" />
@@ -108,16 +109,25 @@
         <EnableDefaultPageItems>false</EnableDefaultPageItems>
     </PropertyGroup>
     <ItemGroup>
-        <Compile Include="**\*.cs" Exclude="bin\**;obj\**;publish\**" />
+        <Compile Include="**/*.cs" Exclude="bin/**;obj/**;publish/**" />
         <ApplicationDefinition Include="Application.xaml" Condition="Exists('Application.xaml')" />
         <ApplicationDefinition Include="App.xaml" Condition="Exists('App.xaml')" />
-        <Page Include="**\*.xaml" Exclude="bin\**;obj\**;@(ApplicationDefinition)" />
-        <Resource Include="Images\**" />
-        <Resource Include="Resources\**" Exclude="Resources\**\*.xaml" />
+        <Page Include="**/*.xaml" Exclude="bin/**;obj/**;@(ApplicationDefinition)" />
+        <Resource Include="Images/**" />
+        <Resource Include="Resources/**" Exclude="Resources/**/*.xaml" />
         <EmbeddedResource Include="metadata.json" />
     </ItemGroup>
     <ItemGroup>
         <Content Include="LICENCE" />
+    </ItemGroup>
+    <!-- Linux 包需要将 SQLite 原生库与启动器放在同一目录，不能依赖包管理脚本猜测 RID。 -->
+    <ItemGroup Condition="'$(RuntimeIdentifier)' == 'linux-x64'">
+        <Content Include="$(PkgSourceGear_sqlite3)/runtimes/linux-x64/native/libe_sqlite3.so">
+            <TargetPath>libe_sqlite3.so</TargetPath>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+            <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+        </Content>
     </ItemGroup>
     <!-- NAudio 仅使用 WaveOutEvent (WinMM) 与 AudioFileReader (Core)，裁掉未用的子模块程序集 -->
     <Target Name="TrimUnusedNAudioAssemblies" AfterTargets="ResolveAssemblyReferences">

@@ -119,7 +119,7 @@ public partial class FormMain
         }
 
         // 管理员权限下文件拖拽
-        if (ProcessInterop.IsAdmin())
+        if (OperatingSystem.IsWindows() && ProcessInterop.IsAdmin())
         {
             ModBase.Log("[Start] PCL 当前正以管理员权限运行");
             SourceInitialized += (_, _) =>
@@ -456,6 +456,15 @@ public partial class FormMain
             return;
         }
 
+        if (OperatingSystem.IsMacOS())
+        {
+            if (Application.IsMacOSApplicationQuitRequested) return;
+
+            e.Cancel = true;
+            Dispatcher.BeginInvoke(() => Hidden = true);
+            return;
+        }
+
         EndProgram(true);
         e.Cancel = true;
     }
@@ -588,7 +597,7 @@ public partial class FormMain
 
     private void BtnTitleClose_Click(object sender, EventArgs e)
     {
-        EndProgram(true);
+        Close();
     }
 
     // 移动
@@ -740,7 +749,7 @@ public partial class FormMain
         {
             ModMain.frmSelectRight.showHidden = !ModMain.frmSelectRight.showHidden;
             ModLoader.LoaderFolderRun(ModInstanceList.mcInstanceListLoader, ModFolder.mcFolderSelected,
-                ModLoader.LoaderFolderRunType.ForceRun, 1, @"versions\");
+                ModLoader.LoaderFolderRunType.ForceRun, 1, "versions");
             return;
         }
 
@@ -835,7 +844,7 @@ public partial class FormMain
             {
                 // 实例选择自动刷新
                 ModLoader.LoaderFolderRun(ModInstanceList.mcInstanceListLoader, ModFolder.mcFolderSelected,
-                    ModLoader.LoaderFolderRunType.RunOnUpdated, 1, @"versions\");
+                    ModLoader.LoaderFolderRunType.RunOnUpdated, 1, "versions");
             }
             else if (ModMain.frmMain.pageRight is PageInstanceSavesDatapack &&
                      ModMain.frmInstanceSavesDatapack is not null)
@@ -934,7 +943,10 @@ public partial class FormMain
                     else if (str.StartsWithF("file:///"))
                     {
                         // 文件拖拽（例如从浏览器下载窗口拖入）
-                        var filePath = WebUtility.UrlDecode(str).Substring("file:///".Length).Replace("/", @"\");
+                        var decodedUri = WebUtility.UrlDecode(str);
+                        if (!Uri.TryCreate(decodedUri, UriKind.Absolute, out var fileUri) || !fileUri.IsFile)
+                            return;
+                        var filePath = fileUri.LocalPath;
                         e.Handled = true;
                         e.Effects = DragDropEffects.Copy;
                         FileDrag(new List<string> { filePath });
@@ -1011,11 +1023,12 @@ public partial class FormMain
             if (extension == "xaml")
             {
                 ModBase.Log("[System] 文件后缀为 XAML，作为主页加载");
-                if (File.Exists(ModBase.exePath + @"PCL\Custom.xaml"))
+                var customHomepagePath = Path.Combine(ModBase.pathPCLData, "Custom.xaml");
+                if (File.Exists(customHomepagePath))
                     if (ModMain.MyMsgBox(Lang.Text("Main.FileDrag.HomepageExists"), Lang.Text("Main.FileDrag.OverwriteTitle"), Lang.Text("Common.Action.Overwrite"), Lang.Text("Common.Action.Cancel")) == 2)
                         return;
 
-                ModBase.CopyFile(filePath, ModBase.exePath + @"PCL\Custom.xaml");
+                ModBase.CopyFile(filePath, customHomepagePath);
                 ModBase.RunInUi(() =>
                 {
                     Config.Preference.Homepage.Type = 1;
@@ -1048,8 +1061,8 @@ public partial class FormMain
                 {
                     case PageSubType.VersionWorld:
                     {
-                        var destFolder = PageInstanceLeft.McInstance.PathIndie + @"saves\" +
-                                         ModBase.GetFileNameWithoutExtentionFromPath(filePath);
+                        var destFolder = Path.Combine(PageInstanceLeft.McInstance.PathIndie, "saves",
+                            ModBase.GetFileNameWithoutExtentionFromPath(filePath));
                         var destLevelDat = Path.Combine(destFolder, "level.dat");
                         if (Directory.Exists(destFolder))
                         {
@@ -1098,8 +1111,8 @@ public partial class FormMain
                     }
                     case PageSubType.VersionResourcePack:
                     {
-                        var destFile = PageInstanceLeft.McInstance.PathIndie + @"resourcepacks\" +
-                                       ModBase.GetFileNameFromPath(filePath);
+                        var destFile = Path.Combine(PageInstanceLeft.McInstance.PathIndie, "resourcepacks",
+                            ModBase.GetFileNameFromPath(filePath));
                         if (File.Exists(destFile))
                         {
                             HintService.Hint(Lang.Text("Main.FileDrag.SameFileExists", destFile), HintType.Error);
@@ -1114,8 +1127,8 @@ public partial class FormMain
                     }
                     case PageSubType.VersionShader:
                     {
-                        var destFile = PageInstanceLeft.McInstance.PathIndie + @"shaderpacks\" +
-                                       ModBase.GetFileNameFromPath(filePath);
+                        var destFile = Path.Combine(PageInstanceLeft.McInstance.PathIndie, "shaderpacks",
+                            ModBase.GetFileNameFromPath(filePath));
                         if (File.Exists(destFile))
                         {
                             HintService.Hint(Lang.Text("Main.FileDrag.SameFileExists", destFile), HintType.Error);
@@ -1135,15 +1148,15 @@ public partial class FormMain
                 new[] { "litematic", "nbt", "schematic", "schem" }.Contains(extension) &&
                 PageCurrentSub == PageSubType.VersionSchematic)
             {
-                var destFile = PageInstanceLeft.McInstance.PathIndie + @"schematics\" +
-                               ModBase.GetFileNameFromPath(filePath);
+                var destFile = Path.Combine(PageInstanceLeft.McInstance.PathIndie, "schematics",
+                    ModBase.GetFileNameFromPath(filePath));
                 if (File.Exists(destFile))
                 {
                     HintService.Hint(Lang.Text("Main.FileDrag.SameFileExists", destFile), HintType.Error);
                     return;
                 }
 
-                Directory.CreateDirectory(PageInstanceLeft.McInstance.PathIndie + @"schematics\");
+                Directory.CreateDirectory(Path.Combine(PageInstanceLeft.McInstance.PathIndie, "schematics"));
                 ModBase.CopyFile(filePath, destFile);
                 HintService.Hint(Lang.Text("Main.FileDrag.Imported", ModBase.GetFileNameFromPath(filePath)), HintType.Success);
                 if (ModMain.frmInstanceSchematic is not null)

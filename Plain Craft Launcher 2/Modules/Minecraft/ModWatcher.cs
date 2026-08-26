@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Media;
@@ -755,7 +756,7 @@ public static class ModWatcher
                         analyzer.Output(
                             false,
                             [
-                                version.PathInstance + version.Name + ".json",
+                                Path.Combine(version.PathInstance, version.Name + ".json"),
                                 LogWrapper.CurrentLogger.CurrentLogFiles.Last(),
                                 System.IO.Path.Combine(ModBase.pathPCLData, "LatestLaunch.bat")
                             ]);

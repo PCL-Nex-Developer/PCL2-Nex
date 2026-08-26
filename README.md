@@ -21,6 +21,8 @@
 [提交问题](https://github.com/PCL-Nex-Developer/PCL2-Nex/issues/new/choose) |
 [插件开发指南](https://github.com/PCL-Nex-Developer/PCL2-Nex/wiki/Home)
 
+[点击链接加入群聊【PCL Nex 1】](https://qm.qq.com/q/aG9jwMyyIw)（群号：523291985）
+
 </div>
 
 PCL Nex 是基于 PCL 开源代码二次开发的社区版本，包含主线暂未制作的功能和改进。

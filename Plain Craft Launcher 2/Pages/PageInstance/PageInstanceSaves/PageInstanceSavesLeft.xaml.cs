@@ -22,7 +22,7 @@ public partial class PageInstanceSavesLeft : IRefreshable
     private void BtnOpenFolder_Click(object sender, MouseButtonEventArgs e)
     {
         e.Handled = true;
-        ModBase.OpenExplorer($@"{currentSave}\");
+        ModBase.OpenExplorer(currentSave);
     }
 
     #region 龙猫牌 页面管理
