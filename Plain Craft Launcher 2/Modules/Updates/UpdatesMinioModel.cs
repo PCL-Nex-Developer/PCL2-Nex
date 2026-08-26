@@ -46,7 +46,8 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
         if (_remoteCache is null)
             RefreshCache();
         // 确定版本通道名称
-        return GetChannelInfo(channel, arch);
+        return GetChannelInfo(channel, arch)
+               ?? throw new InvalidOperationException("当前平台和更新通道暂无可用发布包。");
     }
 
     public bool IsLatest(UpdateChannel channel, UpdateArch arch, LauncherBaseVersion currentVersion)
@@ -54,6 +55,11 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
         if (_remoteCache is null)
             RefreshCache();
         var latestVersion = GetChannelInfo(channel, arch);
+        if (latestVersion is null)
+        {
+            ModBase.Log("[Update] 当前通道暂无适用于此平台的发布包");
+            return true;
+        }
         return currentVersion >= latestVersion.BaseVersion;
     }
 
@@ -155,13 +161,14 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
                    || (signature[2] == 0x07 && signature[3] == 0x08));
     }
 
-    private VersionDataModel GetChannelInfo(UpdateChannel channel, UpdateArch arch)
+    private VersionDataModel? GetChannelInfo(UpdateChannel channel, UpdateArch arch)
     {
         var channelName = GetChannelName(channel, arch);
-        var deJsonData = GetRemoteInfoByName($"updates-{channelName}", "updates/")?.ToObject<MinioUpdateModel>().Assets
-            .FirstOrDefault(IsPclNexAsset);
-        if (deJsonData is null)
-            throw new NullReferenceException("Can not get remote update info!");
+        var deJsonData = GetRemoteInfoByName($"updates-{channelName}", "updates/")
+            ?.ToObject<MinioUpdateModel>()
+            ?.Assets
+            ?.FirstOrDefault(IsPclNexAsset);
+        if (deJsonData is null) return null;
         return new VersionDataModel
         {
             FileName = deJsonData.FileName,

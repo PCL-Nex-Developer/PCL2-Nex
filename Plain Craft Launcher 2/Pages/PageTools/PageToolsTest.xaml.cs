@@ -484,12 +484,7 @@ public partial class PageToolsTest
             if (response.IsSuccessStatusCode)
                 using (var stream = await response.Content.ReadAsStreamAsync())
                 {
-                    var bitmapImage = new BitmapImage();
-                    bitmapImage.BeginInit();
-                    bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
-                    bitmapImage.StreamSource = stream;
-                    bitmapImage.EndInit();
-                    bitmapImage.Freeze();
+                    var bitmapImage = ImageLoaderHelper.CreateNormalizedBitmap(stream);
 
                     Dispatcher.Invoke(() =>
                     {

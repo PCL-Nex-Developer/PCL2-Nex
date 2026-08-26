@@ -167,20 +167,11 @@ public partial class PageInstanceScreenshot : IRefreshable
                 var image = new Image();
                 image.Source = await Task.Run(() =>
                 {
-                    var bitmapImage = new BitmapImage();
                     var loadSource = i;
                     using (var fs = new FileStream(loadSource, FileMode.Open, FileAccess.Read))
                     {
-                        bitmapImage.BeginInit();
-                        bitmapImage.DecodePixelHeight = 200;
-                        bitmapImage.DecodePixelWidth = 400;
-                        bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
-                        bitmapImage.StreamSource = fs;
-                        bitmapImage.EndInit();
-                        bitmapImage.Freeze();
+                        return ImageLoaderHelper.CreateNormalizedBitmap(fs, 400, 200);
                     }
-
-                    return bitmapImage;
                 });
                 image.Stretch = Stretch.Uniform; // 使图片自适应控件大小
                 image.Cursor = Cursors.Hand;

@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
+using PCL.Core.UI.Media;
 
 namespace PCL.Core.UI;
 
@@ -33,7 +34,7 @@ public static class ImageLoaderHelper {
         string base64String, 
         Image imageElement, 
         string? fallbackImageUri = null) {
-        ArgumentNullException.ThrowIfNull(nameof(imageElement));
+        ArgumentNullException.ThrowIfNull(imageElement);
         
         if (string.IsNullOrWhiteSpace(base64String)) {
             SetFallbackImage(imageElement, fallbackImageUri);
@@ -53,7 +54,7 @@ public static class ImageLoaderHelper {
             }
 
             // 异步转换图像
-            var bitmapImage = await Task.Run(() => _CreateBitmapFromBase64(base64Data));
+            var bitmapImage = await Task.Run(() => CreateBitmapFromBase64(base64Data));
             
             // 在 UI 线程上设置图像
             if (imageElement.Dispatcher.CheckAccess()) {
@@ -71,17 +72,27 @@ public static class ImageLoaderHelper {
     /// </summary>
     /// <param name="base64Data">Base64 数据</param>
     /// <returns>BitmapImage 对象</returns>
-    private static BitmapImage _CreateBitmapFromBase64(string base64Data) {
+    internal static BitmapImage CreateBitmapFromBase64(string base64Data) {
         var imageBytes = Convert.FromBase64String(base64Data);
-        
         using var ms = new MemoryStream(imageBytes);
+        return CreateNormalizedBitmap(ms);
+    }
+
+    public static BitmapImage CreateNormalizedBitmap(
+        Stream input,
+        int decodePixelWidth = 0,
+        int decodePixelHeight = 0) {
+        ArgumentNullException.ThrowIfNull(input);
+        using var normalized = ImageConverter.NormalizeToPng(input);
         var bitmap = new BitmapImage();
         bitmap.BeginInit();
         bitmap.CacheOption = BitmapCacheOption.OnLoad;
-        bitmap.StreamSource = ms;
+        bitmap.CreateOptions = BitmapCreateOptions.None;
+        bitmap.DecodePixelWidth = decodePixelWidth;
+        bitmap.DecodePixelHeight = decodePixelHeight;
+        bitmap.StreamSource = normalized;
         bitmap.EndInit();
-        bitmap.Freeze(); // 确保跨线程安全
-        
+        bitmap.Freeze();
         return bitmap;
     }
 
@@ -129,7 +140,7 @@ public static class ImageLoaderHelper {
         string imagePath,
         Image imageElement,
         string fallbackImageUri) {
-        ArgumentNullException.ThrowIfNull(nameof(imageElement));
+        ArgumentNullException.ThrowIfNull(imageElement);
 
         if (string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath)) {
             SetFallbackImage(imageElement, fallbackImageUri);
@@ -137,15 +148,9 @@ public static class ImageLoaderHelper {
         }
 
         try {
-            var bitmapImage = await Task.Run(() =>
-            {
-                var bitmap = new BitmapImage();
-                bitmap.BeginInit();
-                bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                bitmap.UriSource = new Uri(imagePath);
-                bitmap.EndInit();
-                bitmap.Freeze();
-                return bitmap;
+            var bitmapImage = await Task.Run(() => {
+                using var stream = new FileStream(imagePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                return CreateNormalizedBitmap(stream);
             });
 
             if (imageElement.Dispatcher.CheckAccess()) {

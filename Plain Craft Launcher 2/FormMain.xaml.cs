@@ -96,8 +96,11 @@ public partial class FormMain
         InitializeComponent();
         if (!OperatingSystem.IsWindows())
         {
-            // Keep a native frame so pointer coordinates use the same client-area origin as layout.
-            WindowStyle = WindowStyle.SingleBorderWindow;
+            MinHeight = 450;
+            MinWidth = 790;
+            WindowStyle = WindowStyle.None;
+            // 透明无边框模式让自绘内容与指针命中使用同一客户区原点。
+            AllowsTransparency = true;
             WindowChrome.SetWindowChrome(this, null);
             SetResourceReference(BackgroundProperty, "ColorBrushBackground");
             PanWindowShadow.Visibility = Visibility.Collapsed;
@@ -644,7 +647,7 @@ public partial class FormMain
             VideoBack.Height = formHeight;
         }
 
-        if (WindowState == WindowState.Maximized)
+        if (OperatingSystem.IsWindows() && WindowState == WindowState.Maximized)
             WindowState = WindowState.Normal; // 修复 #1938
     }
 

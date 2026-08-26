@@ -58,8 +58,9 @@ public sealed class MyBitmap
             x > PixelWidth - width || y > PixelHeight - height)
             throw new ArgumentOutOfRangeException(nameof(width), "The requested crop is outside the image bounds.");
 
+        var normalized = ToBgra32(_source);
         var pixels = new byte[checked(width * height * 4)];
-        _source.CopyPixels(new Int32Rect(x, y, width, height), pixels, width * 4, 0);
+        normalized.CopyPixels(new Int32Rect(x, y, width, height), pixels, width * 4, 0);
         return new MyBitmap(CreateSource(width, height, pixels), true);
     }
 
@@ -159,21 +160,23 @@ public sealed class MyBitmap
 
         var path = FileSystemPath.NormalizeSeparators(source);
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-        Span<byte> header = stackalloc byte[12];
-        if (stream.Length >= header.Length && stream.Read(header) == header.Length &&
-            header[..4].SequenceEqual("RIFF"u8) && header[8..].SequenceEqual("WEBP"u8))
-        {
-            stream.Position = 0;
-            using var pngStream = stream.FromWebpToPng();
-            return Decode(pngStream);
-        }
-
-        stream.Position = 0;
-        return Decode(stream);
+        using var normalized = ImageConverter.NormalizeToPng(stream);
+        return Decode(normalized);
     }
 
     private static BitmapSource LoadUri(string source)
     {
+        if (!OperatingSystem.IsWindows())
+        {
+            var resource = System.Windows.Application.GetResourceStream(new Uri(source, UriKind.Absolute));
+            if (resource?.Stream is not null)
+            {
+                using (resource.Stream)
+                using (var normalized = ImageConverter.NormalizeToPng(resource.Stream))
+                    return Decode(normalized);
+            }
+        }
+
         var bitmap = new BitmapImage();
         bitmap.BeginInit();
         bitmap.CacheOption = BitmapCacheOption.OnLoad;
@@ -185,10 +188,12 @@ public sealed class MyBitmap
 
     private static BitmapSource Decode(Stream stream)
     {
-        var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad);
+        var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
         if (decoder.Frames.Count == 0)
             throw new InvalidDataException("The image contains no decodable frames.");
-        return ToBitmapSource(decoder.Frames[0]);
+        var bitmap = decoder.Frames[0];
+        if (bitmap.CanFreeze) bitmap.Freeze();
+        return bitmap;
     }
 
     private static BitmapSource ToBitmapSource(ImageSource image)
@@ -196,8 +201,16 @@ public sealed class MyBitmap
         if (image is not BitmapSource bitmap)
             throw new ArgumentException("The image source must be a bitmap.", nameof(image));
 
-        if (bitmap.CanFreeze) bitmap.Freeze();
-        return bitmap;
+        if (OperatingSystem.IsWindows())
+        {
+            if (bitmap.CanFreeze) bitmap.Freeze();
+            return bitmap;
+        }
+
+        var normalized = ToBgra32(bitmap);
+        var pixels = new byte[checked(normalized.PixelWidth * normalized.PixelHeight * 4)];
+        normalized.CopyPixels(pixels, normalized.PixelWidth * 4, 0);
+        return CreateSource(normalized.PixelWidth, normalized.PixelHeight, pixels, normalized.DpiX, normalized.DpiY);
     }
 
     private static BitmapSource CreateSource(int width, int height, byte[] pixels, double dpiX = 96, double dpiY = 96)
@@ -215,11 +228,13 @@ public sealed class MyBitmap
 
     private byte[] GetPixels()
     {
-        var normalized = _source.Format == PixelFormats.Bgra32
-            ? _source
-            : new FormatConvertedBitmap(_source, PixelFormats.Bgra32, null, 0);
+        var normalized = ToBgra32(_source);
         var pixels = new byte[checked(PixelWidth * PixelHeight * 4)];
         normalized.CopyPixels(pixels, PixelWidth * 4, 0);
         return pixels;
     }
+
+    private static BitmapSource ToBgra32(BitmapSource source) => source.Format == PixelFormats.Bgra32
+        ? source
+        : new FormatConvertedBitmap(source, PixelFormats.Bgra32, null, 0);
 }
