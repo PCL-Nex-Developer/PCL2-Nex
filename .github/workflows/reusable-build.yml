@@ -108,6 +108,7 @@ jobs:
           BUILD_SCRIPT_B64: ${{ secrets.BUILD_SCRIPT_B64 }}
           PRIVATE_FEED_TOKEN: ${{ secrets.FEED_TOKEN_RO }}
           RuntimeIdentifier: ${{ matrix.runtime }}
+          AppendRuntimeIdentifierToOutputPath: 'false'
           PCL_WRITE_SECRET: '1'
           PCL_MS_CLIENT_ID: ${{ secrets.CLIENT_ID }}
           PCL_CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
