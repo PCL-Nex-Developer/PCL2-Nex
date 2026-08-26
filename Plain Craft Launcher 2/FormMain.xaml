@@ -25,7 +25,7 @@
             CornerRadius="12"
             GlassFrameThickness="0" />
     </WindowChrome.WindowChrome>
-    <Grid SnapsToDevicePixels="True" UseLayoutRounding="True">
+    <Grid x:Name="PanRoot" SnapsToDevicePixels="True" UseLayoutRounding="True">
         <Grid.RenderTransform>
             <TransformGroup>
                 <RotateTransform x:Name="TransformRotate" Angle="-4" />

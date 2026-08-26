@@ -104,6 +104,8 @@ public partial class FormMain
             PanWindowShadow.Visibility = Visibility.Collapsed;
             PanBack.Margin = new Thickness(0);
             PanBack.Clip = null;
+            // The non-Windows UI layer does not consistently apply this transform to pointer hit testing.
+            PanRoot.RenderTransform = null;
         }
         Opacity = 0d;
         try
@@ -207,7 +209,7 @@ public partial class FormMain
                 -TransformRotate.Angle, 500, 100, new ModAnimation.AniEaseOutBack(ModAnimation.AniEasePower.Weak)),
             ModAnimation.AaCode(() =>
             {
-                RenderTransform = null;
+                PanRoot.RenderTransform = null;
                 isWindowLoadFinished = true;
                 ModBase.Log(
                     $"[System] DPI：{ModBase.dpi}，系统版本：{Environment.OSVersion.VersionString}，PCL 位置：{Basics.ExecutablePath}");

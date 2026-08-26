@@ -44,7 +44,7 @@ public partial class Application
 
         try
         {
-            // XPF owns the macOS desktop lifetime, without a compile-time Avalonia dependency here.
+            // The cross-platform UI layer owns the macOS desktop lifetime.
             var avaloniaApplicationType = Type.GetType("Avalonia.Application, Avalonia.Controls");
             var avaloniaApplication = avaloniaApplicationType?
                 .GetProperty("Current", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);

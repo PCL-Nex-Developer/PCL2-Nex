@@ -1,9 +1,11 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text.Json.Nodes;
 using PCL.Core.App;
 using PCL.Core.IO;
+using PCL.Core.Minecraft.Launch;
 using PCL.Core.Utils;
 using PCL.Core.Utils.Exts;
 using PCL.Core.Utils.OS;
@@ -85,64 +87,8 @@ public static class ModLibrary
     /// <param name="ruleToken">JSON 中的 "rules" 项目。</param>
     public static bool McJsonRuleCheck(JsonNode ruleToken)
     {
-        if (ruleToken is null)
-            return true;
-
-        // 初始化
-        var required = false;
-        foreach (var Rule in ruleToken.AsArray())
-        {
-            // 单条条件验证
-            var isRightRule = true; // 是否为正确的规则
-            if (Rule["os"] is not null) // 操作系统
-            {
-                if (Rule["os"]["name"] is not null) // 操作系统名称
-                {
-                    var osName = Rule["os"]["name"].ToString();
-                    if (osName == "unknown")
-                    {
-                    }
-                    else if (osName == "windows")
-                    {
-                        if (Rule["os"]["version"] is not null) // 操作系统版本
-                        {
-                            var cr = Rule["os"]["version"].ToString();
-                            isRightRule = isRightRule && osVersion.RegexCheck(cr);
-                        }
-                    }
-                    else
-                    {
-                        isRightRule = false;
-                    }
-                }
-
-                if (Rule["os"]["arch"] is not null) // 操作系统架构
-                    isRightRule = isRightRule && Rule["os"]["arch"].ToString() == "x86" == SystemInfo.Is32BitSystem;
-            }
-
-            if (Rule["features"] is not null) // 标签
-            {
-                isRightRule = isRightRule && Rule["features"]["is_demo_user"] is null; // 反选是否为 Demo 用户
-                if (Rule["features"].AsObject().Any(prop => prop.Key.Contains("quick_play")))
-                    isRightRule = false; // 不开 Quick Play，让玩家自己加去
-            }
-
-            // 反选确认
-            if (Rule["action"].ToString() == "allow")
-            {
-                if (isRightRule)
-                    required = true; // allow
-            }
-            else if (isRightRule)
-            {
-                required = false; // disallow
-            }
-        }
-
-        return required;
+        return MinecraftPlatformRules.CheckCurrent(ruleToken);
     }
-
-    private static readonly string osVersion = Environment.OSVersion.Version.ToString();
 
     /// <summary>
     ///     递归获取 Minecraft 某一实例的完整支持库列表。
@@ -301,38 +247,45 @@ public static class ModLibrary
                     });
                 }
             }
-            else if (library["natives"]["windows"] is not null) // 有 Windows Natives
+            else
             {
+                var osName = EnvironmentInterop.GetCurrentOsName();
+                var nativeClassifierTemplate = library["natives"]?[osName]?.ToString();
+                if (nativeClassifierTemplate is null)
+                    continue;
+
+                var nativeClassifier = MinecraftPlatformRules.ResolveNativeClassifier(
+                    nativeClassifierTemplate, RuntimeInformation.OSArchitecture);
+                var classifier = library["downloads"]?["classifiers"]?[nativeClassifier];
                 var nativePath = library["downloads"] is not null && library["downloads"]["classifiers"] is not null &&
-                                 library["downloads"]["classifiers"]["natives-windows"] is not null
-                    ? library["downloads"]["classifiers"]["natives-windows"]["path"]
+                                 classifier is not null
+                    ? classifier["path"]
                     : null;
+                var localPath = McLibGet((string)library["name"], customMcFolder: customMcFolder)
+                    .Replace(".jar", "-" + nativeClassifier + ".jar");
+                var nativeRootUrl = rootUrl?.Replace(".jar", "-" + nativeClassifier + ".jar");
                 try
                 {
-                    if (library["downloads"] is not null && library["downloads"]["classifiers"] is not null &&
-                        library["downloads"]["classifiers"]["natives-windows"] is not null)
+                    if (classifier is not null)
                         basicArray.Add(new McLibToken
                         {
                             OriginalName = (string)library["name"],
-                            Url = (string)(rootUrl ?? library["downloads"]["classifiers"]["natives-windows"]["url"]),
+                            Url = (string)(nativeRootUrl ?? classifier["url"]),
                             LocalPath = nativePath is null
-                                ? McLibGet((string)library["name"], customMcFolder: customMcFolder)
-                                    .Replace(".jar", "-" + library["natives"]["windows"] + ".jar")
-                                    .Replace("${arch}", Environment.Is64BitOperatingSystem ? "64" : "32")
+                                ? localPath
                                 : McLibGetByArtifactPath(nativePath.ToString(), customMcFolder),
-                            size = (long)Math.Round(
-                                ModBase.Val(library["downloads"]["classifiers"]["natives-windows"]["size"].ToString())),
+                            size = classifier["size"] is null
+                                ? 0L
+                                : (long)Math.Round(ModBase.Val(classifier["size"].ToString())),
                             IsNatives = true,
-                            Sha1 = library["downloads"]["classifiers"]["natives-windows"]["sha1"].ToString(),
+                            Sha1 = classifier["sha1"]?.ToString(),
                             IsLocal = isLocal
                         });
                     else
                         basicArray.Add(new McLibToken
                         {
-                            OriginalName = (string)library["name"], Url = rootUrl,
-                            LocalPath = McLibGet((string)library["name"], customMcFolder: customMcFolder)
-                                .Replace(".jar", "-" + library["natives"]["windows"] + ".jar")
-                                .Replace("${arch}", Environment.Is64BitOperatingSystem ? "64" : "32"),
+                            OriginalName = (string)library["name"], Url = nativeRootUrl,
+                            LocalPath = localPath,
                             size = 0L, IsNatives = true, Sha1 = null, IsLocal = isLocal
                         });
                 }
@@ -346,10 +299,8 @@ public static class ModLibrary
                     ModBase.Log(ex, "处理实际支持库列表失败（有 Natives，" + (library["name"] ?? "Nothing") + "）");
                     basicArray.Add(new McLibToken
                     {
-                        OriginalName = (string)library["name"], Url = rootUrl,
-                        LocalPath = McLibGet((string)library["name"], customMcFolder: customMcFolder)
-                            .Replace(".jar", "-" + library["natives"]["windows"] + ".jar")
-                            .Replace("${arch}", Environment.Is64BitOperatingSystem ? "64" : "32"),
+                        OriginalName = (string)library["name"], Url = nativeRootUrl,
+                        LocalPath = localPath,
                         size = 0L, IsNatives = true, Sha1 = null, IsLocal = false
                     });
                 }

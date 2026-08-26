@@ -9,7 +9,7 @@ using PCL.Core.UI.Media;
 namespace PCL;
 
 /// <summary>
-/// A small bitmap wrapper backed by WPF/XPF image APIs.
+/// A small bitmap wrapper backed by WPF-compatible image APIs.
 /// </summary>
 public sealed class MyBitmap
 {
