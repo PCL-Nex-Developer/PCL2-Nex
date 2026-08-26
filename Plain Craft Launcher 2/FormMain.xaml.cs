@@ -96,9 +96,8 @@ public partial class FormMain
         InitializeComponent();
         if (!OperatingSystem.IsWindows())
         {
-            MinHeight = 450;
-            MinWidth = 790;
-            WindowStyle = WindowStyle.None;
+            // Keep a native frame so pointer coordinates use the same client-area origin as layout.
+            WindowStyle = WindowStyle.SingleBorderWindow;
             WindowChrome.SetWindowChrome(this, null);
             SetResourceReference(BackgroundProperty, "ColorBrushBackground");
             PanWindowShadow.Visibility = Visibility.Collapsed;

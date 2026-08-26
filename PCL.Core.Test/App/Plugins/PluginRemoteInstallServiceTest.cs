@@ -43,7 +43,7 @@ public class PluginRemoteInstallServiceTest
             var manifestEntry = archive.CreateEntry("plugin.json");
             await using (var stream = manifestEntry.Open())
                 await JsonSerializer.SerializeAsync(stream, manifest, PluginJson.SerializerOptions);
-            archive.CreateEntry("lib/Example.Plugin.dll");
+            archive.CreateEntry("lib\\Example.Plugin.dll");
             archive.CreateEntry("mixins.json");
         }
 
@@ -69,6 +69,7 @@ public class PluginRemoteInstallServiceTest
             Assert.AreEqual("https://example.test/example.pclx", prepared.SourceUrl);
             Assert.AreEqual(expectedSha256, prepared.VerifiedSha256);
             Assert.IsTrue(File.Exists(Path.Combine(prepared.PluginRoot, "plugin.json")));
+            Assert.IsTrue(File.Exists(Path.Combine(prepared.PluginRoot, "lib", "Example.Plugin.dll")));
             Assert.IsTrue(Directory.Exists(prepared.CleanupPath));
 
             var cleanupPath = prepared.CleanupPath;

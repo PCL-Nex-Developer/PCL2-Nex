@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Threading;
 using PCL.Network;
 using PCL.Core.App.Localization;
+using PCL.Controls.Behaviors;
 
 namespace PCL;
 
@@ -143,16 +144,39 @@ public partial class PageSpeedLeft
 
                             card.RowDefinitions.Clear();
                             card.Children.Clear();
-                            card.Children.Add((UIElement)ModBase.GetObjectFromXML(
-                                "<Path xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" Stretch=\"Uniform\" Tag=\"Failed\" Data=\"F1 M2.5,0 L0,2.5 7.5,10 0,17.5 2.5,20 10,12.5 17.5,20 20,17.5 12.5,10 20,2.5 17.5,0 10,7.5 2.5,0Z\" Height=\"15\" Width=\"15\" HorizontalAlignment=\"Center\" Grid.Column=\"0\" Grid.Row=\"0\" Fill=\"{DynamicResource ColorBrush3}\" Margin=\"0,1,0,0\" VerticalAlignment=\"Top\"/>"));
-                            var tb = (TextBlock)ModBase.GetObjectFromXML(
-                                "<TextBlock xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" TextWrapping=\"Wrap\" HorizontalAlignment=\"Left\" ToolTip=\"" + Lang.Text("Speed.Error.ClickToCopy") + "\" Grid.Column=\"1\" Grid.Row=\"0\" Margin=\"0,0,0,5\" />");
-                            tb.Text = loader.Error.ToString();
-                            tb.MouseLeftButtonDown += (sender, _) =>
+                            var errorText = loader.Error?.ToString() ?? loader.name;
+                            var copy = new MyIconButton
                             {
-                                ModBase.ClipboardSet(((TextBlock)sender).Text, false);
+                                SvgIcon = "lucide/copy",
+                                Height = 25,
+                                Width = 25,
+                                HorizontalAlignment = HorizontalAlignment.Center,
+                                VerticalAlignment = VerticalAlignment.Top,
+                                ToolTip = Lang.Text("Speed.Error.ClickToCopy")
+                            };
+                            Grid.SetColumn(copy, 0);
+                            Grid.SetRow(copy, 0);
+                            copy.Click += (_, _) =>
+                            {
+                                ModBase.ClipboardSet(errorText, false);
                                 HintService.Hint(Lang.Text("Speed.Error.Copied"), HintType.Success);
                             };
+                            card.Children.Add(copy);
+
+                            var tb = new TextBox
+                            {
+                                Text = errorText,
+                                IsReadOnly = true,
+                                AcceptsReturn = true,
+                                TextWrapping = TextWrapping.Wrap,
+                                BorderThickness = new Thickness(0),
+                                Background = System.Windows.Media.Brushes.Transparent,
+                                HorizontalAlignment = HorizontalAlignment.Stretch,
+                                Margin = new Thickness(0, 0, 0, 5)
+                            };
+                            ClipboardInterceptor.SetEnableSafeClipboard(tb, true);
+                            Grid.SetColumn(tb, 1);
+                            Grid.SetRow(tb, 0);
                             card.Children.Add(tb);
                             break;
                         }

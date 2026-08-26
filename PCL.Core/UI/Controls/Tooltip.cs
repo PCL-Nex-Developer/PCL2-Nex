@@ -82,6 +82,7 @@ public static class Tooltip
     private static readonly MouseEventHandler _OnEnterHandler = OnEnter;
     private static readonly MouseEventHandler _OnMoveHandler = OnMove;
     private static readonly MouseEventHandler _OnLeaveHandler = OnLeave;
+    private static readonly MouseButtonEventHandler _OnPressHandler = OnPress;
     private static readonly MouseButtonEventHandler _OnReleaseHandler = OnRelease;
     private static readonly ToolTipEventHandler _OnOpeningHandler = OnOpening;
     private static readonly RoutedEventHandler _OnUnloadedHandler = OnUnloaded;
@@ -107,6 +108,8 @@ public static class Tooltip
             UIElement.MouseMoveEvent, _OnMoveHandler, true);
         EventManager.RegisterClassHandler(typeof(FrameworkElement),
             UIElement.MouseLeaveEvent, _OnLeaveHandler, true);
+        EventManager.RegisterClassHandler(typeof(FrameworkElement),
+            UIElement.PreviewMouseDownEvent, _OnPressHandler, true);
         EventManager.RegisterClassHandler(typeof(FrameworkElement),
             UIElement.PreviewMouseUpEvent, _OnReleaseHandler, true);
         EventManager.RegisterClassHandler(typeof(FrameworkElement),
@@ -179,7 +182,13 @@ public static class Tooltip
     }
 
     private static bool _IsCursorPlaced(FrameworkElement el) =>
-        GetFollowCursor(el) && ToolTipService.GetPlacement(el) is PlacementMode.Mouse or PlacementMode.MousePoint;
+        OperatingSystem.IsWindows() && GetFollowCursor(el) &&
+        ToolTipService.GetPlacement(el) is PlacementMode.Mouse or PlacementMode.MousePoint;
+
+    private static void OnPress(object s, MouseButtonEventArgs e)
+    {
+        if (_running) _Hush();
+    }
 
     private static void OnMove(object s, MouseEventArgs e)
     {
@@ -580,6 +589,16 @@ public static class Tooltip
     {
         _flyout!.PlacementTarget = target;
         var mode = ToolTipService.GetPlacement(target);
+
+        // Cursor-relative popups can cover the control receiving the click on non-Windows hosts.
+        if (!OperatingSystem.IsWindows() && mode is PlacementMode.Mouse or PlacementMode.MousePoint)
+        {
+            _flyout.Placement = PlacementMode.Bottom;
+            _flyout.PlacementRectangle = default;
+            _flyout.HorizontalOffset = ToolTipService.GetHorizontalOffset(target);
+            _flyout.VerticalOffset = 6 + ToolTipService.GetVerticalOffset(target);
+            return;
+        }
 
         if (mode is PlacementMode.Mouse)
         {

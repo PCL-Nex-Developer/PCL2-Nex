@@ -3,7 +3,6 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.Json.Nodes;
-using Microsoft.VisualBasic;
 using PCL.Core.App.Localization;
 using PCL.Core.UI;
 using PCL.Core.Utils;
@@ -151,7 +150,7 @@ public static class ModSkin
             {
                 FileDownloader.DownloadAsync(address, fileAddress + ModNet.netDownloadEnd).GetAwaiter().GetResult();
                 File.Delete(fileAddress);
-                FileSystem.Rename(fileAddress + ModNet.netDownloadEnd, fileAddress);
+                File.Move(fileAddress + ModNet.netDownloadEnd, fileAddress, true);
                 ModBase.Log("[Minecraft] 皮肤下载成功：" + fileAddress);
             }
 

@@ -53,18 +53,20 @@ jobs:
         include:
           - configuration: Beta
             architecture: x64
+            runtime: win-x64
           - configuration: Beta
             architecture: ARM64
+            runtime: win-arm64
     steps:
       - name: Download Build Artifact
         uses: actions/download-artifact@v4
         with:
-          name: PCL2_Nex_${{ matrix.configuration }}_${{ matrix.architecture }}
+          name: PCL2_Nex_${{ matrix.configuration }}_${{ matrix.runtime }}
           path: ./artifact
 
       - name: Rename binaries
         run: |
-          mv "./artifact/Plain Craft Launcher 2.exe" "PCL2_Nex_${{ matrix.configuration }}_${{ matrix.architecture }}.exe"
+          mv "./artifact/Plain Craft Launcher 2.exe" "PCL2_Nex_${{ matrix.configuration }}_${{ matrix.runtime }}.exe"
 
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@v6
@@ -74,14 +76,14 @@ jobs:
 
       - name: Sign the binary
         run: |
-          gpg --detach-sign --armor "PCL2_Nex_${{ matrix.configuration }}_${{ matrix.architecture }}.exe"
+          gpg --detach-sign --armor "PCL2_Nex_${{ matrix.configuration }}_${{ matrix.runtime }}.exe"
 
       - name: Upload binary and signature to Release
         uses: softprops/action-gh-release@v2.2.2
         with:
           files: |
-            PCL2_Nex_${{ matrix.configuration }}_${{ matrix.architecture }}.exe
-            PCL2_Nex_${{ matrix.configuration }}_${{ matrix.architecture }}.exe.asc
+            PCL2_Nex_${{ matrix.configuration }}_${{ matrix.runtime }}.exe
+            PCL2_Nex_${{ matrix.configuration }}_${{ matrix.runtime }}.exe.asc
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -93,18 +95,27 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Download Linux and macOS Build Artifacts
+      - name: Download Linux Build Artifacts
         uses: actions/download-artifact@v5
         with:
           path: ./artifacts
-          pattern: cross-*
+          pattern: PCL2_Nex_Beta_linux-*
+          merge-multiple: true
+
+      - name: Download macOS Build Artifacts
+        uses: actions/download-artifact@v5
+        with:
+          path: ./artifacts
+          pattern: PCL2_Nex_Beta_osx-*
           merge-multiple: true
 
       - name: Upload Linux and macOS Builds to Release
         uses: softprops/action-gh-release@v2.5.0
         with:
           tag_name: ${{ github.event.release.tag_name }}
-          files: artifacts/*
+          files: |
+            artifacts/PCL2_Nex_Beta_linux-*
+            artifacts/PCL2_Nex_Beta_osx-*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

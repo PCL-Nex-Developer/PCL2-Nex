@@ -164,7 +164,9 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
             throw new NullReferenceException("Can not get remote update info!");
         return new VersionDataModel
         {
+            FileName = deJsonData.FileName,
             BaseVersion = deJsonData.Version.BaseVersion,
+            Downloads = deJsonData.Downloads ?? [],
             Sha256 = deJsonData.Sha256,
             Source = SourceName,
             Changelog = deJsonData.Changelog
@@ -227,7 +229,7 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
                (ModBase.GetFileMD5(cacheFile) ?? "") == (hash ?? "");
     }
 
-    private string GetChannelName(UpdateChannel channel, UpdateArch arch)
+    internal static string GetChannelName(UpdateChannel channel, UpdateArch arch)
     {
         var channelName = string.Empty;
         switch (channel)
@@ -249,6 +251,9 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
                 break;
             }
         }
+
+        if (OperatingSystem.IsLinux()) channelName += "-linux-";
+        else if (OperatingSystem.IsMacOS()) channelName += "-osx-";
 
         switch (arch)
         {

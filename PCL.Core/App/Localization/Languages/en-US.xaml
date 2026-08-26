@@ -4027,6 +4027,7 @@
     <sys:String x:Key="Setup.Update.DotNetMissing.Title">Launcher update - missing runtime</sys:String>
     <sys:String x:Key="Setup.Update.Error.NetworkFailed">Unable to retrieve latest version information. Please check your network connection.</sys:String>
     <sys:String x:Key="Setup.Update.Install">Download and install</sys:String>
+    <sys:String x:Key="Setup.Update.OpenDownloadPage">Open download page</sys:String>
     <sys:String x:Key="Setup.Update.Latest">Already up to date</sys:String>
     <sys:String x:Key="Setup.Update.MirrorChyanCdk.Get">Get CDK</sys:String>
     <sys:String x:Key="Setup.Update.MirrorChyanCdk.Label">MirrorChyan CDK</sys:String>

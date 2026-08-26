@@ -126,8 +126,11 @@ public sealed class MyBitmap
         if (x < 0 || y < 0 || x >= PixelWidth || y >= PixelHeight)
             throw new ArgumentOutOfRangeException(nameof(x));
 
+        var normalized = _source.Format == PixelFormats.Bgra32
+            ? _source
+            : new FormatConvertedBitmap(_source, PixelFormats.Bgra32, null, 0);
         var pixels = new byte[4];
-        _source.CopyPixels(new Int32Rect(x, y, 1, 1), pixels, 4, 0);
+        normalized.CopyPixels(new Int32Rect(x, y, 1, 1), pixels, 4, 0);
         return System.Windows.Media.Color.FromArgb(pixels[3], pixels[2], pixels[1], pixels[0]);
     }
 
@@ -137,10 +140,9 @@ public sealed class MyBitmap
         var directory = Path.GetDirectoryName(filePath);
         if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
 
-        var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(_source));
+        using var png = ImageConverter.Bgra32ToPng(GetPixels(), PixelWidth, PixelHeight);
         using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
-        encoder.Save(fileStream);
+        png.CopyTo(fileStream);
     }
 
     public static MyBitmap Create(int width, int height)
@@ -157,7 +159,9 @@ public sealed class MyBitmap
 
         var path = FileSystemPath.NormalizeSeparators(source);
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-        if (stream.Length > 2 && stream.ReadByte() == 'R' && stream.ReadByte() == 'I')
+        Span<byte> header = stackalloc byte[12];
+        if (stream.Length >= header.Length && stream.Read(header) == header.Length &&
+            header[..4].SequenceEqual("RIFF"u8) && header[8..].SequenceEqual("WEBP"u8))
         {
             stream.Position = 0;
             using var pngStream = stream.FromWebpToPng();
@@ -175,6 +179,7 @@ public sealed class MyBitmap
         bitmap.CacheOption = BitmapCacheOption.OnLoad;
         bitmap.UriSource = new Uri(source, UriKind.Absolute);
         bitmap.EndInit();
+        bitmap.Freeze();
         return ToBitmapSource(bitmap);
     }
 
@@ -191,25 +196,30 @@ public sealed class MyBitmap
         if (image is not BitmapSource bitmap)
             throw new ArgumentException("The image source must be a bitmap.", nameof(image));
 
-        var converted = bitmap.Format == PixelFormats.Bgra32
-            ? bitmap
-            : new FormatConvertedBitmap(bitmap, PixelFormats.Bgra32, null, 0);
-        var pixels = new byte[checked(converted.PixelWidth * converted.PixelHeight * 4)];
-        converted.CopyPixels(pixels, converted.PixelWidth * 4, 0);
-        return CreateSource(converted.PixelWidth, converted.PixelHeight, pixels, converted.DpiX, converted.DpiY);
+        if (bitmap.CanFreeze) bitmap.Freeze();
+        return bitmap;
     }
 
     private static BitmapSource CreateSource(int width, int height, byte[] pixels, double dpiX = 96, double dpiY = 96)
     {
-        var source = BitmapSource.Create(width, height, dpiX, dpiY, PixelFormats.Bgra32, null, pixels, width * 4);
-        source.Freeze();
-        return source;
+        if (OperatingSystem.IsWindows())
+        {
+            var source = BitmapSource.Create(width, height, dpiX, dpiY, PixelFormats.Bgra32, null, pixels, width * 4);
+            source.Freeze();
+            return source;
+        }
+
+        using var png = ImageConverter.Bgra32ToPng(pixels, width, height);
+        return Decode(png);
     }
 
     private byte[] GetPixels()
     {
+        var normalized = _source.Format == PixelFormats.Bgra32
+            ? _source
+            : new FormatConvertedBitmap(_source, PixelFormats.Bgra32, null, 0);
         var pixels = new byte[checked(PixelWidth * PixelHeight * 4)];
-        _source.CopyPixels(pixels, PixelWidth * 4, 0);
+        normalized.CopyPixels(pixels, PixelWidth * 4, 0);
         return pixels;
     }
 }

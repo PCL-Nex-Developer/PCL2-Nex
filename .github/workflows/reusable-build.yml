@@ -156,16 +156,38 @@ jobs:
             fi
           done
 
+      - name: Normalize Linux and macOS release filenames
+        if: matrix.kind == 'cross-platform'
+        shell: bash
+        run: |
+          mkdir -p release-artifact
+          found=0
+          while IFS= read -r -d '' package; do
+            case "$package" in
+              *.deb) extension=deb ;;
+              *.rpm) extension=rpm ;;
+              *.AppImage) extension=AppImage ;;
+              *.dmg) extension=dmg ;;
+              *) continue ;;
+            esac
+            mv "$package" "release-artifact/PCL2_Nex_${{ inputs.configuration }}_${{ matrix.runtime }}.${extension}"
+            found=1
+          done < <(find dist -type f -print0)
+          if (( found == 0 )); then
+            echo 'No supported release package was produced.' >&2
+            exit 1
+          fi
+
       - name: Upload Windows Build Artifact
         if: matrix.kind == 'windows'
         uses: actions/upload-artifact@v7
         with:
-          name: PCL2_Nex_${{ inputs.configuration }}_${{ matrix.platform }}
+          name: PCL2_Nex_${{ inputs.configuration }}_${{ matrix.runtime }}
           path: artifact/**
 
       - name: Upload Linux or macOS Build Artifact
         if: matrix.kind == 'cross-platform'
         uses: actions/upload-artifact@v7
         with:
-          name: cross-${{ matrix.platform }}
-          path: dist/**
+          name: PCL2_Nex_${{ inputs.configuration }}_${{ matrix.runtime }}
+          path: release-artifact/**

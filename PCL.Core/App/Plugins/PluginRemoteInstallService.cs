@@ -538,11 +538,13 @@ public static class PluginRemoteInstallService
         foreach (var entry in archive.Entries)
         {
             if (string.IsNullOrWhiteSpace(entry.FullName)) continue;
-            var targetPath = Path.GetFullPath(Path.Combine(destinationDirectory, entry.FullName));
+            var entryPath = entry.FullName.Replace('\\', '/');
+            var targetPath = Path.GetFullPath(Path.Combine(destinationDirectory,
+                entryPath.Replace('/', Path.DirectorySeparatorChar)));
             if (!FileSystemPath.IsWithinDirectory(targetPath, destinationDirectory))
                 throw new InvalidDataException(Lang.Text("Plugins.RemoteInstall.Error.UnsafePathInPackage"));
 
-            if (string.IsNullOrEmpty(entry.Name))
+            if (entryPath.EndsWith('/'))
             {
                 Directory.CreateDirectory(targetPath);
                 continue;

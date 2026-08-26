@@ -112,7 +112,9 @@ public partial class PageSetupUpdate
                 }
                 else
                 {
-                    BtnUpdate.Text = Lang.Text("Setup.Update.Install");
+                    BtnUpdate.Text = Lang.Text(UpdateManager.SupportsInPlaceUpdate
+                        ? "Setup.Update.Install"
+                        : "Setup.Update.OpenDownloadPage");
                     BtnUpdate.IsEnabled = true;
                 }
 

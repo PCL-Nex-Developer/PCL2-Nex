@@ -1,6 +1,8 @@
 using System;
 using System.IO;
-using System.Windows.Media.Imaging;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace PCL.Core.UI.Media;
 
@@ -8,7 +10,7 @@ public static class ImageConverter
 {
     /// <summary>
     /// 从 WebP 输入流解码并转换为 PNG，返回包含 PNG 数据的 MemoryStream（Position=0）。
-    /// 需要系统内置的 WebP WIC 编解码器（Windows 10/11 通常已内置或可通过商店扩展提供）。
+    /// 使用托管解码器，不依赖平台图像组件。
     /// </summary>
     /// <param name="input">输入 WebP 流（不会在此方法中关闭）</param>
     /// <param name="frameIndex">要提取的帧索引，默认 0</param>
@@ -35,26 +37,13 @@ public static class ImageConverter
         }
         try
         {
-            // 使用 WPF 的 BitmapDecoder（底层是 WIC）。OnLoad 使得图像数据在解码完成后与源流解耦。
-            var decoder = BitmapDecoder.Create(
-                source,
-                BitmapCreateOptions.PreservePixelFormat,
-                BitmapCacheOption.OnLoad);
+            using var image = Image.Load(source);
+            if (frameIndex < 0 || frameIndex >= image.Frames.Count)
+                throw new ArgumentOutOfRangeException(nameof(frameIndex), $"帧索引超出范围（0..{image.Frames.Count - 1}）。");
 
-            if (decoder.Frames.Count == 0)
-                throw new NotSupportedException("未能从输入数据解码出任何图像帧，可能不是有效的 WebP 图像。");
-
-            if (frameIndex < 0 || frameIndex >= decoder.Frames.Count)
-                throw new ArgumentOutOfRangeException(nameof(frameIndex), $"帧索引超出范围（0..{decoder.Frames.Count - 1}）。");
-
-            var frame = decoder.Frames[frameIndex];
-
-            var encoder = new PngBitmapEncoder();
-            // 使用 BitmapFrame.Create 包装，避免后续冻结或依赖源的问题
-            encoder.Frames.Add(BitmapFrame.Create(frame));
-
+            using var frame = image.Frames.CloneFrame(frameIndex);
             var output = new MemoryStream();
-            encoder.Save(output);
+            frame.Save(output, new PngEncoder());
             output.Position = 0;
             return output;
         }
@@ -73,5 +62,18 @@ public static class ImageConverter
             // 仅释放我们创建的临时缓冲，不关闭调用方传入的 input
             tempBuffer?.Dispose();
         }
+    }
+
+    public static MemoryStream Bgra32ToPng(byte[] pixels, int width, int height)
+    {
+        ArgumentNullException.ThrowIfNull(pixels);
+        if (width <= 0 || height <= 0 || pixels.Length != checked(width * height * 4))
+            throw new ArgumentException("Pixel buffer dimensions do not match its length.", nameof(pixels));
+
+        using var image = Image.LoadPixelData<Bgra32>(pixels, width, height);
+        var output = new MemoryStream();
+        image.Save(output, new PngEncoder());
+        output.Position = 0;
+        return output;
     }
 }

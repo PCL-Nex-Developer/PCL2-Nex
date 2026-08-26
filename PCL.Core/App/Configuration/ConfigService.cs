@@ -46,7 +46,7 @@ public sealed partial class ConfigService
     /// <summary>
     /// 本地配置文件路径。
     /// </summary>
-    public static string LocalConfigPath { get; } = Path.Combine(Paths.Data, "config.v1.yml");
+    public static string LocalConfigPath { get; } = Path.Combine(Paths.Data, "config.local.v1.json");
 
     #region Getters & Setters
 
@@ -175,11 +175,18 @@ public sealed partial class ConfigService
                     {
                         From = Path.Combine(Paths.Data, "setup.ini"),
                         To = LocalConfigPath,
-                        OnMigration = CatIniMigration
+                        OnMigration = CatIniToJsonMigration
+                    },
+                    new ConfigMigration
+                    {
+                        From = Path.Combine(Paths.Data, "config.v1.yml"),
+                        To = LocalConfigPath,
+                        OnMigration = YamlToJsonMigration,
+                        Priority = 10
                     }
                 ]);
                 // load
-                var fileProvider = new YamlFileProvider(LocalConfigPath);
+                var fileProvider = new JsonFileProvider(LocalConfigPath);
                 _localConfigProvider = new FileConfigStorage(fileProvider);
             },
             () => // instance config file(s)
@@ -190,16 +197,23 @@ public sealed partial class ConfigService
                     {
                         ArgumentNullException.ThrowIfNull(argument);
                         var dir = Path.GetFullPath(argument.ToString()!);
-                        var configPath = Path.Combine(dir, "PCL", "config.v1.yml");
-                        if (!File.Exists(dir)) _TryMigrate(dir, [
+                        var configPath = Path.Combine(dir, "PCL", "config.v1.json");
+                        if (!File.Exists(configPath)) _TryMigrate(configPath, [
                             new ConfigMigration
                             {
                                 From = Path.Combine(dir, "PCL", "setup.ini"),
                                 To = configPath,
-                                OnMigration = CatIniMigration
+                                OnMigration = CatIniToJsonMigration
+                            },
+                            new ConfigMigration
+                            {
+                                From = Path.Combine(dir, "PCL", "config.v1.yml"),
+                                To = configPath,
+                                OnMigration = YamlToJsonMigration,
+                                Priority = 10
                             }
                         ]);
-                        var fileProvider = new YamlFileProvider(configPath);
+                        var fileProvider = new JsonFileProvider(configPath);
                         var storage = new FileConfigStorage(fileProvider);
                         return storage;
                     }
@@ -214,18 +228,35 @@ public sealed partial class ConfigService
         {
             File.Copy(from, to);
         }
-        void CatIniMigration(string from, string to)
+        void CatIniToJsonMigration(string from, string to)
         {
             var lines = File.ReadAllLines(from);
-            var yamlProvider = new YamlFileProvider(to);
+            var jsonProvider = new JsonFileProvider(to);
             foreach (var line in lines)
             {
                 if (line.IsNullOrWhiteSpace()) continue;
                 var kv = line.Split(':', 2);
                 if (kv.Length != 2) continue;
-                yamlProvider.Set(kv[0], kv[1]);
+                jsonProvider.Set(kv[0], kv[1]);
             }
-            yamlProvider.Sync();
+            jsonProvider.Sync();
+        }
+        void YamlToJsonMigration(string from, string to)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(to)!);
+            var temporary = to + ".migrating";
+            try
+            {
+                using (var input = new FileStream(from, FileMode.Open, FileAccess.Read, FileShare.Read))
+                using (var output = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None))
+                    YamlToJsonConverter.Convert(input, output, leaveOpen: true);
+                File.Move(temporary, to, true);
+                File.Delete(from);
+            }
+            finally
+            {
+                if (File.Exists(temporary)) File.Delete(temporary);
+            }
         }
     }
 

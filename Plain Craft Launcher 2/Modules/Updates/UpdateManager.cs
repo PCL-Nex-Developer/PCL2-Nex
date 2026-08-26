@@ -28,14 +28,14 @@ public static class UpdateManager
         : UpdateArch.x64;
 
     /// <summary>
-    ///     当前构建是否启用自动更新：更新服务器仅提供 Windows 包，且自更新器为 Windows 实现；
-    ///     Debug / CI 构建同样不启用。
+    ///     当前构建是否启用更新检查。Debug / CI 构建不启用。
     /// </summary>
     public static bool IsUpdateEnabled
     {
         get
         {
-            if (!OperatingSystem.IsWindows()) return false;
+            if (!OperatingSystem.IsWindows() && !OperatingSystem.IsMacOS() && !OperatingSystem.IsLinux()) return false;
+            if (OperatingSystem.IsLinux() && SystemInfo.IsArm64System) return false;
 #if DEBUG || DEBUGCI
             return false;
 #else
@@ -43,6 +43,8 @@ public static class UpdateManager
 #endif
         }
     }
+
+    public static bool SupportsInPlaceUpdate => OperatingSystem.IsWindows();
 
     /// <summary>更新包落盘路径（跟随各平台数据目录，使用平台分隔符）。</summary>
     private static string UpdatePackagePath =>
@@ -100,6 +102,15 @@ public static class UpdateManager
                     });
                     return;
                     // 构造步骤加载器
+                }
+
+                if (!SupportsInPlaceUpdate)
+                {
+                    var download = version.Downloads.FirstOrDefault();
+                    ModBase.OpenWebsite(string.IsNullOrWhiteSpace(download)
+                        ? $"https://github.com/PCL-Nex-Developer/PCL2-Nex/releases/tag/v{version.BaseVersion}"
+                        : download);
+                    return;
                 }
 
                 var loaders = new List<ModLoader.LoaderBase>();
@@ -245,6 +256,13 @@ public static class UpdateManager
         if (!IsUpdateEnabled)
         {
             ModBase.Log("[Update] 当前构建不支持自动更新");
+            return;
+        }
+        if (!SupportsInPlaceUpdate)
+        {
+            if (Config.Update.UpdateMode != LauncherAutoUpdateBehavior.Disable &&
+                GetVersionStatus() != UpdateEnums.VersionStatus.Latest)
+                UpdateStart(UpdateEnums.UpdateType.PromptOnly);
             return;
         }
         switch (Config.Update.UpdateMode)

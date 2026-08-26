@@ -139,59 +139,73 @@ public partial class FontSelector
             CustomFontCollection.Add(new CustomFontProperties { Name = Lang.Text("Common.State.Loading") });
             ComboFont.SelectedIndex = 0;
 
-            var availableFonts = new List<(string Name, FontFamily Font)>();
-
-            await Task.Run(() =>
+            try
             {
-                foreach (var font in Fonts.SystemFontFamilies)
-                    try
-                    {
-                        if (font.Source.StartsWith("Global ")) continue;
+                var availableFonts = new List<(string Name, FontFamily Font)>();
 
-                        if (OperatingSystem.IsWindows())
-                        {
-                            foreach (var typeface in font.GetTypefaces())
+                if (OperatingSystem.IsWindows())
+                    await Task.Run(() =>
+                    {
+                        foreach (var font in Fonts.SystemFontFamilies)
+                            try
                             {
-                                if (!typeface.TryGetGlyphTypeface(out var glyph))
-                                    throw new NullReferenceException(
-                                        $"字形 {typeface.FaceNames.GetForCurrentUiCulture("(unknown)")} 无法加载");
+                                if (font.Source.StartsWith("Global ")) continue;
 
-                                _ = new GlyphTypeface(glyph.FontUri);
+                                foreach (var typeface in font.GetTypefaces())
+                                {
+                                    if (!typeface.TryGetGlyphTypeface(out var glyph))
+                                        throw new NullReferenceException(
+                                            $"字形 {typeface.FaceNames.GetForCurrentUiCulture("(unknown)")} 无法加载");
+
+                                    _ = new GlyphTypeface(glyph.FontUri);
+                                }
+
+                                availableFonts.Add((font.FamilyNames.GetForCurrentUiCulture(), font));
                             }
-                        }
+                            catch (Exception ex)
+                            {
+                                LogWrapper.Error(ex, $"发现了一个无法加载的异常的字体：{font.Source}");
+                            }
 
-                        availableFonts.Add((font.FamilyNames.GetForCurrentUiCulture(), font));
-                    }
-                    catch (Exception ex)
-                    {
-                        LogWrapper.Error(ex, $"发现了一个无法加载的异常的字体：{font.Source}");
-                    }
+                        availableFonts.Sort((l, r) => string.Compare(l.Name, r.Name, StringComparison.Ordinal));
+                    });
 
-                availableFonts.Sort((l, r) => string.Compare(l.Name, r.Name, StringComparison.Ordinal));
-            });
-
-            CustomFontCollection.Clear();
-            CustomFontCollection.Add(new CustomFontProperties
-            {
-                Name = Lang.Text("Common.Option.Default"),
-                Font = LocalizationFontService.BuildLaunchFontFamily(),
-                Tag = ""
-            });
-
-            foreach (var font in availableFonts)
+                CustomFontCollection.Clear();
                 CustomFontCollection.Add(new CustomFontProperties
-                    { Name = font.Name, Font = font.Font, Tag = font.Font.Source });
+                {
+                    Name = Lang.Text("Common.Option.Default"),
+                    Font = LocalizationFontService.BuildLaunchFontFamily(),
+                    Tag = ""
+                });
 
-            ComboFont.IsEnabled = true;
+                foreach (var font in availableFonts)
+                    CustomFontCollection.Add(new CustomFontProperties
+                        { Name = font.Name, Font = font.Font, Tag = font.Font.Source });
 
-            if (_pendingFontTag is not null)
-            {
-                var pendingTag = _pendingFontTag;
-                _pendingFontTag = null;
-                SelectedFontTag = pendingTag;
+                if (_pendingFontTag is not null)
+                {
+                    var pendingTag = _pendingFontTag;
+                    _pendingFontTag = null;
+                    SelectedFontTag = pendingTag;
+                }
             }
-
-            _isInitializing = false;
+            catch (Exception ex)
+            {
+                LogWrapper.Error(ex, "加载系统字体列表失败，已使用默认字体");
+                CustomFontCollection.Clear();
+                CustomFontCollection.Add(new CustomFontProperties
+                {
+                    Name = Lang.Text("Common.Option.Default"),
+                    Font = LocalizationFontService.BuildLaunchFontFamily(),
+                    Tag = ""
+                });
+                ComboFont.SelectedIndex = 0;
+            }
+            finally
+            {
+                ComboFont.IsEnabled = true;
+                _isInitializing = false;
+            }
         });
     }
 
