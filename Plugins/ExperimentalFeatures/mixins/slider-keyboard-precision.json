@@ -1,7 +1,0 @@
-{
-  "required": true,
-  "package": "PclNex.ExperimentalFeatures.Mixins",
-  "mixins": ["SliderKeyboardPrecisionMixin"],
-  "priority": 1000,
-  "injectors": { "defaultRequire": 1 }
-}
