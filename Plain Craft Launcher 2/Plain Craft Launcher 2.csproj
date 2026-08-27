@@ -8,7 +8,9 @@
         <IsWebBootstrapper>false</IsWebBootstrapper>
         <StartupObject>PCL.Program</StartupObject>
         <PublishUrl>publish/</PublishUrl>
+        <!-- Harmony/MonoMod 需要直接访问 CLR 原生模块，Linux/macOS 发布不能使用 .NET 单文件捆绑。 -->
         <PublishSingleFile>true</PublishSingleFile>
+        <PublishSingleFile Condition="'$(RuntimeIdentifier)' != '' And !$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('win-'))">false</PublishSingleFile>
         <!-- The SDK only supports bundle compression for self-contained releases. -->
         <EnableCompressionInSingleFile Condition="'$(SelfContained)' == 'true'">true</EnableCompressionInSingleFile>
         <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
