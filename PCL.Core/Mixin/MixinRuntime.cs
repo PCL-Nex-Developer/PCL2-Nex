@@ -2,14 +2,18 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using HarmonyLib;
+using PCL.Core.Logging;
 
 namespace PCL.Mixin;
 
 internal sealed class MixinRuntime : IMixinRuntime, IDisposable
 {
+    private static readonly Lazy<IntPtr> RuntimeJitHandle = new(LoadRuntimeJitLibrary);
     private readonly object _lock = new();
     private readonly Dictionary<MethodBase, TargetPlan> _plans = [];
     private readonly Dictionary<MethodInfo, ShadowMethodRegistration> _shadowMethods = [];
@@ -20,10 +24,34 @@ internal sealed class MixinRuntime : IMixinRuntime, IDisposable
 
     public MixinRuntime(string? ownerId = null)
     {
+        _ = RuntimeJitHandle.Value;
         OwnerId = string.IsNullOrWhiteSpace(ownerId)
             ? $"pclnex.mixin.{Guid.NewGuid():N}"
             : ownerId;
         _harmony = new Harmony(OwnerId);
+    }
+
+    private static IntPtr LoadRuntimeJitLibrary()
+    {
+        if (!OperatingSystem.IsMacOS()) return IntPtr.Zero;
+
+        const string libraryName = "libclrjit.dylib";
+        var libraryPath = Path.Combine(RuntimeEnvironment.GetRuntimeDirectory(), libraryName);
+
+        if (File.Exists(libraryPath) && NativeLibrary.TryLoad(libraryPath, out var handle))
+        {
+            LogWrapper.Debug("Mixin", $"已预加载 macOS 运行时补丁依赖：{libraryPath}");
+            return handle;
+        }
+
+        if (NativeLibrary.TryLoad(libraryName, out handle))
+        {
+            LogWrapper.Debug("Mixin", "已通过系统动态库搜索预加载 macOS 运行时补丁依赖");
+            return handle;
+        }
+
+        LogWrapper.Warn("Mixin", $"无法预加载 macOS 运行时补丁依赖：{libraryPath}");
+        return IntPtr.Zero;
     }
 
     public string OwnerId { get; }
