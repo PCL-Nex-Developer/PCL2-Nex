@@ -211,6 +211,7 @@ public static class PluginInstallService
 
             // 删除安装记录
             _DeleteRecord(pluginId);
+            PluginEnablementService.ClearSelfProtectionDisabled(pluginId);
         }
         return Task.CompletedTask;
     }

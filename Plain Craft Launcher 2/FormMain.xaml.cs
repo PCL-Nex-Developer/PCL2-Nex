@@ -102,10 +102,12 @@ public partial class FormMain
             // 透明无边框模式让自绘内容与指针命中使用同一客户区原点。
             AllowsTransparency = true;
             WindowChrome.SetWindowChrome(this, null);
-            SetResourceReference(BackgroundProperty, "ColorBrushBackground");
+            Background = Brushes.Transparent;
+            PanBack.SetResourceReference(Border.BackgroundProperty, "ColorBrushBackground");
             PanWindowShadow.Visibility = Visibility.Collapsed;
             PanBack.Margin = new Thickness(0);
-            PanBack.Clip = null;
+            RectForm.RadiusX = 12d;
+            RectForm.RadiusY = 12d;
             // The non-Windows UI layer does not consistently apply this transform to pointer hit testing.
             PanRoot.RenderTransform = null;
         }
@@ -267,6 +269,8 @@ public partial class FormMain
                             }
                     }
 
+                ShowSelfProtectionPluginWarnings();
+
                 // 启动加载器池
                 try
                 {
@@ -288,6 +292,63 @@ public partial class FormMain
         }, "Start Loader", ThreadPriority.BelowNormal);
 
         ModBase.Log($"[Start] 第三阶段加载用时：{TimeUtils.GetTimeTick() - ModBase.applicationStartTick} ms");
+    }
+
+    private void ShowSelfProtectionPluginWarnings()
+    {
+        IReadOnlyList<PluginSelfProtectionRecord> records;
+        try
+        {
+            records = PluginEnablementService.GetSelfProtectionDisabledPlugins()
+                .Where(record => !record.NotificationShown)
+                .ToArray();
+        }
+        catch (Exception ex)
+        {
+            ModBase.Log(ex, "读取插件保护性禁用记录失败", ModBase.LogLevel.Debug);
+            return;
+        }
+
+        foreach (var record in records)
+        {
+            var displayName = string.Equals(record.PluginName, record.PluginId, StringComparison.OrdinalIgnoreCase)
+                ? record.PluginId
+                : $"{record.PluginName} ({record.PluginId})";
+            var reason = string.IsNullOrWhiteSpace(record.Reason)
+                ? Lang.Text("Plugins.SelfProtection.Reason.Unknown")
+                : record.Reason;
+            var result = ModMain.MyMsgBox(
+                Lang.Text("Plugins.SelfProtection.Dialog.Message", displayName, reason),
+                Lang.Text("Plugins.SelfProtection.Dialog.Title"),
+                Lang.Text("Plugins.SelfProtection.Button.KeepDisabled"),
+                Lang.Text("Plugins.SelfProtection.Button.ForceEnable"),
+                isWarn: true);
+
+            try
+            {
+                PluginEnablementService.MarkSelfProtectionNotificationShown(record.PluginId);
+            }
+            catch (Exception ex)
+            {
+                ModBase.Log(ex, $"保存插件保护性禁用提醒状态失败：{record.PluginId}", ModBase.LogLevel.Debug);
+            }
+
+            if (result != 2) continue;
+            try
+            {
+                if (!PluginInstallService.SetEnabledAsync(record.PluginId, true).GetAwaiter().GetResult()) continue;
+                ModBase.RunInUi(() => RefreshRestartButton(true));
+                ModMain.MyMsgBox(
+                    Lang.Text("Plugins.SelfProtection.Message.ForceEnabled", displayName),
+                    Lang.Text("Plugins.Installed.Dialog.Title.PluginStatus"));
+            }
+            catch (Exception ex)
+            {
+                ModMain.MyMsgBox(
+                    Lang.Text("Plugins.SelfProtection.Message.ForceEnableFailed", ex.Message),
+                    Lang.Text("Plugins.Common.Dialog.Title.Error"));
+            }
+        }
     }
 
     // 根据打开次数触发的事件
@@ -628,8 +689,13 @@ public partial class FormMain
 
         if (PanBack is not null)
         {
-            if (OperatingSystem.IsWindows())
-                RectForm.Rect = new Rect(0d, 0d, PanBack.ActualWidth, PanBack.ActualHeight);
+            RectForm.Rect = new Rect(0d, 0d, PanBack.ActualWidth, PanBack.ActualHeight);
+            if (!OperatingSystem.IsWindows())
+            {
+                var radius = WindowState == WindowState.Maximized ? 0d : 12d;
+                RectForm.RadiusX = radius;
+                RectForm.RadiusY = radius;
+            }
 
             var formWidth = PanBack.ActualWidth + 0.001d;
             var formHeight = PanBack.ActualHeight + 0.001d;

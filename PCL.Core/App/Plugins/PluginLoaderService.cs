@@ -285,7 +285,14 @@ public sealed class PluginLoaderService : GeneralService
             loadContext?.Unload();
             if (disableFailedPlugins)
             {
-                try { PluginEnablementService.MarkSelfProtectionDisabled(manifest.Id); }
+                try
+                {
+                    PluginEnablementService.MarkSelfProtectionDisabled(
+                        manifest.Id,
+                        manifest.Name,
+                        manifest.Version,
+                        exception.GetBaseException().Message);
+                }
                 catch (Exception disableException)
                 {
                     _context?.Warn($"写入插件自我保护禁用标记失败：{manifest.Id}", disableException);

@@ -111,14 +111,38 @@ public partial class PagePluginsInstalled
             title.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrush2");
             info.Children.Add(title);
 
+            var selfProtectionRecord = PluginEnablementService.GetSelfProtectionDisabledPlugin(pluginId);
+            var isSelfProtectionDisabled = selfProtectionRecord is not null;
             var isEnabled = PluginEnablementService.IsEnabled(pluginId);
             var orderIndex = IndexOfPlugin(enabledOrder, pluginId);
             var orderText = orderIndex >= 0 ? "  |  " + Lang.Text("Plugins.Installed.Label.LoadOrder") + (orderIndex + 1) : string.Empty;
             var source = record?.InstalledFrom ?? (manifest is not null ? Lang.Text("Plugins.Installed.Label.SourceLocal") : loadedRecord != null ? Lang.Text("Plugins.Installed.Label.SourceLegacy") : Lang.Text("Common.State.Unknown"));
-            var state = loadedRecord != null ? loadedRecord.State.ToString() : (isEnabled ? Lang.Text("Plugins.Installed.Label.StateNotLoaded") : Lang.Text("Plugins.Installed.Label.StateDisabled"));
+            var state = loadedRecord != null
+                ? loadedRecord.State.ToString()
+                : isSelfProtectionDisabled
+                    ? Lang.Text("Plugins.SelfProtection.Label.StateDisabled")
+                    : isEnabled
+                        ? Lang.Text("Plugins.Installed.Label.StateNotLoaded")
+                        : Lang.Text("Plugins.Installed.Label.StateDisabled");
             var src = new TextBlock { Text = Lang.Text("Plugins.Installed.Label.SourcePrefix") + source + "  |  " + Lang.Text("Plugins.Installed.Label.StatePrefix") + state + orderText, FontSize = 11, Margin = new Thickness(0, 2, 0, 0) };
             src.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
             info.Children.Add(src);
+
+            if (selfProtectionRecord is not null)
+            {
+                var reason = string.IsNullOrWhiteSpace(selfProtectionRecord.Reason)
+                    ? Lang.Text("Plugins.SelfProtection.Reason.Unknown")
+                    : selfProtectionRecord.Reason;
+                var failure = new TextBlock
+                {
+                    Text = Lang.Text("Plugins.SelfProtection.Label.FailureReason", reason),
+                    FontSize = 11,
+                    Margin = new Thickness(0, 2, 0, 0),
+                    TextTrimming = TextTrimming.CharacterEllipsis
+                };
+                failure.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
+                info.Children.Add(failure);
+            }
 
             var experimentalFeatures = manifest?.ExperimentalFeatures?.Where(feature => feature is not null).ToList() ?? [];
             var enabledExperimentalFeatures = manifest is null
@@ -172,15 +196,26 @@ public partial class PagePluginsInstalled
 
             var toggleBtn = new MyButton
             {
-                Text = isEnabled ? Lang.Text("Common.Action.Disable") : Lang.Text("Common.Action.Enable"),
+                Text = isSelfProtectionDisabled
+                    ? Lang.Text("Plugins.SelfProtection.Button.ForceEnable")
+                    : isEnabled
+                        ? Lang.Text("Common.Action.Disable")
+                        : Lang.Text("Common.Action.Enable"),
                 Height = 28,
-                MinWidth = 60,
+                MinWidth = isSelfProtectionDisabled ? 76 : 60,
                 Margin = new Thickness(8, 0, 0, 0),
-                IsEnabled = true
+                IsEnabled = true,
+                ColorType = isSelfProtectionDisabled ? MyButton.ColorState.Red : MyButton.ColorState.Normal
             };
             toggleBtn.SetValue(Grid.ColumnProperty, 5);
             var id1 = pluginId; var en = isEnabled;
-            toggleBtn.Click += (_, _) => TogglePlugin(id1, !en);
+            toggleBtn.Click += (_, _) =>
+            {
+                if (isSelfProtectionDisabled)
+                    ForceEnablePlugin(id1);
+                else
+                    TogglePlugin(id1, !en);
+            };
             row.Children.Add(toggleBtn);
 
             var uninstallBtn = new MyButton { Text = Lang.Text("Plugins.Installed.Button.Uninstall"), Height = 28, MinWidth = 60, Margin = new Thickness(4, 0, 0, 0), ColorType = MyButton.ColorState.Red, IsEnabled = true };
@@ -318,6 +353,46 @@ public partial class PagePluginsInstalled
             BuildInstalledList();
         }
         catch (Exception ex) { ModMain.MyMsgBox(Lang.Text("Plugins.Installed.Message.OperationFailed", ex.Message), Lang.Text("Plugins.Common.Dialog.Title.Error")); }
+    }
+
+    private async void ForceEnablePlugin(string pluginId)
+    {
+        var record = PluginEnablementService.GetSelfProtectionDisabledPlugin(pluginId);
+        if (record is null)
+        {
+            BuildInstalledList();
+            return;
+        }
+
+        var displayName = string.Equals(record.PluginName, record.PluginId, StringComparison.OrdinalIgnoreCase)
+            ? record.PluginId
+            : $"{record.PluginName} ({record.PluginId})";
+        var reason = string.IsNullOrWhiteSpace(record.Reason)
+            ? Lang.Text("Plugins.SelfProtection.Reason.Unknown")
+            : record.Reason;
+        if (ModMain.MyMsgBox(
+                Lang.Text("Plugins.SelfProtection.Dialog.Message", displayName, reason),
+                Lang.Text("Plugins.SelfProtection.Dialog.Title"),
+                Lang.Text("Plugins.SelfProtection.Button.ForceEnable"),
+                Lang.Text("Common.Action.Cancel"),
+                isWarn: true) != 1)
+            return;
+
+        try
+        {
+            if (!await PluginInstallService.SetEnabledAsync(pluginId, true)) return;
+            ModMain.frmMain?.RefreshRestartButton(true);
+            ModMain.MyMsgBox(
+                Lang.Text("Plugins.SelfProtection.Message.ForceEnabled", displayName),
+                Lang.Text("Plugins.Installed.Dialog.Title.PluginStatus"));
+            BuildInstalledList();
+        }
+        catch (Exception ex)
+        {
+            ModMain.MyMsgBox(
+                Lang.Text("Plugins.SelfProtection.Message.ForceEnableFailed", ex.Message),
+                Lang.Text("Plugins.Common.Dialog.Title.Error"));
+        }
     }
 
     private void MovePlugin(string pluginId, int offset)

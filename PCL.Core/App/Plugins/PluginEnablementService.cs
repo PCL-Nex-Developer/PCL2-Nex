@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using PCL.Core.App.Localization;
 
 namespace PCL.Core.App.Plugins;
@@ -9,8 +10,10 @@ namespace PCL.Core.App.Plugins;
 public static class PluginEnablementService
 {
     private const string SelfProtectionDisabledDirectoryName = ".self-protection-disabled";
+    private const int MaxFailureReasonLength = 1200;
 
     private static readonly string[] SessionEnabledBaseline = NormalizeEnabledStates(ReadEnabledStates()).ToArray();
+    private static readonly object SelfProtectionSyncRoot = new();
 
     public static bool IsEnabled(string pluginId)
     {
@@ -46,18 +49,70 @@ public static class PluginEnablementService
         return File.Exists(_GetSelfProtectionMarkerPath(pluginId));
     }
 
-    public static void MarkSelfProtectionDisabled(string pluginId)
+    public static void MarkSelfProtectionDisabled(
+        string pluginId,
+        string? pluginName = null,
+        string? pluginVersion = null,
+        string? reason = null)
     {
         if (!PluginPackageService.IsValidPluginId(pluginId)) throw new ArgumentException(Text("Plugins.Install.Error.InvalidPluginId", "插件 Id 无效。"), nameof(pluginId));
-        Directory.CreateDirectory(_GetSelfProtectionDirectory());
-        File.WriteAllText(_GetSelfProtectionMarkerPath(pluginId), DateTimeOffset.UtcNow.ToString("O"));
+        var record = new PluginSelfProtectionRecord
+        {
+            PluginId = pluginId,
+            PluginName = string.IsNullOrWhiteSpace(pluginName) ? pluginId : pluginName.Trim(),
+            PluginVersion = string.IsNullOrWhiteSpace(pluginVersion) ? null : pluginVersion.Trim(),
+            Reason = NormalizeFailureReason(reason),
+            DisabledAt = DateTimeOffset.UtcNow,
+            NotificationShown = false
+        };
+        WriteSelfProtectionRecord(record);
+    }
+
+    public static IReadOnlyList<PluginSelfProtectionRecord> GetSelfProtectionDisabledPlugins()
+    {
+        var directory = _GetSelfProtectionDirectory();
+        if (!Directory.Exists(directory)) return [];
+
+        var records = new List<PluginSelfProtectionRecord>();
+        foreach (var markerPath in Directory.GetFiles(directory, "*", SearchOption.TopDirectoryOnly))
+        {
+            var pluginId = Path.GetFileName(markerPath);
+            if (!PluginPackageService.IsValidPluginId(pluginId)) continue;
+            var record = ReadSelfProtectionRecord(pluginId, markerPath);
+            if (record is not null) records.Add(record);
+        }
+        return records.OrderByDescending(record => record.DisabledAt).ToArray();
+    }
+
+    public static PluginSelfProtectionRecord? GetSelfProtectionDisabledPlugin(string pluginId)
+    {
+        if (!PluginPackageService.IsValidPluginId(pluginId)) return null;
+        var markerPath = _GetSelfProtectionMarkerPath(pluginId);
+        return File.Exists(markerPath) ? ReadSelfProtectionRecord(pluginId, markerPath) : null;
+    }
+
+    public static void MarkSelfProtectionNotificationShown(string pluginId)
+    {
+        if (!PluginPackageService.IsValidPluginId(pluginId)) return;
+        lock (SelfProtectionSyncRoot)
+        {
+            var markerPath = _GetSelfProtectionMarkerPath(pluginId);
+            if (!File.Exists(markerPath)) return;
+            var record = ReadSelfProtectionRecord(pluginId, markerPath);
+            if (record is null || record.NotificationShown) return;
+            record.NotificationShown = true;
+            WriteSelfProtectionRecord(record);
+        }
     }
 
     public static void ClearSelfProtectionDisabled(string pluginId)
     {
         if (!PluginPackageService.IsValidPluginId(pluginId)) return;
-        var markerPath = _GetSelfProtectionMarkerPath(pluginId);
-        if (File.Exists(markerPath)) File.Delete(markerPath);
+        lock (SelfProtectionSyncRoot)
+        {
+            var markerPath = _GetSelfProtectionMarkerPath(pluginId);
+            if (File.Exists(markerPath)) File.Delete(markerPath);
+        }
     }
 
     public static IReadOnlyList<string> GetEnabledPluginOrder()
@@ -145,6 +200,66 @@ public static class PluginEnablementService
     private static string _GetSelfProtectionMarkerPath(string pluginId)
         => Path.Combine(_GetSelfProtectionDirectory(), _SafeFileName(pluginId));
 
+    private static PluginSelfProtectionRecord? ReadSelfProtectionRecord(string pluginId, string markerPath)
+    {
+        try
+        {
+            var content = File.ReadAllText(markerPath);
+            try
+            {
+                var record = JsonSerializer.Deserialize<PluginSelfProtectionRecord>(content, PluginJson.SerializerOptions);
+                if (record is not null)
+                {
+                    record.PluginId = pluginId;
+                    if (string.IsNullOrWhiteSpace(record.PluginName)) record.PluginName = pluginId;
+                    record.Reason = NormalizeFailureReason(record.Reason);
+                    return record;
+                }
+            }
+            catch (JsonException)
+            {
+                // Older versions stored only an ISO-8601 timestamp in this marker.
+            }
+
+            var disabledAt = DateTimeOffset.TryParse(content, out var timestamp)
+                ? timestamp
+                : new DateTimeOffset(File.GetLastWriteTimeUtc(markerPath));
+            return new PluginSelfProtectionRecord
+            {
+                PluginId = pluginId,
+                PluginName = pluginId,
+                DisabledAt = disabledAt,
+                NotificationShown = false
+            };
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+    }
+
+    private static void WriteSelfProtectionRecord(PluginSelfProtectionRecord record)
+    {
+        lock (SelfProtectionSyncRoot)
+        {
+            var directory = _GetSelfProtectionDirectory();
+            Directory.CreateDirectory(directory);
+            var markerPath = _GetSelfProtectionMarkerPath(record.PluginId);
+            var temporaryPath = Path.Combine(directory, "." + record.PluginId + ".tmp");
+            File.WriteAllText(temporaryPath, JsonSerializer.Serialize(record, PluginJson.SerializerOptions));
+            File.Move(temporaryPath, markerPath, overwrite: true);
+        }
+    }
+
+    private static string? NormalizeFailureReason(string? reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason)) return null;
+        var normalized = reason.Trim();
+        return normalized.Length <= MaxFailureReasonLength
+            ? normalized
+            : normalized[..MaxFailureReasonLength] + "...";
+    }
+
     private static string _SafeFileName(string value)
     {
         if (!PluginPackageService.IsValidPluginId(value))
@@ -160,4 +275,14 @@ public static class PluginEnablementService
             template = fallback;
         return string.Format(Lang.Culture, template, args);
     }
+}
+
+public sealed class PluginSelfProtectionRecord
+{
+    public string PluginId { get; set; } = string.Empty;
+    public string PluginName { get; set; } = string.Empty;
+    public string? PluginVersion { get; set; }
+    public string? Reason { get; set; }
+    public DateTimeOffset DisabledAt { get; set; }
+    public bool NotificationShown { get; set; }
 }

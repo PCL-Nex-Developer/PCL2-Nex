@@ -3308,6 +3308,15 @@
     <sys:String x:Key="Plugins.Installed.Dialog.Title.PluginStatus">Plugin Status</sys:String>
     <sys:String x:Key="Plugins.Installed.Message.OperationFailed">Operation failed: {0}</sys:String>
     <sys:String x:Key="Plugins.Installed.Message.MoveFailed">Failed to adjust order: {0}</sys:String>
+    <sys:String x:Key="Plugins.SelfProtection.Label.StateDisabled">Disabled by launcher protection</sys:String>
+    <sys:String x:Key="Plugins.SelfProtection.Label.FailureReason">Load failure: {0}</sys:String>
+    <sys:String x:Key="Plugins.SelfProtection.Reason.Unknown">No error details are available</sys:String>
+    <sys:String x:Key="Plugins.SelfProtection.Dialog.Title">Plugin Disabled by the Launcher</sys:String>
+    <sys:String x:Key="Plugins.SelfProtection.Dialog.Message">Plugin {0} failed to load during startup and was disabled by launcher protection.&#x0a;&#x0a;Reason: {1}&#x0a;&#x0a;You can keep it disabled, or force-enable it and retry on the next startup. Force-enabling does not activate the plugin in the current session, and the plugin may fail again or affect launcher stability.</sys:String>
+    <sys:String x:Key="Plugins.SelfProtection.Button.KeepDisabled">Keep Disabled</sys:String>
+    <sys:String x:Key="Plugins.SelfProtection.Button.ForceEnable">Force Enable</sys:String>
+    <sys:String x:Key="Plugins.SelfProtection.Message.ForceEnabled">Plugin {0} has been force-enabled.&#x0a;Restart the launcher to retry loading it.</sys:String>
+    <sys:String x:Key="Plugins.SelfProtection.Message.ForceEnableFailed">Failed to force-enable the plugin: {0}</sys:String>
     <sys:String x:Key="Plugins.Installed.Message.PluginRunning">Plugin {0} is currently running.&#x0a;Please disable the plugin and restart the launcher before uninstalling.</sys:String>
     <sys:String x:Key="Plugins.Installed.Dialog.Title.CannotUninstall">Cannot Uninstall</sys:String>
     <sys:String x:Key="Plugins.Installed.Dialog.Message.ConfirmUninstall">Are you sure you want to uninstall plugin {0}?&#x0a;This will delete plugin files and data, and requires a launcher restart.</sys:String>

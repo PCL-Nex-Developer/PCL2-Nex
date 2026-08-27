@@ -3307,6 +3307,15 @@
     <sys:String x:Key="Plugins.Installed.Dialog.Title.PluginStatus">插件状态</sys:String>
     <sys:String x:Key="Plugins.Installed.Message.OperationFailed">操作失败: {0}</sys:String>
     <sys:String x:Key="Plugins.Installed.Message.MoveFailed">调整顺序失败: {0}</sys:String>
+    <sys:String x:Key="Plugins.SelfProtection.Label.StateDisabled">启动器保护性禁用</sys:String>
+    <sys:String x:Key="Plugins.SelfProtection.Label.FailureReason">加载失败: {0}</sys:String>
+    <sys:String x:Key="Plugins.SelfProtection.Reason.Unknown">无可用错误详情</sys:String>
+    <sys:String x:Key="Plugins.SelfProtection.Dialog.Title">插件已被启动器禁用</sys:String>
+    <sys:String x:Key="Plugins.SelfProtection.Dialog.Message">插件 {0} 在启动时加载失败，已由启动器保护性禁用。&#x0a;&#x0a;原因：{1}&#x0a;&#x0a;你可以保持禁用，或强制启用并在下次启动时重新尝试。强制启用不会让插件在本次运行中立即生效，且插件仍可能再次加载失败或影响启动器稳定性。</sys:String>
+    <sys:String x:Key="Plugins.SelfProtection.Button.KeepDisabled">保持禁用</sys:String>
+    <sys:String x:Key="Plugins.SelfProtection.Button.ForceEnable">强制启用</sys:String>
+    <sys:String x:Key="Plugins.SelfProtection.Message.ForceEnabled">插件 {0} 已强制启用。&#x0a;请重启启动器以重新尝试加载。</sys:String>
+    <sys:String x:Key="Plugins.SelfProtection.Message.ForceEnableFailed">强制启用插件失败: {0}</sys:String>
     <sys:String x:Key="Plugins.Installed.Message.PluginRunning">插件 {0} 正在运行。&#x0a;请先禁用插件并重启启动器，再进行卸载。</sys:String>
     <sys:String x:Key="Plugins.Installed.Dialog.Title.CannotUninstall">无法卸载</sys:String>
     <sys:String x:Key="Plugins.Installed.Dialog.Message.ConfirmUninstall">确定卸载插件 {0}？&#x0a;此操作将删除插件文件和数据，需要重启启动器。</sys:String>
