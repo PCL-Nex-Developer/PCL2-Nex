@@ -92,7 +92,7 @@ jobs:
     permissions:
       contents: write
       actions: read
-    needs: build
+    needs: [build, rename_and_release]
     runs-on: ubuntu-latest
     steps:
       - name: Download Linux Build Artifacts
@@ -118,4 +118,18 @@ jobs:
             artifacts/PCL2_Nex_Release_osx-*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Queue ModelScope release mirror
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if ! gh api \
+            --method POST \
+            "repos/$GITHUB_REPOSITORY/dispatches" \
+            -f event_type='mirror-modelscope-release' \
+            -f "client_payload[tag]=$RELEASE_TAG"; then
+            echo "::warning::GitHub Release assets were published, but the ModelScope mirror was not queued. Run the mirror workflow manually for $RELEASE_TAG."
+          fi
 

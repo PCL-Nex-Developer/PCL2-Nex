@@ -1,0 +1,223 @@
+name: Mirror Release to ModelScope
+
+on:
+  repository_dispatch:
+    types: [mirror-modelscope-release]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published GitHub Release tag
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: modelscope-mirror-${{ github.event.client_payload.tag || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    if: github.repository == 'PCL-Nex-Developer/PCL2-Nex'
+    runs-on: ubuntu-latest
+    env:
+      MODELSCOPE_DATASET: AnxunBCX/PCL_Nex
+      MODELSCOPE_BRANCH: master
+    steps:
+      - name: Resolve release tag
+        shell: bash
+        env:
+          DISPATCH_TAG: ${{ github.event.client_payload.tag }}
+          MANUAL_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          release_tag="${DISPATCH_TAG:-${MANUAL_TAG:-}}"
+          if [[ ! "$release_tag" =~ ^v[1-9][0-9]{3}\.(0[1-9]|1[0-2])\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Invalid release tag: $release_tag" >&2
+            exit 1
+          fi
+          echo "RELEASE_TAG=$release_tag" >> "$GITHUB_ENV"
+
+      - name: Download GitHub Release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          release_assets_dir="$RUNNER_TEMP/release-assets"
+          mkdir -p "$release_assets_dir"
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern 'PCL2_Nex_*' \
+            --pattern 'pcl2_*.deb' \
+            --pattern 'pcl2-*.rpm' \
+            --pattern 'pcl2-*.AppImage' \
+            --pattern 'PCL2-macOS-*.dmg' \
+            --dir "$release_assets_dir" \
+            --clobber
+          gh release view "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json body \
+            --jq '.body' > "$release_assets_dir/RELEASE_NOTE.md"
+          if [ "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq '.isPrerelease')" = true ]; then
+            echo 'BUILD_CONFIGURATION=Beta' >> "$GITHUB_ENV"
+          else
+            echo 'BUILD_CONFIGURATION=Release' >> "$GITHUB_ENV"
+          fi
+          echo "RELEASE_ASSETS_DIR=$release_assets_dir" >> "$GITHUB_ENV"
+
+      - name: Normalize legacy PCL asset layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RELEASE_ASSETS_DIR"
+          normalize_legacy_asset() {
+            local source="$1"
+            local target="$2"
+            if [ ! -e "$source" ]; then
+              return
+            fi
+            if [ -e "$target" ]; then
+              echo "Refusing ambiguous legacy asset mapping: $source and $target" >&2
+              exit 1
+            fi
+            mv -- "$source" "$target"
+          }
+
+          normalize_legacy_asset "PCL2_Nex_${BUILD_CONFIGURATION}_x64.exe" \
+            "PCL2_Nex_${BUILD_CONFIGURATION}_win-x64.exe"
+          normalize_legacy_asset "PCL2_Nex_${BUILD_CONFIGURATION}_x64.exe.asc" \
+            "PCL2_Nex_${BUILD_CONFIGURATION}_win-x64.exe.asc"
+          normalize_legacy_asset "PCL2_Nex_${BUILD_CONFIGURATION}_ARM64.exe" \
+            "PCL2_Nex_${BUILD_CONFIGURATION}_win-arm64.exe"
+          normalize_legacy_asset "PCL2_Nex_${BUILD_CONFIGURATION}_ARM64.exe.asc" \
+            "PCL2_Nex_${BUILD_CONFIGURATION}_win-arm64.exe.asc"
+          normalize_legacy_asset 'PCL2-macOS-x64.dmg' \
+            "PCL2_Nex_${BUILD_CONFIGURATION}_osx-x64.dmg"
+          normalize_legacy_asset 'PCL2-macOS-arm64.dmg' \
+            "PCL2_Nex_${BUILD_CONFIGURATION}_osx-arm64.dmg"
+
+          shopt -s nullglob
+          for source in pcl2_*.deb; do
+            normalize_legacy_asset "$source" "PCL2_Nex_${BUILD_CONFIGURATION}_linux-x64.deb"
+          done
+          for source in pcl2-*.rpm; do
+            normalize_legacy_asset "$source" "PCL2_Nex_${BUILD_CONFIGURATION}_linux-x64.rpm"
+          done
+          for source in pcl2-*.AppImage; do
+            normalize_legacy_asset "$source" "PCL2_Nex_${BUILD_CONFIGURATION}_linux-x64.AppImage"
+          done
+
+      - name: Verify release assets and create checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RELEASE_ASSETS_DIR"
+          mapfile -t release_assets < <(find . -maxdepth 1 -type f -name 'PCL2_Nex_*' -printf '%f\n' | LC_ALL=C sort)
+          if (( ${#release_assets[@]} == 0 )); then
+            echo 'No PCL2_Nex release assets were downloaded.' >&2
+            exit 1
+          fi
+
+          for runtime in win-x64 win-arm64; do
+            test -s "PCL2_Nex_${BUILD_CONFIGURATION}_${runtime}.exe"
+            test -s "PCL2_Nex_${BUILD_CONFIGURATION}_${runtime}.exe.asc"
+          done
+          for runtime in linux-x64 osx-x64 osx-arm64; do
+            if ! compgen -G "PCL2_Nex_${BUILD_CONFIGURATION}_${runtime}.*" > /dev/null; then
+              echo "Missing release asset for $runtime" >&2
+              exit 1
+            fi
+          done
+          for asset in "${release_assets[@]}"; do
+            test -s "$asset"
+          done
+          for asset in "${release_assets[@]}"; do
+            sha256sum "$asset"
+          done > SHA256SUMS
+
+      - name: Mirror release to ModelScope
+        shell: bash
+        env:
+          MODELSCOPE_TOKEN: ${{ secrets.MODELSCOPE_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${MODELSCOPE_TOKEN:-}" ]; then
+            echo 'MODELSCOPE_TOKEN is required' >&2
+            exit 1
+          fi
+
+          git lfs version
+
+          askpass="$RUNNER_TEMP/modelscope-askpass.sh"
+          mirror_dir="$RUNNER_TEMP/modelscope-release-mirror"
+          destination="releases/$RELEASE_TAG"
+          trap 'rm -f "$askpass"' EXIT
+          umask 077
+          cat > "$askpass" <<'EOF'
+          #!/usr/bin/env bash
+          case "$1" in
+            *Username*) printf '%s\n' 'oauth2' ;;
+            *Password*) printf '%s\n' "${MODELSCOPE_TOKEN:?}" ;;
+            *) exit 1 ;;
+          esac
+          EOF
+          chmod 700 "$askpass"
+
+          export GIT_ASKPASS="$askpass"
+          export GIT_TERMINAL_PROMPT=0
+          export GIT_LFS_SKIP_SMUDGE=1
+          git clone --depth 1 --branch "$MODELSCOPE_BRANCH" \
+            "https://www.modelscope.cn/datasets/$MODELSCOPE_DATASET.git" \
+            "$mirror_dir"
+          git -C "$mirror_dir" lfs install --local
+          git -C "$mirror_dir" lfs pull --include "$destination/**"
+          git -C "$mirror_dir" lfs track '*.exe' '*.deb' '*.rpm' '*.AppImage' '*.dmg'
+
+          mkdir -p "$mirror_dir/$destination"
+          while IFS= read -r -d '' source; do
+            name="$(basename "$source")"
+            target="$mirror_dir/$destination/$name"
+            if [ -e "$target" ] && ! cmp -s "$source" "$target"; then
+              echo "Refusing to overwrite the existing release file: $destination/$name" >&2
+              exit 1
+            fi
+            cp -- "$source" "$target"
+          done < <(find "$RELEASE_ASSETS_DIR" -maxdepth 1 -type f -name 'PCL2_Nex_*' -print0)
+          for file in SHA256SUMS; do
+            source="$RELEASE_ASSETS_DIR/$file"
+            target="$mirror_dir/$destination/$file"
+            if [ -e "$target" ] && ! cmp -s "$source" "$target"; then
+              echo "Refusing to overwrite the existing release file: $destination/$file" >&2
+              exit 1
+            fi
+            cp -- "$source" "$target"
+          done
+          cp -- "$RELEASE_ASSETS_DIR/RELEASE_NOTE.md" "$mirror_dir/$destination/RELEASE_NOTE.md"
+
+          git -C "$mirror_dir" config user.name 'github-actions[bot]'
+          git -C "$mirror_dir" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C "$mirror_dir" add .gitattributes "$destination"
+          if git -C "$mirror_dir" diff --cached --quiet; then
+            echo "ModelScope already contains release $RELEASE_TAG."
+          else
+            git -C "$mirror_dir" commit -m "Mirror PCL2 Nex $RELEASE_TAG"
+            for attempt in 1 2 3; do
+              if git -C "$mirror_dir" push origin "HEAD:$MODELSCOPE_BRANCH"; then
+                break
+              fi
+              if [ "$attempt" -eq 3 ]; then
+                echo 'Unable to push the ModelScope mirror after three attempts.' >&2
+                exit 1
+              fi
+              git -C "$mirror_dir" pull --rebase origin "$MODELSCOPE_BRANCH"
+            done
+          fi
+
+          modelscope_url="https://www.modelscope.cn/datasets/$MODELSCOPE_DATASET/tree/$MODELSCOPE_BRANCH/$destination"
+          {
+            echo '## ModelScope mirror'
+            echo
+            echo "Mirrored release $RELEASE_TAG to [$MODELSCOPE_DATASET]($modelscope_url)."
+          } >> "$GITHUB_STEP_SUMMARY"
