@@ -15,6 +15,9 @@ namespace PCL;
 
 public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格式
 {
+    private const string ModelScopePatchBaseUrl =
+        "https://www.modelscope.cn/datasets/AnxunBCX/PCL_Nex/resolve/master/static/patch/";
+
     private readonly string _baseUrl;
 
     private Dictionary<string, string> _remoteCache;
@@ -100,14 +103,20 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
                 patchUpdate = true;
                 tempPath += patchFileName;
                 load.output = new List<DownloadFile>
-                    { new(new[] { $"{_baseUrl}static/patch/{patchFileName}" }, tempPath) };
+                {
+                    new(new[]
+                    {
+                        $"{ModelScopePatchBaseUrl}{patchFileName}",
+                        $"{_baseUrl}static/patch/{patchFileName}"
+                    }, tempPath)
+                };
             }
             else
             {
                 patchUpdate = false;
 
                 tempPath += $"{deJsonData.Sha256}.bin";
-                load.output = new List<DownloadFile> { new(RandomUtils.Shuffle(deJsonData.Downloads), tempPath) };
+                load.output = new List<DownloadFile> { new(deJsonData.Downloads, tempPath) };
             }
         }));
         loaders.Add(new LoaderDownload(Lang.Text("Update.Task.DownloadFile"), new List<DownloadFile>()));

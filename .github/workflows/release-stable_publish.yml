@@ -10,17 +10,21 @@ on:
 jobs:
   build:
     if: ${{ !github.event.release.prerelease }}
+    permissions:
+      contents: write
     uses: ./.github/workflows/reusable-build.yml
     with:
       configuration: Release
       tag: ${{ github.event.release.tag_name }}
+      publish_release: true
     secrets: inherit
 
-  changelog:
+  finalize_release:
+    name: Finalize release and ModelScope mirror
+    needs: build
     permissions:
       contents: write
     runs-on: ubuntu-latest
-    continue-on-error: true
     if: ${{ !github.event.release.prerelease }}
     steps:
       - name: Checkout all
@@ -30,95 +34,19 @@ jobs:
 
       - name: Install git-cliff
         uses: taiki-e/install-action@git-cliff
+        continue-on-error: true
 
       - name: Generate changelog
         run: git-cliff --latest -o CHANGELOG.md
+        continue-on-error: true
 
       - name: Add changelog to release
+        if: ${{ hashFiles('CHANGELOG.md') != '' }}
         uses: softprops/action-gh-release@v2.2.2
+        continue-on-error: true
         with:
           tag_name: ${{ github.event.release.tag_name }}
           body_path: CHANGELOG.md
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  rename_and_release:
-    permissions:
-      contents: write
-      actions: write
-    needs: [build, changelog]
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - configuration: Release
-            architecture: x64
-            runtime: win-x64
-          - configuration: Release
-            architecture: ARM64
-            runtime: win-arm64
-    steps:
-      - name: Download Build Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: PCL2_Nex_${{ matrix.configuration }}_${{ matrix.runtime }}
-          path: ./artifact
-
-      - name: Rename binaries
-        run: |
-          mv "./artifact/Plain Craft Launcher 2.exe" "PCL2_Nex_${{ matrix.configuration }}_${{ matrix.runtime }}.exe"
-
-      - name: Import GPG key
-        uses: crazy-max/ghaction-import-gpg@v6
-        with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.GPG_PASSPHRASE }}
-
-      - name: Sign the binary
-        run: |
-          gpg --detach-sign --armor "PCL2_Nex_${{ matrix.configuration }}_${{ matrix.runtime }}.exe"
-
-      - name: Upload binary and signature to Release
-        uses: softprops/action-gh-release@v2.5.0
-        with:
-          files: |
-            PCL2_Nex_${{ matrix.configuration }}_${{ matrix.runtime }}.exe
-            PCL2_Nex_${{ matrix.configuration }}_${{ matrix.runtime }}.exe.asc
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  release_cross_platform:
-    if: ${{ !github.event.release.prerelease }}
-    permissions:
-      contents: write
-      actions: read
-    needs: [build, rename_and_release]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout mirror script
-        uses: actions/checkout@v6
-
-      - name: Download Linux Build Artifacts
-        uses: actions/download-artifact@v5
-        with:
-          path: ./artifacts
-          pattern: PCL2_Nex_Release_linux-*
-          merge-multiple: true
-
-      - name: Download macOS Build Artifacts
-        uses: actions/download-artifact@v5
-        with:
-          path: ./artifacts
-          pattern: PCL2_Nex_Release_osx-*
-          merge-multiple: true
-
-      - name: Upload Linux and macOS Builds to Release
-        uses: softprops/action-gh-release@v2.5.0
-        with:
-          tag_name: ${{ github.event.release.tag_name }}
-          files: |
-            artifacts/PCL2_Nex_Release_linux-*
-            artifacts/PCL2_Nex_Release_osx-*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

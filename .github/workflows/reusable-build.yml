@@ -1,7 +1,7 @@
 name: Build (Reusable)
 
 permissions:
-  contents: read
+  contents: write
 
 on:
   workflow_call:
@@ -14,6 +14,11 @@ on:
         required: false
         type: string
         default: ''
+      publish_release:
+        description: Publish each matrix build directly to the GitHub Release
+        required: false
+        type: boolean
+        default: false
 
 env:
   DOTNET_VERSION: '10.0.x'
@@ -178,15 +183,47 @@ jobs:
             exit 1
           fi
 
-      - name: Upload Windows Build Artifact
-        if: matrix.kind == 'windows'
+      - name: Normalize Windows release filename
+        if: inputs.publish_release && matrix.kind == 'windows'
+        shell: bash
+        run: |
+          mkdir -p release-artifact
+          mv "./artifact/Plain Craft Launcher 2.exe" \
+            "release-artifact/PCL2_Nex_${{ inputs.configuration }}_${{ matrix.runtime }}.exe"
+
+      - name: Import GPG key
+        if: inputs.publish_release && matrix.kind == 'windows'
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Sign Windows release binary
+        if: inputs.publish_release && matrix.kind == 'windows'
+        shell: bash
+        run: |
+          gpg --detach-sign --armor \
+            "release-artifact/PCL2_Nex_${{ inputs.configuration }}_${{ matrix.runtime }}.exe"
+
+      - name: Upload build directly to GitHub Release
+        if: inputs.publish_release
+        uses: softprops/action-gh-release@v2.5.0
+        with:
+          tag_name: ${{ inputs.tag }}
+          files: release-artifact/*
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Upload Windows CI artifact
+        if: ${{ !inputs.publish_release && matrix.kind == 'windows' }}
         uses: actions/upload-artifact@v7
         with:
           name: PCL2_Nex_${{ inputs.configuration }}_${{ matrix.runtime }}
           path: artifact/**
 
-      - name: Upload Linux or macOS Build Artifact
-        if: matrix.kind == 'cross-platform'
+      - name: Upload Linux or macOS CI artifact
+        if: ${{ !inputs.publish_release && matrix.kind == 'cross-platform' }}
         uses: actions/upload-artifact@v7
         with:
           name: PCL2_Nex_${{ inputs.configuration }}_${{ matrix.runtime }}
