@@ -158,70 +158,86 @@ jobs:
             fi
           done
 
-      - name: Normalize Linux and macOS release filenames
-        if: matrix.kind == 'cross-platform'
+      - name: Normalize release filenames
         shell: bash
+        env:
+          BUILD_KIND: ${{ matrix.kind }}
+          BUILD_CONFIGURATION: ${{ inputs.configuration }}
+          BUILD_RUNTIME: ${{ matrix.runtime }}
         run: |
-          mkdir -p release-artifact
+          set -euo pipefail
+          mkdir -p artifact
           found=0
-          while IFS= read -r -d '' package; do
-            case "$package" in
-              *.deb) extension=deb ;;
-              *.rpm) extension=rpm ;;
-              *.AppImage) extension=AppImage ;;
-              *.dmg) extension=dmg ;;
-              *) continue ;;
-            esac
-            mv "$package" "release-artifact/PCL2_Nex_${{ inputs.configuration }}_${{ matrix.runtime }}.${extension}"
+
+          if [[ "$BUILD_KIND" == 'windows' ]]; then
+            source='./artifact/Plain Craft Launcher 2.exe'
+            target="artifact/PCL2_Nex_${BUILD_CONFIGURATION}_${BUILD_RUNTIME}.exe"
+            if [[ ! -s "$source" ]]; then
+              echo "Windows release executable is missing: $source" >&2
+              exit 1
+            fi
+            mv "$source" "$target"
             found=1
-          done < <(find dist -type f -print0)
+          else
+            while IFS= read -r -d '' package; do
+              case "$package" in
+                *.deb) extension=deb ;;
+                *.rpm) extension=rpm ;;
+                *.AppImage) extension=AppImage ;;
+                *.dmg) extension=dmg ;;
+                *) continue ;;
+              esac
+              target="artifact/PCL2_Nex_${BUILD_CONFIGURATION}_${BUILD_RUNTIME}.${extension}"
+              if [[ -e "$target" ]]; then
+                echo "Multiple packages resolve to the same release filename: $target" >&2
+                exit 1
+              fi
+              mv "$package" "$target"
+              found=1
+            done < <(find dist -type f -print0)
+          fi
+
           if (( found == 0 )); then
             echo 'No supported release package was produced.' >&2
             exit 1
           fi
 
-      - name: Normalize Windows release filename
-        if: inputs.publish_release && matrix.kind == 'windows'
-        shell: bash
-        run: |
-          mkdir -p release-artifact
-          mv "./artifact/Plain Craft Launcher 2.exe" \
-            "release-artifact/PCL2_Nex_${{ inputs.configuration }}_${{ matrix.runtime }}.exe"
-
       - name: Import GPG key
-        if: inputs.publish_release && matrix.kind == 'windows'
+        if: inputs.publish_release
         uses: crazy-max/ghaction-import-gpg@v6
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
-      - name: Sign Windows release binary
-        if: inputs.publish_release && matrix.kind == 'windows'
+      - name: Sign release artifacts
+        if: inputs.publish_release
         shell: bash
         run: |
-          gpg --detach-sign --armor \
-            "release-artifact/PCL2_Nex_${{ inputs.configuration }}_${{ matrix.runtime }}.exe"
+          set -euo pipefail
+          found=0
+          while IFS= read -r -d '' asset; do
+            gpg --batch --yes --detach-sign --armor "$asset"
+            found=1
+          done < <(find artifact -maxdepth 1 -type f -name 'PCL2_Nex_*' ! -name '*.asc' -print0)
+          if (( found == 0 )); then
+            echo 'No normalized release artifact was found to sign.' >&2
+            exit 1
+          fi
 
       - name: Upload build directly to GitHub Release
         if: inputs.publish_release
         uses: softprops/action-gh-release@v2.5.0
         with:
           tag_name: ${{ inputs.tag }}
-          files: release-artifact/*
+          files: artifact/PCL2_Nex_*
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
-      - name: Upload Windows CI artifact
-        if: ${{ !inputs.publish_release && matrix.kind == 'windows' }}
+      - name: Upload CI artifact
+        if: ${{ !inputs.publish_release }}
         uses: actions/upload-artifact@v7
         with:
           name: PCL2_Nex_${{ inputs.configuration }}_${{ matrix.runtime }}
           path: artifact/**
-
-      - name: Upload Linux or macOS CI artifact
-        if: ${{ !inputs.publish_release && matrix.kind == 'cross-platform' }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: PCL2_Nex_${{ inputs.configuration }}_${{ matrix.runtime }}
-          path: release-artifact/**
+          if-no-files-found: error

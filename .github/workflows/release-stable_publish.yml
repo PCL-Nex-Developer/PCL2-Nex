@@ -42,7 +42,7 @@ jobs:
 
       - name: Add changelog to release
         if: ${{ hashFiles('CHANGELOG.md') != '' }}
-        uses: softprops/action-gh-release@v2.2.2
+        uses: softprops/action-gh-release@v2.5.0
         continue-on-error: true
         with:
           tag_name: ${{ github.event.release.tag_name }}

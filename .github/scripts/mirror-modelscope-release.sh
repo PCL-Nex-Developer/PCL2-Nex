@@ -25,11 +25,7 @@ mkdir -p "$release_assets_dir"
 
 gh release download "$RELEASE_TAG" \
   --repo "$GITHUB_REPOSITORY" \
-  --pattern 'PCL2_Nex_*' \
-  --pattern 'pcl2_*.deb' \
-  --pattern 'pcl2-*.rpm' \
-  --pattern 'pcl2-*.AppImage' \
-  --pattern 'PCL2-macOS-*.dmg' \
+  --pattern "PCL2_Nex_${BUILD_CONFIGURATION}_*" \
   --dir "$release_assets_dir" \
   --clobber
 gh release view "$RELEASE_TAG" \
@@ -37,74 +33,52 @@ gh release view "$RELEASE_TAG" \
   --json body \
   --jq '.body' > "$release_assets_dir/RELEASE_NOTE.md"
 
-normalize_legacy_asset() {
-  local source="$1"
-  local target="$2"
-  if [[ ! -e "$release_assets_dir/$source" ]]; then
-    return
-  fi
-  if [[ -e "$release_assets_dir/$target" ]]; then
-    echo "Refusing ambiguous legacy asset mapping: $source and $target" >&2
-    exit 1
-  fi
-  mv -- "$release_assets_dir/$source" "$release_assets_dir/$target"
-}
-
-normalize_legacy_asset \
-  "PCL2_Nex_${BUILD_CONFIGURATION}_x64.exe" \
-  "PCL2_Nex_${BUILD_CONFIGURATION}_win-x64.exe"
-normalize_legacy_asset \
-  "PCL2_Nex_${BUILD_CONFIGURATION}_x64.exe.asc" \
-  "PCL2_Nex_${BUILD_CONFIGURATION}_win-x64.exe.asc"
-normalize_legacy_asset \
-  "PCL2_Nex_${BUILD_CONFIGURATION}_ARM64.exe" \
-  "PCL2_Nex_${BUILD_CONFIGURATION}_win-arm64.exe"
-normalize_legacy_asset \
-  "PCL2_Nex_${BUILD_CONFIGURATION}_ARM64.exe.asc" \
-  "PCL2_Nex_${BUILD_CONFIGURATION}_win-arm64.exe.asc"
-normalize_legacy_asset \
-  'PCL2-macOS-x64.dmg' \
-  "PCL2_Nex_${BUILD_CONFIGURATION}_osx-x64.dmg"
-normalize_legacy_asset \
-  'PCL2-macOS-arm64.dmg' \
-  "PCL2_Nex_${BUILD_CONFIGURATION}_osx-arm64.dmg"
-
-shopt -s nullglob
-for source in "$release_assets_dir"/pcl2_*.deb; do
-  normalize_legacy_asset \
-    "$(basename "$source")" \
-    "PCL2_Nex_${BUILD_CONFIGURATION}_linux-x64.deb"
-done
-for source in "$release_assets_dir"/pcl2-*.rpm; do
-  normalize_legacy_asset \
-    "$(basename "$source")" \
-    "PCL2_Nex_${BUILD_CONFIGURATION}_linux-x64.rpm"
-done
-for source in "$release_assets_dir"/pcl2-*.AppImage; do
-  normalize_legacy_asset \
-    "$(basename "$source")" \
-    "PCL2_Nex_${BUILD_CONFIGURATION}_linux-x64.AppImage"
-done
-
 mapfile -t release_assets < <(
   find "$release_assets_dir" -maxdepth 1 -type f -name 'PCL2_Nex_*' -printf '%f\n' |
+    LC_ALL=C sort
+)
+mapfile -t release_products < <(
+  find "$release_assets_dir" -maxdepth 1 -type f -name 'PCL2_Nex_*' ! -name '*.asc' -printf '%f\n' |
     LC_ALL=C sort
 )
 if (( ${#release_assets[@]} == 0 )); then
   echo 'No PCL2_Nex release assets were downloaded.' >&2
   exit 1
 fi
+if (( ${#release_products[@]} == 0 )); then
+  echo 'No signed release product was downloaded.' >&2
+  exit 1
+fi
 
-for runtime in win-x64 win-arm64; do
-  test -s "$release_assets_dir/PCL2_Nex_${BUILD_CONFIGURATION}_${runtime}.exe"
-  test -s "$release_assets_dir/PCL2_Nex_${BUILD_CONFIGURATION}_${runtime}.exe.asc"
-done
-for runtime in linux-x64 osx-x64 osx-arm64; do
-  if ! compgen -G "$release_assets_dir/PCL2_Nex_${BUILD_CONFIGURATION}_${runtime}.*" > /dev/null; then
-    echo "Missing release asset for $runtime" >&2
+expected_products=(
+  "PCL2_Nex_${BUILD_CONFIGURATION}_win-x64.exe"
+  "PCL2_Nex_${BUILD_CONFIGURATION}_win-arm64.exe"
+  "PCL2_Nex_${BUILD_CONFIGURATION}_linux-x64.AppImage"
+  "PCL2_Nex_${BUILD_CONFIGURATION}_linux-x64.deb"
+  "PCL2_Nex_${BUILD_CONFIGURATION}_linux-x64.rpm"
+  "PCL2_Nex_${BUILD_CONFIGURATION}_osx-x64.dmg"
+  "PCL2_Nex_${BUILD_CONFIGURATION}_osx-arm64.dmg"
+)
+for product in "${expected_products[@]}"; do
+  if [[ ! -s "$release_assets_dir/$product" ]]; then
+    echo "Missing release product: $product" >&2
+    exit 1
+  fi
+  if [[ ! -s "$release_assets_dir/$product.asc" ]]; then
+    echo "Missing release signature: $product.asc" >&2
     exit 1
   fi
 done
+if (( ${#release_products[@]} != ${#expected_products[@]} )); then
+  echo "Expected ${#expected_products[@]} release products, found ${#release_products[@]}." >&2
+  printf 'Downloaded product: %s\n' "${release_products[@]}" >&2
+  exit 1
+fi
+if (( ${#release_assets[@]} != ${#expected_products[@]} * 2 )); then
+  echo "Expected one signature per release product, found ${#release_assets[@]} total release files." >&2
+  printf 'Downloaded release file: %s\n' "${release_assets[@]}" >&2
+  exit 1
+fi
 for asset in "${release_assets[@]}"; do
   test -s "$release_assets_dir/$asset"
 done
