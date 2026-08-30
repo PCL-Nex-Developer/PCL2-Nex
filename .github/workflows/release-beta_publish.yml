@@ -95,6 +95,9 @@ jobs:
     needs: [build, rename_and_release]
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout mirror script
+        uses: actions/checkout@v6
+
       - name: Download Linux Build Artifacts
         uses: actions/download-artifact@v5
         with:
@@ -119,17 +122,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Queue ModelScope release mirror
+      - name: Mirror release to ModelScope
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          MODELSCOPE_TOKEN: ${{ secrets.MODELSCOPE_TOKEN }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
+          BUILD_CONFIGURATION: Beta
         run: |
-          if ! gh api \
-            --method POST \
-            "repos/$GITHUB_REPOSITORY/dispatches" \
-            -f event_type='mirror-modelscope-release' \
-            -f "client_payload[tag]=$RELEASE_TAG"; then
-            echo "::warning::GitHub Release assets were published, but the ModelScope mirror was not queued. Run the mirror workflow manually for $RELEASE_TAG."
-          fi
+          bash .github/scripts/mirror-modelscope-release.sh
 
