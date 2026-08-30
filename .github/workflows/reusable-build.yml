@@ -1,8 +1,5 @@
 name: Build (Reusable)
 
-permissions:
-  contents: write
-
 on:
   workflow_call:
     inputs:
