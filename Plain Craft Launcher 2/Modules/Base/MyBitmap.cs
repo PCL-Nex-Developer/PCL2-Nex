@@ -132,7 +132,9 @@ public sealed class MyBitmap
             : new FormatConvertedBitmap(_source, PixelFormats.Bgra32, null, 0);
         var pixels = new byte[4];
         normalized.CopyPixels(new Int32Rect(x, y, 1, 1), pixels, 4, 0);
-        return System.Windows.Media.Color.FromArgb(pixels[3], pixels[2], pixels[1], pixels[0]);
+        return OperatingSystem.IsWindows()
+            ? System.Windows.Media.Color.FromArgb(pixels[3], pixels[2], pixels[1], pixels[0])
+            : System.Windows.Media.Color.FromArgb(pixels[3], pixels[0], pixels[1], pixels[2]);
     }
 
     public void Save(string filePath)
@@ -141,7 +143,7 @@ public sealed class MyBitmap
         var directory = Path.GetDirectoryName(filePath);
         if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
 
-        using var png = ImageConverter.Bgra32ToPng(GetPixels(), PixelWidth, PixelHeight);
+        using var png = EncodePixels(GetPixels(), PixelWidth, PixelHeight);
         using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
         png.CopyTo(fileStream);
     }
@@ -222,9 +224,14 @@ public sealed class MyBitmap
             return source;
         }
 
-        using var png = ImageConverter.Bgra32ToPng(pixels, width, height);
+        using var png = EncodePixels(pixels, width, height);
         return Decode(png);
     }
+
+    private static MemoryStream EncodePixels(byte[] pixels, int width, int height) =>
+        OperatingSystem.IsWindows()
+            ? ImageConverter.Bgra32ToPng(pixels, width, height)
+            : ImageConverter.Rgba32ToPng(pixels, width, height);
 
     private byte[] GetPixels()
     {

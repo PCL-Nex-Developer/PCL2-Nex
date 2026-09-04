@@ -3,7 +3,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
-using Clipboard = System.Windows.Forms.Clipboard;
 
 // Author: uye (owner of the MaaAssistantArknights team)
 // Original Source: MaaAssistantArknights project - https://github.com/MaaAssistantArknights/MaaAssistantArknights

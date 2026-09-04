@@ -45,6 +45,8 @@ public static class Tooltip
     private const double TipLineHeight = 17;
     private const int AnimLength = 80;
     private const int AnimExit = 80;
+    private const double CursorOffsetX = 16;
+    private const double CursorOffsetY = 20;
 
     private static readonly Thickness _InnerPad = new(12, 10, 12, 10);
     private static readonly DropShadowEffect _Shadow = new()
@@ -181,9 +183,7 @@ public static class Tooltip
         fe.Dispatcher.BeginInvoke(() => _TryClaim(fe));
     }
 
-    private static bool _IsCursorPlaced(FrameworkElement el) =>
-        OperatingSystem.IsWindows() && GetFollowCursor(el) &&
-        ToolTipService.GetPlacement(el) is PlacementMode.Mouse or PlacementMode.MousePoint;
+    private static bool _IsCursorPlaced(FrameworkElement el) => GetFollowCursor(el);
 
     private static void OnPress(object s, MouseButtonEventArgs e)
     {
@@ -590,13 +590,14 @@ public static class Tooltip
         _flyout!.PlacementTarget = target;
         var mode = ToolTipService.GetPlacement(target);
 
-        // Cursor-relative popups can cover the control receiving the click on non-Windows hosts.
-        if (!OperatingSystem.IsWindows() && mode is PlacementMode.Mouse or PlacementMode.MousePoint)
+        // Keep the popup away from the pointer so it cannot obscure the control's hit area.
+        // Fixed ToolTipService placements are still available through Tooltip.FollowCursor="False".
+        if (GetFollowCursor(target))
         {
-            _flyout.Placement = PlacementMode.Bottom;
+            _flyout.Placement = PlacementMode.Relative;
             _flyout.PlacementRectangle = default;
-            _flyout.HorizontalOffset = ToolTipService.GetHorizontalOffset(target);
-            _flyout.VerticalOffset = 6 + ToolTipService.GetVerticalOffset(target);
+            _flyout.HorizontalOffset = Math.Round(pt.X + CursorOffsetX + ToolTipService.GetHorizontalOffset(target));
+            _flyout.VerticalOffset = Math.Round(pt.Y + CursorOffsetY + ToolTipService.GetVerticalOffset(target));
             return;
         }
 

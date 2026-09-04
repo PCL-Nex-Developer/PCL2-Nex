@@ -37,10 +37,12 @@ public static class ModFolder
 
     /// <summary>
     /// Expands the legacy '$' marker used for portable Windows installations and normalizes old separators.
+    /// An empty value represents that no Minecraft folder has been selected yet.
     /// </summary>
     public static string ResolveMinecraftFolderPath(string value)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+        if (string.IsNullOrWhiteSpace(value))
+            return "";
         var path = value.StartsWith('$')
             ? FileSystemPath.Combine(ModBase.exePath, value[1..])
             : value;

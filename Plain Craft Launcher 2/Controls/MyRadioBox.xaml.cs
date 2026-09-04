@@ -46,8 +46,10 @@ public partial class MyRadioBox : IMyRadio
     public MyRadioBox()
     {
         InitializeComponent();
-        MouseLeftButtonUp += (_, _) => Radiobox_MouseUp();
-        MouseLeftButtonDown += (_, _) => Radiobox_MouseDown();
+        // XPF's ScrollViewer consumes the bubbling mouse events used by selection dialogs.
+        // Listen on the preview route, as MyListItem does, so dynamically hosted radios remain clickable.
+        PreviewMouseLeftButtonUp += (_, _) => Radiobox_MouseUp();
+        PreviewMouseLeftButtonDown += (_, _) => Radiobox_MouseDown();
         MouseLeave += (_, _) => Radiobox_MouseLeave();
         IsEnabledChanged += (_, _) => Radiobox_IsEnabledChanged();
         MouseEnter += (_, _) => Radiobox_MouseEnterAnimation();

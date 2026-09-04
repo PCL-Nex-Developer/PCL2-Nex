@@ -92,6 +92,19 @@ public static class ImageConverter
         return output;
     }
 
+    public static MemoryStream Rgba32ToPng(byte[] pixels, int width, int height)
+    {
+        ArgumentNullException.ThrowIfNull(pixels);
+        if (width <= 0 || height <= 0 || pixels.Length != checked(width * height * 4))
+            throw new ArgumentException("Pixel buffer dimensions do not match its length.", nameof(pixels));
+
+        using var image = Image.LoadPixelData<Rgba32>(pixels, width, height);
+        var output = new MemoryStream();
+        image.Save(output, CreateCanonicalPngEncoder());
+        output.Position = 0;
+        return output;
+    }
+
     private static PngEncoder CreateCanonicalPngEncoder() => new()
     {
         BitDepth = PngBitDepth.Bit8,

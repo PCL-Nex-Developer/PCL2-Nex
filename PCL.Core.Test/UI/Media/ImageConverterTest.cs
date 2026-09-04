@@ -46,6 +46,22 @@ public class ImageConverterTest
     }
 
     [TestMethod]
+    public void Rgba32ToPng_ShouldPreserveChannelsAndAlpha()
+    {
+        byte[] pixels =
+        [
+            255, 0, 0, 255,
+            0, 0, 255, 64
+        ];
+
+        using var png = ImageConverter.Rgba32ToPng(pixels, 2, 1);
+        using var result = Image.Load<Rgba32>(png);
+
+        Assert.AreEqual(new Rgba32(255, 0, 0, 255), result[0, 0]);
+        Assert.AreEqual(new Rgba32(0, 0, 255, 64), result[1, 0]);
+    }
+
+    [TestMethod]
     public void NormalizeToPng_ShouldProduceCanonicalRgbaForRgbAndGrayscaleInputs()
     {
         using var rgb = new Image<Rgb24>(1, 1);

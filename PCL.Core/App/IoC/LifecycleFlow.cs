@@ -39,7 +39,14 @@ partial class Lifecycle
         AppDomain.CurrentDomain.ProcessExit += (_, _) => _Exit();
         TaskScheduler.UnobservedTaskException += (_, e) =>
         {
-            Context.Error("未观测到的异步任务异常", e.Exception);
+            var details = e.Exception.ToString();
+            var unavailableDesktopMenu = !OperatingSystem.IsWindows() &&
+                details.Contains("org.freedesktop.DBus.Error.ServiceUnknown", StringComparison.Ordinal) &&
+                details.Contains("com.canonical.AppMenu.Registrar", StringComparison.Ordinal);
+            if (unavailableDesktopMenu)
+                Context.Debug("桌面环境未提供全局菜单服务，已忽略");
+            else
+                Context.Error("未观测到的异步任务异常", e.Exception);
             e.SetObserved();
         };
         // 添加系统服务
