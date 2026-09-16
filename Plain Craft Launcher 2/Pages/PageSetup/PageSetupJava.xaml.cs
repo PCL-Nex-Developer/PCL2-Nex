@@ -32,8 +32,11 @@ public partial class PageSetupJava
 
     private void Load_GetJavaList(ModLoader.LoaderTask<bool, List<JavaEntry>> loader)
     {
-        if (loader.input)
+        if (loader.input || loader.isForceRestarting)
+        {
             JavaService.JavaManager.ScanJavaAsync(force: loader.isForceRestarting).GetAwaiter().GetResult();
+            JavaService.JavaManager.CheckAllAvailability();
+        }
         loader.output = ModJava.Javas.GetSortedJavaList();
     }
 
