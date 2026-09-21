@@ -63,45 +63,50 @@ public class HttpProxyManager : IWebProxy, IDisposable
     {
         if (proxyString.IsNullOrWhiteSpace()) return [];
 
-        // 形式：http=192.168.1.100:8080;socks=192.168.1.100:1080
+        // 含 '=' 的形式：http=192.168.1.100:8080;socks=192.168.1.100:1080;ftp=127.0.0.1:124
+        // 也可以是 http=http://127.0.0.1:10808
         if (proxyString.Contains('='))
         {
             var items = new List<ProxyItem>();
             foreach (var segment in proxyString.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
-                var eqIndex = segment.IndexOf('=');
-                if (eqIndex <= 0 || eqIndex >= segment.Length - 1)
-                    continue;
-
-                var protocolStr = segment[..eqIndex].Trim();
-                var address = segment[(eqIndex + 1)..].Trim();
-
-                if (string.IsNullOrWhiteSpace(address))
-                    continue;
-
-                if (Uri.TryCreate(address, new UriCreationOptions(), out var proxyUri) && !proxyUri.Host.IsNullOrEmpty())
-                    address = proxyUri.Port > 0 ? $"{proxyUri.Host}:{proxyUri.Port}" : proxyUri.Host;
-                items.Add(new ProxyItem(_ParseProtocol(protocolStr), address));
+                if (_ParseKeyValueSegment(segment) is { } item)
+                    items.Add(item);
             }
-
             return [.. items];
         }
 
         // 形式：http://127.0.0.1:1145/ 或者单纯 127.0.0.1:1145
-        var ret = new List<ProxyItem>();
-        if (Uri.TryCreate(proxyString, new UriCreationOptions(), out var proxyAddr))
+        var proxy = _ParseAddress(proxyString.Trim());
+        return proxy is null ? [] : [proxy];
+    }
+
+    /// <summary>解析 <c>protocol=address</c> 形式的段；格式非法时返回 null 以便忽略该段</summary>
+    private static ProxyItem? _ParseKeyValueSegment(string segment)
+    {
+        var eqIndex = segment.IndexOf('=');
+        // 缺少 '='、协议名或地址的段视为非法，直接忽略
+        if (eqIndex <= 0 || eqIndex >= segment.Length - 1) return null;
+
+        return _ParseAddress(
+            segment[(eqIndex + 1)..].Trim(),
+            _ParseProtocol(segment[..eqIndex].Trim()));
+    }
+
+    /// <summary>解析单个代理地址：支持带 scheme 的地址（如 http://127.0.0.1:10808）与纯 host:port 地址（如 127.0.0.1:1145）</summary>
+    private static ProxyItem? _ParseAddress(string address, ProxyProtocol? protocol = null)
+    {
+        if (address.IsNullOrWhiteSpace()) return null;
+
+        // 能解析出主机名的地址，规范化为 host:port
+        if (Uri.TryCreate(address, new UriCreationOptions(), out var uri) && !uri.Host.IsNullOrEmpty())
         {
-            var address = proxyAddr.Port > 0
-                ? $"{proxyAddr.Host}:{proxyAddr.Port}"
-                : proxyAddr.Host;
-            ret.Add(new ProxyItem(_ParseProtocol(proxyAddr.Scheme), address));
-        }
-        else
-        {
-            ret.Add(new ProxyItem(ProxyProtocol.Http, proxyString.Trim()));
+            var hostPort = uri.Port > 0 ? $"{uri.Host}:{uri.Port}" : uri.Host;
+            return new ProxyItem(protocol ?? _ParseProtocol(uri.Scheme), hostPort);
         }
 
-        return [.. ret];
+        // 纯 host:port 地址（无法作为 URI 解析），按指定协议（默认 Http）原样使用
+        return new ProxyItem(protocol ?? ProxyProtocol.Http, address);
     }
 
     private static ProxyProtocol _ParseProtocol(string scheme)
