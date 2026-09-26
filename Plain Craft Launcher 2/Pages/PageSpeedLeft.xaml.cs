@@ -42,7 +42,12 @@ public partial class PageSpeedLeft
             return;
         isLoad = true;
 
-        // 非调试模式隐藏线程数
+        // 监控定时器
+        var timer = new DispatcherTimer { Interval = new TimeSpan(0, 0, 0, 0, watcherInterval) };
+        timer.Tick += (_, _) => Watcher();
+        timer.Start();
+
+        // 非调试模式隐藏连接数
         if (!ModBase.modeDebug)
         {
             RowDefinitions[12].Height = new GridLength(0d);
@@ -71,7 +76,7 @@ public partial class PageSpeedLeft
                 LabProgress.Text = Lang.Number(1d, "P0");
                 LabSpeed.Text = ModBase.GetString(0) + "/s";
                 LabFile.Text = Lang.Number(0, "N0");
-                LabThread.Text = Lang.Number(0, "N0") + " / " + Lang.Number(ModNet.NetTaskThreadLimit, "N0");
+                LabThread.Text = Lang.Number(0, "N0") + " / " + Lang.Number(ModNet.NetTaskConnectionLimit, "N0");
             }
             else
             {
@@ -86,8 +91,8 @@ public partial class PageSpeedLeft
                 LabProgress.Text = rawPercent > 0.999999d ? Lang.Number(1d, "P0") : predictText;
                 LabSpeed.Text = ModBase.GetString(ModNet.NetManager.Speed) + "/s";
                 LabFile.Text = ModNet.NetManager.FileRemain < 0 ? "0*" : Lang.Number(ModNet.NetManager.FileRemain, "N0");
-                LabThread.Text = Lang.Number(ModNet.NetManager.ThreadCount, "N0") + " / " +
-                                 Lang.Number(ModNet.NetTaskThreadLimit, "N0");
+                LabThread.Text = Lang.Number(ModNet.NetManager.ConnectionCount, "N0") + " / " +
+                                 Lang.Number(ModNet.NetTaskConnectionLimit, "N0");
             }
         }
 

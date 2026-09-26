@@ -1,6 +1,25 @@
 namespace PCL.Core.App;
 
 /// <summary>
+/// 联机协议偏好
+/// </summary>
+public enum LinkProtocolPreference
+{
+    Tcp,
+    Udp
+}
+
+/// <summary>
+/// 文件下载使用的 HTTP 协议模式。
+/// </summary>
+public enum DownloadHttpMode
+{
+    Auto = 0,
+    Http11 = 1,
+    Http2 = 2
+}
+
+/// <summary>
 /// 主题模式（亮/暗/系统）
 /// </summary>
 public enum ColorMode
