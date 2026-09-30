@@ -3639,5 +3639,8 @@
 <sys:String x:Key="Setup.GameManage.Download.HttpProtocol.Http11.ToolTip">Force HTTP/1.1 for all file downloads. This can help environments where independent connections improve large-file throughput.</sys:String>
 <sys:String x:Key="Setup.GameManage.Download.HttpProtocol.Http2">Prefer HTTP/2</sys:String>
 <sys:String x:Key="Setup.GameManage.Download.HttpProtocol.Http2.ToolTip">Prefer HTTP/2 for all file downloads, falling back to HTTP/1.1 when the source or proxy does not support it.</sys:String>
+<sys:String x:Key="Launch.Skin.Cape.Name.Aurora">Aurora</sys:String>
+<sys:String x:Key="Launch.Skin.Cape.Name.Hero">Hero</sys:String>
+<sys:String x:Key="Launch.Skin.Cape.Name.Twisted">Twisted</sys:String>
 
 </ResourceDictionary>

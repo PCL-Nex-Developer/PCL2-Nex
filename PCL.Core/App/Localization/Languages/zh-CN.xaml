@@ -3639,5 +3639,8 @@
 <sys:String x:Key="Setup.GameManage.Download.HttpProtocol.Http11.ToolTip">所有文件下载强制使用 HTTP/1.1。适合需要多条独立连接提升大文件速度的网络环境。</sys:String>
 <sys:String x:Key="Setup.GameManage.Download.HttpProtocol.Http2">优先使用 HTTP/2</sys:String>
 <sys:String x:Key="Setup.GameManage.Download.HttpProtocol.Http2.ToolTip">所有文件下载优先使用 HTTP/2；如果下载源或代理不支持，会自动回退到 HTTP/1.1。</sys:String>
+<sys:String x:Key="Launch.Skin.Cape.Name.Aurora">极光披风</sys:String>
+<sys:String x:Key="Launch.Skin.Cape.Name.Hero">英雄披风</sys:String>
+<sys:String x:Key="Launch.Skin.Cape.Name.Twisted">扭曲披风</sys:String>
 
 </ResourceDictionary>
