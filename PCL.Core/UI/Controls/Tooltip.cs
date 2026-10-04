@@ -594,7 +594,7 @@ public static class Tooltip
         // Fixed ToolTipService placements are still available through Tooltip.FollowCursor="False".
         if (GetFollowCursor(target))
         {
-            _flyout.Placement = PlacementMode.Relative;
+            _flyout.Placement = PlacementMode.Left;
             _flyout.PlacementRectangle = default;
             _flyout.HorizontalOffset = Math.Round(pt.X + CursorOffsetX + ToolTipService.GetHorizontalOffset(target));
             _flyout.VerticalOffset = Math.Round(pt.Y + CursorOffsetY + ToolTipService.GetVerticalOffset(target));
