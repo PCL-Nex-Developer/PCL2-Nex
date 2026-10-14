@@ -5,8 +5,6 @@ using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using System.Windows;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
@@ -19,6 +17,7 @@ using PCL.Core.Utils.OS;
 using PCL.Core.Utils.Secret;
 using PCL.Network;
 using PCL.Core.IO.Net.Http;
+using PCL.Core.Minecraft.IdentityModel;
 using PCL.Core.Minecraft.IdentityModel.Yggdrasil;
 using System.Globalization;
 
@@ -1994,11 +1993,54 @@ public static class ModLaunch
             maxVer = new Version(999, 999, 999, 999);
         }
 
+        // compatibleJavaMajors 声明的兼容主版本集合（选择 Java 时按成员资格判断，而非连续区间）
+        IReadOnlySet<int> compatibleJavaMajorsSet = null;
+        // JSON 中要求的兼容 Java 主版本（例如 MultiMC 整合包的 compatibleJavaMajors）
+        if (ModInstanceList.McMcInstanceSelected.JsonObject["compatibleJavaMajors"] is JsonArray compatibleMajors &&
+            compatibleMajors.Count > 0)
+        {
+            var majors = compatibleMajors
+                // Val 无法解析 JsonNode（会返回 0），必须先转为字符串
+                .Select(major => (int)Math.Round(ModBase.Val(major?.ToString())))
+                .Where(major => major > 0)
+                .Distinct()
+                .OrderBy(major => major)
+                .ToList();
+            if (majors.Count > 0)
+            {
+                static Version ToCompatibleVersion(int major, bool isMax) => major <= 8
+                    ? new Version(1, major, isMax ? 999 : 0, isMax ? 999 : 0)
+                    : new Version(major, isMax ? 999 : 0, isMax ? 999 : 0, isMax ? 999 : 0);
+                var compatibleMinVer = ToCompatibleVersion(majors.Min(), false);
+                var compatibleMaxVer = ToCompatibleVersion(majors.Max(), true);
+                if (ModBase.modeDebug)
+                    ModBase.Log("[Launch] [Debug] JSON 中要求的兼容 Java 主版本：" + string.Join(", ", majors));
+                // compatibleJavaMajors 具有最高优先级
+                // 先与其他规则取交集；若无交集（例如旧版本的 Java 8 上限规则），则直接采用 compatibleJavaMajors 声明的范围
+                var intersectMin = compatibleMinVer > minVer ? compatibleMinVer : minVer;
+                var intersectMax = compatibleMaxVer < maxVer ? compatibleMaxVer : maxVer;
+                if (intersectMax < intersectMin)
+                {
+                    intersectMin = compatibleMinVer;
+                    intersectMax = compatibleMaxVer;
+                }
+
+                minVer = intersectMin;
+                maxVer = intersectMax;
+                // 记录原始集合：自动选择时按成员资格过滤，避免接受集合未声明的主版本（例如 [8, 17] 不接受 9 - 16）
+                compatibleJavaMajorsSet = majors.ToHashSet();
+            }
+        }
+
         lock (ModJava.javaLock)
         {
             // 选择 Java
-            McLaunchLog("Java 版本需求：最低 " + minVer + "，最高 " + maxVer);
-            mcLaunchJavaSelected = ModJava.JavaSelect("$$", minVer, maxVer, ModInstanceList.McMcInstanceSelected);
+            McLaunchLog("Java 版本需求：最低 " + minVer + "，最高 " + maxVer +
+                        (compatibleJavaMajorsSet is null
+                            ? ""
+                            : "，兼容主版本：" + string.Join(", ", compatibleJavaMajorsSet.OrderBy(major => major))));
+            mcLaunchJavaSelected = ModJava.JavaSelect("$$", minVer, maxVer, ModInstanceList.McMcInstanceSelected,
+                false, compatibleJavaMajorsSet);
             if (task.IsAborted)
                 return;
             if (mcLaunchJavaSelected is not null)
@@ -2014,7 +2056,25 @@ public static class ModLaunch
             string javaCode;
             var normalizedMinVer = JavaManager.NormalizeVersion(minVer);
             var normalizedMaxVer = JavaManager.NormalizeVersion(maxVer);
-            if (normalizedMinVer.Major >= 9)
+            // compatibleJavaMajors 声明的主版本优先于连续区间，用于挑选自动下载的 Java 版本
+            var compatibleDownloadMajor = compatibleJavaMajorsSet?
+                .Where(major =>
+                {
+                    var majorMinVer = major <= 8
+                        ? new Version(1, major, 0, 0)
+                        : new Version(major, 0, 0, 0);
+                    var majorMaxVer = major <= 8
+                        ? new Version(1, major, 999, 999)
+                        : new Version(major, 999, 999, 999);
+                    return majorMaxVer >= minVer && majorMinVer <= maxVer;
+                })
+                .OrderBy(major => major)
+                .FirstOrDefault();
+            if (compatibleDownloadMajor > 0)
+            {
+                javaCode = compatibleDownloadMajor.Value.ToString();
+            }
+            else if (normalizedMinVer.Major >= 9)
             {
                 javaCode = normalizedMinVer.Major.ToString();
             }
@@ -2071,7 +2131,8 @@ public static class ModLaunch
             }
 
             // 检查下载结果
-            mcLaunchJavaSelected = ModJava.JavaSelect("$$", minVer, maxVer, ModInstanceList.McMcInstanceSelected);
+            mcLaunchJavaSelected = ModJava.JavaSelect("$$", minVer, maxVer, ModInstanceList.McMcInstanceSelected,
+                false, compatibleJavaMajorsSet);
             if (task.IsAborted)
                 return;
             if (mcLaunchJavaSelected is not null)
