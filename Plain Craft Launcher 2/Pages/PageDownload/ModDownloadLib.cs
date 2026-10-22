@@ -3704,16 +3704,15 @@ public static class ModDownloadLib
     {
         try
         {
+            // 仅在下载失败或取消时清理，其他状态直接返回，避免无谓的 1s 等待
+            var state = ((ModLoader.LoaderBase)loader).State;
+            if (state != ModBase.LoadState.Failed && state != ModBase.LoadState.Aborted) return;
             Thread.Sleep(1000); // 防止存在尚未完全释放的文件，导致清理失败（例如整合包安装）
-            if (((ModLoader.LoaderBase)loader).State == ModBase.LoadState.Failed ||
-                ((ModLoader.LoaderBase)loader).State == ModBase.LoadState.Aborted)
-            {
-                // 删除实例文件夹
-                ModBase.Log($"[Download] 由于下载失败或取消，清理实例文件夹：{((ModLoader.LoaderCombo)loader).input}", ModBase.LogLevel.Developer);
-                var instancePath = (string)((ModLoader.LoaderCombo)loader).input;
-                    ((DynamicCacheConfigStorage)ConfigService.GetProvider(ConfigSource.GameInstance)).InvalidateCache(instancePath);
-                    ModBase.DeleteDirectory(instancePath);
-            }
+            // 删除实例文件夹
+            ModBase.Log($"[Download] 由于下载失败或取消，清理实例文件夹：{((ModLoader.LoaderCombo)loader).input}", ModBase.LogLevel.Developer);
+            var instancePath = (string)((ModLoader.LoaderCombo)loader).input;
+            ((DynamicCacheConfigStorage)ConfigService.GetProvider(ConfigSource.GameInstance)).InvalidateCache(instancePath);
+            ModBase.DeleteDirectory(instancePath);
         }
         catch (Exception ex)
         {
