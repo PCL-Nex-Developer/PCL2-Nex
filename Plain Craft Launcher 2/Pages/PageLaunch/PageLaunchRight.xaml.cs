@@ -1,5 +1,6 @@
 using System.IO;
 using System.Globalization;
+using System.Net;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
@@ -247,6 +248,9 @@ public partial class PageLaunchRight : IRefreshable
     private string LoadFromNetwork(string url)
     {
         if (string.IsNullOrWhiteSpace(url)) return "";
+
+        // 替换自定义变量与设置（必须在缓存判定之前，否则含有替换标记的地址永远无法命中缓存）
+        url = ModMain.ArgumentReplace(url, WebUtility.HtmlEncode);
 
         var cachePath = Path.Combine(ModBase.pathTemp, "Cache", "Custom.xaml");
         var cachedUrl = (string)States.UI.SavedHomepageUrl;
