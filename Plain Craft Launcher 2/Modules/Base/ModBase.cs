@@ -2909,30 +2909,28 @@ public static class ModBase
     /// <summary>
     ///     设置剪贴板。将在另一线程运行，且不会抛出异常。
     /// </summary>
-    public static void ClipboardSet(string text, bool showSuccessHint = true)
+    /// <param name="text">要复制的文本</param>
+    /// <param name="showSuccessHint">是否显示复制成功的提示</param>
+    /// <param name="successHint">复制成功的提示文案。为空时使用默认文案“已成功复制！”</param>
+    public static void ClipboardSet(string text, bool showSuccessHint = true, string successHint = "")
     {
         RunInThread(() =>
-        {
-            var success = false;
-
-            for (var attempt = 0; attempt <= 5; attempt++)
+            RunInUi(() =>
+            {
                 try
                 {
-                    RunInUiWait(() => Clipboard.SetText(text));
-                    success = true;
-                    break;
+                    // 先清空再写入，避免部分程序读取到残留内容
+                    Clipboard.Clear();
+                    if (!string.IsNullOrEmpty(text)) Clipboard.SetText(text);
+                    if (showSuccessHint)
+                        HintService.Hint(string.IsNullOrEmpty(successHint) ? "已成功复制！" : successHint, HintType.Success);
                 }
-                catch (Exception ex) when (attempt < 5)
+                catch (Exception ex)
                 {
-                    Thread.Sleep(20);
+                    Log(ex, "剪贴板被占用，文本复制失败", LogLevel.Developer);
+                    HintService.Hint("复制失败，可能由于剪贴板被其他程序占用！", HintType.Error);
                 }
-                catch (Exception finalEx)
-                {
-                    Log(finalEx, "剪贴板被占用，文本复制失败", LogLevel.Hint);
-                }
-
-            if (success && showSuccessHint) RunInUi(() => HintService.Hint("已成功复制！", HintType.Success));
-        });
+            }));
     }
 
     /// <summary>
