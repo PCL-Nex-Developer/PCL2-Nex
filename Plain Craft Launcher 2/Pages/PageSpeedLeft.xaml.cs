@@ -163,8 +163,7 @@ public partial class PageSpeedLeft
                             Grid.SetRow(copy, 0);
                             copy.Click += (_, _) =>
                             {
-                                ModBase.ClipboardSet(errorText, false);
-                                HintService.Hint(Lang.Text("Speed.Error.Copied"), HintType.Success);
+                                ModBase.ClipboardSet(errorText, true, Lang.Text("Speed.Error.Copied"));
                             };
                             card.Children.Add(copy);
 

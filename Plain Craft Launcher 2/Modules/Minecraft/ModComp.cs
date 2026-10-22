@@ -2542,6 +2542,9 @@ public static class ModComp
             var curseForgeUrl = request.GetCurseForgeAddress();
             var modrinthUrl = request.GetModrinthAddress();
             if (isOldForgeRequest) request.modLoader = CompLoaderType.Forge;
+            // 记录用于 Modrinth 结果筛选的条件（老版本 Forge 请求不使用加载器筛选）
+            var modrinthFilterLoader = isOldForgeRequest ? CompLoaderType.Any : request.modLoader;
+            var modrinthFilterVersion = request.gameVersion;
 
             var tasks = new List<Task>();
 
@@ -2580,6 +2583,8 @@ public static class ModComp
                         LogWrapper.Info("[Comp] 开始从 Modrinth 获取列表：" + modrinthUrl);
                         var json = ModDownload.DlModRequest<JsonObject>(modrinthUrl);
                         var projects = json["hits"].AsArray().Select(j => new CompProject((JsonObject)j)).ToList();
+                        // 校验工程是否同时满足加载器与版本要求
+                        projects = FilterModrinthProjectsByFacets(projects, modrinthFilterLoader, modrinthFilterVersion);
                         lock (resultsLock)
                         {
                             rawResults.AddRange(projects);
@@ -2694,6 +2699,50 @@ public static class ModComp
 
         #endregion
     }
+
+    #region Modrinth 结果筛选
+
+    /// <summary>
+    ///     使用 Modrinth 的 facets 查询校验工程是否同时满足加载器与版本要求。
+    ///     Modrinth 工程信息中的加载器与版本是所有版本的总和，直接使用会产生“分别匹配、实际上却没有对应版本”的错误结果。
+    /// </summary>
+    /// <param name="projects">待筛选的工程列表</param>
+    /// <param name="modLoader">要求的加载器，CompLoaderType.Any 代表不限制</param>
+    /// <param name="gameVersion">要求的游戏版本，为空代表不限制</param>
+    /// <returns>同时满足要求的工程列表</returns>
+    private static List<CompProject> FilterModrinthProjectsByFacets(List<CompProject> projects, CompLoaderType modLoader, string gameVersion)
+    {
+        if (!projects.Any()) return projects;
+        // 构造 facets：加载器与版本各占一组，不同组之间为同时满足
+        var facets = new List<string>();
+        if (modLoader != CompLoaderType.Any)
+            facets.Add($"[\"categories:'{ModBase.GetStringFromEnum(modLoader).ToLower()}'\"]");
+        if (!string.IsNullOrEmpty(gameVersion))
+            facets.Add($"[\"versions:'{gameVersion}'\"]");
+        if (!facets.Any()) return projects;
+        // project_id 最多 100 个
+        var ids = projects.Select(p => p.Id).Where(id => !string.IsNullOrEmpty(id)).Distinct().Take(100).ToList();
+        if (!ids.Any()) return projects;
+        facets.Add($"[\"project_id:{string.Join("\",\"project_id:", ids)}\"]");
+        var address =
+            $"https://api.modrinth.com/v2/search?limit={Math.Min(projects.Count, 100)}&facets=[" + string.Join(",", facets) + "]";
+        try
+        {
+            LogWrapper.Info("[Comp] 开始从 Modrinth 获取筛选：" + address);
+            var json = ModDownload.DlModRequest<JsonObject>(address);
+            var matchedIds = json["hits"].AsArray().Select(j => j["project_id"]?.ToString() ?? "").ToHashSet();
+            var result = projects.Where(p => matchedIds.Contains(p.Id)).ToList();
+            LogWrapper.Info($"[Comp] Modrinth 筛选后保留 {result.Count} 个工程（原有 {projects.Count} 个）");
+            return result;
+        }
+        catch (Exception ex)
+        {
+            LogWrapper.Error(ex, "Modrinth 筛选获取失败，将保留原有结果");
+            return projects;
+        }
+    }
+
+    #endregion
 
     #endregion
 
