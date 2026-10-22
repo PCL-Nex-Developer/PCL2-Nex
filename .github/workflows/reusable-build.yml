@@ -117,6 +117,9 @@ jobs:
           PCL_GITHUB_SHA: ${{ github.sha }}
         run: |
           set +x
+          # 关闭 rpm 的 debuginfo 子包：此前 eu-strip 缺失导致 %install 失败（补装 elfutils 后，
+          # debuginfo 包又会与主包归一到同一个发布文件名，脚本按多包冲突中止）
+          printf '%s\n' '%_enable_debug_packages 0' '%debug_package %{nil}' > "$HOME/.rpmmacros"
           script_path="$(mktemp)"
           error_path="$(mktemp)"
           trap 'rm -f "$script_path" "$error_path"' EXIT
