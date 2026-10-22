@@ -87,7 +87,7 @@ jobs:
 
       - name: Install packaging tools (rpm)
         if: matrix.platform == 'linux'
-        run: sudo apt-get update && sudo apt-get install -y rpm
+        run: sudo apt-get update && sudo apt-get install -y rpm elfutils
 
       - name: Build Windows
         if: matrix.kind == 'windows'
