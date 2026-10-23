@@ -297,7 +297,7 @@ public partial class PageInstanceLeft : IRefreshable
     {
         if (pageID == id)
             return;
-        ModAnimation.AniControlEnabled += 1;
+        ModAnimation.AniBeginControl();
         try
         {
             PageChangeRun((MyPageRight)PageGet(id));
@@ -309,7 +309,7 @@ public partial class PageInstanceLeft : IRefreshable
         }
         finally
         {
-            ModAnimation.AniControlEnabled -= 1;
+            ModAnimation.AniEndControl();
         }
     }
 

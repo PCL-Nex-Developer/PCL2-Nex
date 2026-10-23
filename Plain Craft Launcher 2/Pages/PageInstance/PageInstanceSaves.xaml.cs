@@ -139,10 +139,10 @@ public partial class PageInstanceSaves : IRefreshable
     /// </summary>
     public void Reload()
     {
-        ModAnimation.AniControlEnabled += 1;
+        ModAnimation.AniBeginControl();
         PanBack.ScrollToHome();
         LoadFileList();
-        ModAnimation.AniControlEnabled -= 1;
+        ModAnimation.AniEndControl();
     }
 
     private void RefreshUI()
@@ -179,7 +179,7 @@ public partial class PageInstanceSaves : IRefreshable
                     showingSaves.Sort((a, b) => sortMethod(a, b));
                 }
 
-                ModAnimation.AniControlEnabled += 1;
+                ModAnimation.AniBeginControl();
                 PanList.Children.Clear();
 
                 foreach (var curFolder in showingSaves)
@@ -300,7 +300,7 @@ public partial class PageInstanceSaves : IRefreshable
                     PanList.Children.Add(worldItem);
                 }
 
-                ModAnimation.AniControlEnabled -= 1;
+                ModAnimation.AniEndControl();
             }
         }
         catch (Exception ex)

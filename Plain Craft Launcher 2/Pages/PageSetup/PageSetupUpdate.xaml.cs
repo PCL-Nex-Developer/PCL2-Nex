@@ -20,13 +20,13 @@ public partial class PageSetupUpdate
 
     private void Init()
     {
-        ModAnimation.AniControlEnabled += 1;
+        ModAnimation.AniBeginControl();
 
         ComboSystemUpdateChannel.SelectedIndex = (int)Config.Update.UpdateChannel;
         ComboSystemUpdateMode.SelectedIndex = (int)Config.Update.UpdateMode;
 
         TextCurrentVersion.Text = Lang.Text("Update.VersionPrefix", Basics.BaseVersion);
-        ModAnimation.AniControlEnabled -= 1;
+        ModAnimation.AniEndControl();
         if (!UpdateManager.IsUpdateEnabled)
         {
             // 当前构建不支持自动更新：禁用相关选项，仅展示版本号
@@ -167,13 +167,13 @@ public partial class PageSetupUpdate
 
     private void ComboSystemUpdateMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (ModAnimation.AniControlEnabled == 0)
+        if (!ModAnimation.AniExitsAnyControl())
             Config.Update.UpdateMode = (LauncherAutoUpdateBehavior)ComboSystemUpdateMode.SelectedIndex;
     }
 
     private void ComboSystemUpdateBranch_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (ModAnimation.AniControlEnabled != 0)
+        if (ModAnimation.AniExitsAnyControl())
             return;
 
         var isCancelled = false;
@@ -227,10 +227,10 @@ public partial class PageSetupUpdate
 
         if (isCancelled)
         {
-            ModAnimation.AniControlEnabled += 1;
+            ModAnimation.AniBeginControl();
             if (e.RemovedItems.Count > 0)
                 ComboSystemUpdateChannel.SelectedItem = e.RemovedItems[0];
-            ModAnimation.AniControlEnabled -= 1;
+            ModAnimation.AniEndControl();
         }
         else
         {

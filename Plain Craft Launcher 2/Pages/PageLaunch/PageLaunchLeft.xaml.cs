@@ -71,7 +71,7 @@ public partial class PageLaunchLeft
         if (isLoad)
             return;
         isLoad = true;
-        ModAnimation.AniControlEnabled += 1;
+        ModAnimation.AniBeginControl();
 
         // 开始按钮
         ModInstanceList.mcInstanceListLoader.LoadingStateChanged += (_, _) => RefreshButtonsUI();
@@ -190,7 +190,7 @@ public partial class PageLaunchLeft
         // 改变页面
         RefreshPage(false);
 
-        ModAnimation.AniControlEnabled -= 1;
+        ModAnimation.AniEndControl();
     }
 
     // 实例选择按钮
@@ -741,10 +741,10 @@ public partial class PageLaunchLeft
                     ModAnimation.AaOpacity(PanLogin, -PanLogin.Opacity, 100, ease: new ModAnimation.AniEaseOutFluent()),
                     ModAnimation.AaCode(() =>
                     {
-                        ModAnimation.AniControlEnabled += 1;
+                        ModAnimation.AniBeginControl();
                         PanLogin.Children.Clear();
                         PanLogin.Children.Add((UIElement)pageNew);
-                        ModAnimation.AniControlEnabled -= 1;
+                        ModAnimation.AniEndControl();
                     }, 100),
                     ModAnimation.AaOpacity(PanLogin, 1d, 100, 120, new ModAnimation.AniEaseInFluent())
                 }, "FrmLogin PageChange"), DispatcherPriority.Render);
@@ -752,10 +752,10 @@ public partial class PageLaunchLeft
             else
             {
                 // 无动画
-                ModAnimation.AniControlEnabled += 1;
+                ModAnimation.AniBeginControl();
                 PanLogin.Children.Clear();
                 PanLogin.Children.Add((UIElement)pageNew);
-                ModAnimation.AniControlEnabled -= 1;
+                ModAnimation.AniEndControl();
             }
 
             #endregion

@@ -78,9 +78,9 @@ public partial class PageInstanceSetup
         ramTimer.Start();
 
         // 由于各个实例不同，每次都需要重新加载
-        ModAnimation.AniControlEnabled += 1;
+        ModAnimation.AniBeginControl();
         Reload();
-        ModAnimation.AniControlEnabled -= 1;
+        ModAnimation.AniEndControl();
 
         // 非重复加载部分
         if (isLoaded)
@@ -185,7 +185,7 @@ public partial class PageInstanceSetup
 
     private void RadioBoxChange(object o, ModBase.RouteEventArgs routeEventArgs)
     {
-        if (ModAnimation.AniControlEnabled != 0)
+        if (ModAnimation.AniExitsAnyControl())
             return;
         if (o is not MyRadioBox { Tag: string tag }) return;
 
@@ -197,7 +197,7 @@ public partial class PageInstanceSetup
 
     private void TextBoxChange(object o, TextChangedEventArgs textChangedEventArgs)
     {
-        if (ModAnimation.AniControlEnabled != 0)
+        if (ModAnimation.AniExitsAnyControl())
             return;
         if (o is not MyTextBox textBox) return;
 
@@ -206,7 +206,7 @@ public partial class PageInstanceSetup
 
     private void SliderChange(object o, bool user)
     {
-        if (ModAnimation.AniControlEnabled != 0)
+        if (ModAnimation.AniExitsAnyControl())
             return;
         if (o is not MySlider slider) return;
 
@@ -215,7 +215,7 @@ public partial class PageInstanceSetup
 
     private void ComboChange(MyComboBox sender, object e)
     {
-        if (ModAnimation.AniControlEnabled != 0)
+        if (ModAnimation.AniExitsAnyControl())
             return;
 
         SetByTag(sender.Tag?.ToString(), sender.SelectedIndex);
@@ -223,7 +223,7 @@ public partial class PageInstanceSetup
 
     private void CheckBoxChange(object sender, bool user)
     {
-        if (ModAnimation.AniControlEnabled != 0)
+        if (ModAnimation.AniExitsAnyControl())
             return;
         if (sender is not MyCheckBox checkBox) return;
 
@@ -398,7 +398,7 @@ public partial class PageInstanceSetup
             right = 1;
         if (right == 0)
         {
-            if (ModAnimation.AniControlEnabled == 0 &&
+            if (!ModAnimation.AniExitsAnyControl() &&
                 (ramTextRight != right || ModAnimation.AniIsRun("VersionSetup Ram TextRight")))
             {
                 // 需要动画
@@ -418,7 +418,7 @@ public partial class PageInstanceSetup
                 LabRamGameTitle.Margin = new Thickness(totalWidth - labGameTitleWidth, 0d, 0d, 5d);
             }
         }
-        else if (ModAnimation.AniControlEnabled == 0 &&
+        else if (!ModAnimation.AniExitsAnyControl() &&
                  (ramTextRight != right || ModAnimation.AniIsRun("VersionSetup Ram TextRight")))
         {
             // 需要动画
@@ -575,7 +575,7 @@ public partial class PageInstanceSetup
 
     private void ComboServerLogin_Changed(object sender, SelectionChangedEventArgs e)
     {
-        if (ModAnimation.AniControlEnabled != 0)
+        if (ModAnimation.AniExitsAnyControl())
             return;
         ServerLogin(ComboServerLoginRequire.SelectedIndex);
         if (TextServerAuthServer.IsValidated)
@@ -900,7 +900,7 @@ public partial class PageInstanceSetup
     // 下拉框选择更改处理（保存新格式配置）
     private void JavaSelectionUpdate(object sender, SelectionChangedEventArgs e)
     {
-        if (ModAnimation.AniControlEnabled != 0)
+        if (ModAnimation.AniExitsAnyControl())
             return;
         if (ComboArgumentJava.SelectedItem is null)
             return;
@@ -971,7 +971,7 @@ public partial class PageInstanceSetup
 
     private void ComboArgumentIndieV2_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (ModAnimation.AniControlEnabled != 0)
+        if (ModAnimation.AniExitsAnyControl())
             return;
         if (isReverting)
             return;
@@ -1016,7 +1016,7 @@ public partial class PageInstanceSetup
 
     private void ComboAdvanceRenderer_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (ModAnimation.AniControlEnabled != 0)
+        if (ModAnimation.AniExitsAnyControl())
             return;
 
         var args = e; // 转换事件参数
@@ -1044,7 +1044,7 @@ public partial class PageInstanceSetup
 
     private void CheckUseDebugLog4j2Config_CheckChanged(object sender, bool e)
     {
-        if (ModAnimation.AniControlEnabled != 0)
+        if (ModAnimation.AniExitsAnyControl())
             return;
         var checkBox = sender as MyCheckBox;
         if (checkBox is null) return;

@@ -225,11 +225,11 @@ public partial class PageInstanceCompResource : IRefreshable
 
         if (ModMain.frmMain.pageLast.page != FormMain.PageType.CompDetail)
             PanBack.ScrollToHome();
-        ModAnimation.AniControlEnabled += 1;
+        ModAnimation.AniBeginControl();
         selectedMods.Clear();
         ReloadCompFileList();
         ChangeAllSelected(false);
-        ModAnimation.AniControlEnabled -= 1;
+        ModAnimation.AniEndControl();
 
         // 非重复加载部分
         if (isLoad)
@@ -570,7 +570,7 @@ public partial class PageInstanceCompResource : IRefreshable
     {
         try
         {
-            ModAnimation.AniControlEnabled += 1;
+            ModAnimation.AniBeginControl();
             var newItem = new MyLocalCompItem
             {
                 SnapsToDevicePixels = true,
@@ -583,12 +583,12 @@ public partial class PageInstanceCompResource : IRefreshable
             entry.OnCompUpdate += _ => newItem.Refresh();
             // AddHandler Entry.OnCompUpdate, Sub() RunInUi(Sub() DoSort())
             newItem.Refresh();
-            ModAnimation.AniControlEnabled -= 1;
+            ModAnimation.AniEndControl();
             return newItem;
         }
         catch (Exception ex)
         {
-            ModAnimation.AniControlEnabled -= 1;
+            ModAnimation.AniEndControl();
             ModBase.Log(ex, $"创建 UI 项失败：{entry.RawPath}");
             throw;
         }
@@ -690,7 +690,7 @@ public partial class PageInstanceCompResource : IRefreshable
         }
 
         // 重新列出列表
-        ModAnimation.AniControlEnabled += 1;
+        ModAnimation.AniBeginControl();
         if (showingMods.Any())
         {
             PanList.Visibility = Visibility.Visible;
@@ -717,7 +717,7 @@ public partial class PageInstanceCompResource : IRefreshable
             PanList.Visibility = Visibility.Collapsed;
         }
 
-        ModAnimation.AniControlEnabled -= 1;
+        ModAnimation.AniEndControl();
         selectedMods =
             new HashSet<string>(selectedMods.Where(m => showingMods.Any(s => (s.RawPath ?? "") == (m ?? ""))));
         RefreshBars();
@@ -846,7 +846,7 @@ public partial class PageInstanceCompResource : IRefreshable
             }
 
             // 更新显示状态
-            if (ModAnimation.AniControlEnabled == 0)
+            if (!ModAnimation.AniExitsAnyControl())
             {
                 PanListBack.Margin = new Thickness(0d, 0d, 0d, selected ? 95 : 15);
                 if (selected)
@@ -1443,7 +1443,7 @@ public partial class PageInstanceCompResource : IRefreshable
     // 单项切换选择状态
     public void CheckChanged(MyLocalCompItem sender, ModBase.RouteEventArgs e)
     {
-        if (ModAnimation.AniControlEnabled != 0)
+        if (ModAnimation.AniExitsAnyControl())
             return;
         // 更新选择了的内容
         var selectedKey = sender.Entry.RawPath;
@@ -1457,7 +1457,7 @@ public partial class PageInstanceCompResource : IRefreshable
     // 切换所有项的选择状态
     private void ChangeAllSelected(bool value)
     {
-        ModAnimation.AniControlEnabled += 1;
+        ModAnimation.AniBeginControl();
         selectedMods.Clear();
         foreach (var Item in modItems.Values)
         {
@@ -1468,16 +1468,15 @@ public partial class PageInstanceCompResource : IRefreshable
                 selectedMods.Add(Item.Entry.RawPath);
         }
 
-        ModAnimation.AniControlEnabled -= 1;
+        ModAnimation.AniEndControl();
         RefreshBars();
     }
 
     private void UnselectedAllWithAnimation()
     {
-        var cacheAniControlEnabled = ModAnimation.AniControlEnabled;
-        ModAnimation.AniControlEnabled = 0;
+        var cacheAniControlEnabled = ModAnimation.AniResetControl(0);
         ChangeAllSelected(false);
-        ModAnimation.AniControlEnabled += cacheAniControlEnabled;
+        ModAnimation.AniRestoreControl(cacheAniControlEnabled);
     }
 
     private void FrmMain_KeyDown(object sender, KeyEventArgs e) // 若监听自己的事件则在进入页面后需点击右侧控件才可监听到 (#4311)

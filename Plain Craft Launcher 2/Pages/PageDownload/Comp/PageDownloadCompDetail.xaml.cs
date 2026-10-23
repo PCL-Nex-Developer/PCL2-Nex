@@ -27,7 +27,7 @@ public partial class PageDownloadCompDetail
 
     private void Init()
     {
-        ModAnimation.AniControlEnabled += 1;
+        ModAnimation.AniBeginControl();
         _project = ModMain.frmMain.pageCurrent.additional.Value.CompProject;
         PanBack.ScrollToHome();
         // 重启加载器
@@ -55,7 +55,7 @@ public partial class PageDownloadCompDetail
             : Visibility.Collapsed;
         RefreshFavoriteButton();
 
-        ModAnimation.AniControlEnabled -= 1;
+        ModAnimation.AniEndControl();
     }
 
     // 整合包安装

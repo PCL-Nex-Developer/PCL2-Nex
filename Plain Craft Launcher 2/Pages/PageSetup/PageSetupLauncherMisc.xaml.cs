@@ -35,10 +35,10 @@ public partial class PageSetupLauncherMisc
             return;
         isLoaded = true;
 
-        ModAnimation.AniControlEnabled += 1;
+        ModAnimation.AniBeginControl();
         SliderLoad();
         Reload();
-        ModAnimation.AniControlEnabled -= 1;
+        ModAnimation.AniEndControl();
     }
 
     public void Reload()
@@ -93,13 +93,13 @@ public partial class PageSetupLauncherMisc
     private void ComboChange(object senderRaw, SelectionChangedEventArgs e)
     {
         var sender = (MyComboBox)senderRaw;
-        if (ModAnimation.AniControlEnabled == 0)
+        if (!ModAnimation.AniExitsAnyControl())
             SetByTag(sender.Tag?.ToString(), sender.SelectedIndex);
     }
 
     private void ComboPluginGitMirror_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!isLoaded || ModAnimation.AniControlEnabled != 0) return;
+        if (!isLoaded || ModAnimation.AniExitsAnyControl()) return;
         Config.Download.PluginGitMirror = ComboPluginGitMirror.SelectedIndex;
     }
 
@@ -143,13 +143,13 @@ public partial class PageSetupLauncherMisc
 
     private void TextPluginGitHubToken_ValidatedTextChanged(object sender, RoutedEventArgs e)
     {
-        if (!isLoaded || ModAnimation.AniControlEnabled != 0) return;
+        if (!isLoaded || ModAnimation.AniExitsAnyControl()) return;
         Config.Plugin.GitHubToken = TextPluginGitHubToken.Text.Trim();
     }
 
     private void PluginGitDomain_Change(object sender, bool user)
     {
-        if (!user || ModAnimation.AniControlEnabled != 0) return;
+        if (!user || ModAnimation.AniExitsAnyControl()) return;
         GitHubAccelerator.SetConfiguredDomains(GetGitHubDomainCheckBoxes()
             .Where(checkBox => checkBox.Checked == true)
             .Select(checkBox => checkBox.Tag?.ToString() ?? string.Empty));
@@ -173,21 +173,21 @@ public partial class PageSetupLauncherMisc
     {
         var sender = (MyRadioBox)senderRaw;
         var gotCfg = sender.Tag?.ToString()?.Split("/") ?? Array.Empty<string>();
-        if (ModAnimation.AniControlEnabled == 0 && gotCfg.Length >= 2)
+        if (!ModAnimation.AniExitsAnyControl() && gotCfg.Length >= 2)
             SetByTag(gotCfg[0], int.Parse(gotCfg[1]));
     }
 
     private void CheckBoxChange(object senderRaw, bool user)
     {
         var sender = (MyCheckBox)senderRaw;
-        if (ModAnimation.AniControlEnabled == 0)
+        if (!ModAnimation.AniExitsAnyControl())
             SetByTag(sender.Tag?.ToString(), sender.Checked);
     }
 
     private void SliderChange(object senderRaw, bool user)
     {
         var sender = (MySlider)senderRaw;
-        if (ModAnimation.AniControlEnabled == 0)
+        if (!ModAnimation.AniExitsAnyControl())
             SetByTag(sender.Tag?.ToString(), sender.Value);
     }
 
@@ -237,7 +237,7 @@ public partial class PageSetupLauncherMisc
     // 调试模式
     private void CheckDebugMode_Change(object _, bool __)
     {
-        if (ModAnimation.AniControlEnabled == 0)
+        if (!ModAnimation.AniExitsAnyControl())
             HintService.Hint(Lang.Text("Setup.Misc.Debug.Mode.Hint"), log: false);
     }
 
@@ -257,7 +257,7 @@ public partial class PageSetupLauncherMisc
     // 自动更新
     private void ComboSystemActivity_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (ModAnimation.AniControlEnabled != 0)
+        if (ModAnimation.AniExitsAnyControl())
             return;
         if (ComboSystemActivity.SelectedIndex != 2)
             return;

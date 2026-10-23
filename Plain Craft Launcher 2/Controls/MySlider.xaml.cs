@@ -62,7 +62,7 @@ public partial class MySlider
                 // 触发 Preview 事件，修改新值
                 var oldValue = _Value;
                 _Value = value;
-                if (ModAnimation.AniControlEnabled == 0)
+                if (!ModAnimation.AniExitsAnyControl())
                 {
                     var e = new ModBase.RouteEventArgs();
                     PreviewChange?.Invoke(this, e);
@@ -74,7 +74,7 @@ public partial class MySlider
                     }
                 }
 
-                if (IsLoaded && ModAnimation.AniControlEnabled == 0)
+                if (IsLoaded && !ModAnimation.AniExitsAnyControl())
                 {
                     if (ActualWidth < ShapeDot.Width)
                         return;
@@ -110,7 +110,7 @@ public partial class MySlider
                     RefreshWidth(null, null);
                 }
 
-                if (ModAnimation.AniControlEnabled == 0)
+                if (!ModAnimation.AniExitsAnyControl())
                     Change?.Invoke(this, false);
             }
 
@@ -225,7 +225,7 @@ public partial class MySlider
             }
 
             // 触发颜色动画
-            if (IsLoaded && ModAnimation.AniControlEnabled == 0) // 防止默认属性变更触发动画
+            if (IsLoaded && !ModAnimation.AniExitsAnyControl()) // 防止默认属性变更触发动画
             {
                 // 有动画
                 ModAnimation.AniStart(
