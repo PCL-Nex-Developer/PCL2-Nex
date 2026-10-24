@@ -1846,6 +1846,7 @@
 <sys:String x:Key="Instance.Setup.Advanced.IgnoreJavaCompatibility.ToolTip">If a manually selected Java is incompatible with this instance, automatically skip the compatibility warning popup and force the use of the manually selected Java.</sys:String>
 <sys:String x:Key="Instance.Setup.Advanced.DisableFileVerification">Disable file verification</sys:String>
 <sys:String x:Key="Instance.Setup.Advanced.DisableFileVerification.ToolTip">Do not modify Assets at all; do not verify Libraries, third-party login libraries, or the instance main Jar file for modifications.&#xA;Do not enable this unless you have modified related files.</sys:String>
+    <sys:String x:Key="Instance.Setup.Advanced.DisableModUpdate">Disable mod update</sys:String>
 <sys:String x:Key="Instance.Setup.Advanced.UseGlobalProxy">Follow launcher network proxy settings</sys:String>
 <sys:String x:Key="Instance.Setup.Advanced.UseGlobalProxy.ToolTip">Use the proxy configured in [Settings - Misc - Network - HTTP Proxy] to launch the game.&#xA;Incorrect global settings will prevent login!</sys:String>
 <sys:String x:Key="Instance.Setup.Advanced.UseDebugLog4j">Use debug-level log4j configuration</sys:String>
