@@ -196,7 +196,7 @@ public partial class PageSetupJava
 
     private void BtnAdd_Click(object sender, ModBase.RouteEventArgs e)
     {
-        var ret = SystemDialogs.SelectFile(Lang.Text("Setup.Launch.Java.SelectFile.Filter"), Lang.Text("Setup.Launch.Java.SelectFile.Title"));
+        var ret = SystemDialogs.SelectFile(ModJava.GetJavaFileDialogFilter(), Lang.Text("Setup.Launch.Java.SelectFile.Title"));
         if (string.IsNullOrEmpty(ret) || !File.Exists(ret))
             return;
         if (ModJava.Javas.Exist(ret))

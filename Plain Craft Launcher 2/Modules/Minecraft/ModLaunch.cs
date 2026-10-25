@@ -2553,8 +2553,9 @@ public static class ModLaunch
         // Authlib-Injector
         if (mcLoginLoader.output.Type == "Auth")
         {
-            if (OperatingSystem.IsWindows() && mcLaunchJavaSelected.Installation.MajorVersion >= 6)
-                dataList.Add("-Djavax.net.ssl.trustStoreType=WINDOWS-ROOT"); // 信任系统根证书（Meloong-Git/#5252）；WINDOWS-ROOT 仅 Windows 存在，非 Windows 平台传了会令默认 SSLContext 构建失败（PCL-Nex#17）
+            if (mcLaunchJavaSelected.Installation.MajorVersion >= 6 &&
+                JavaPlatform.GetSystemTrustStoreTypeArgument() is { } trustStoreArgument)
+                dataList.Add(trustStoreArgument); // 信任系统根证书（Meloong-Git/#5252）；WINDOWS-ROOT 仅 Windows 存在，非 Windows 平台传了会令默认 SSLContext 构建失败（PCL-Nex#17、PCL-Nex#19）
             var server = mcLoginAuthLoader.input.BaseUrl.Replace("/authserver", "");
             try
             {
@@ -2686,8 +2687,9 @@ public static class ModLaunch
         // Authlib-Injector
         if (mcLoginLoader.output.Type == "Auth")
         {
-            if (OperatingSystem.IsWindows() && mcLaunchJavaSelected.Installation.MajorVersion >= 6)
-                dataList.Add("-Djavax.net.ssl.trustStoreType=WINDOWS-ROOT"); // 信任系统根证书（Meloong-Git/#5252）；WINDOWS-ROOT 仅 Windows 存在，非 Windows 平台传了会令默认 SSLContext 构建失败（PCL-Nex#17）
+            if (mcLaunchJavaSelected.Installation.MajorVersion >= 6 &&
+                JavaPlatform.GetSystemTrustStoreTypeArgument() is { } trustStoreArgument)
+                dataList.Add(trustStoreArgument); // 信任系统根证书（Meloong-Git/#5252）；WINDOWS-ROOT 仅 Windows 存在，非 Windows 平台传了会令默认 SSLContext 构建失败（PCL-Nex#17、PCL-Nex#19）
             var server = mcLoginAuthLoader.input.BaseUrl.Replace("/authserver", "");
             try
             {
