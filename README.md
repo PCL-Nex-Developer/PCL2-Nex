@@ -15,8 +15,9 @@
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/PCL-Nex-Developer/PCL2-Nex/total?style=for-the-badge) <br />
 
 
-[社区版下载](https://github.com/PCL-Nex-Developer/PCL2-Nex/releases/latest) |
-[上游仓库](https://github.com/Meloong-Git/PCL)
+[Nex版下载](https://github.com/PCL-Nex-Developer/PCL2-Nex/releases/latest) |
+[上游仓库](https://github.com/PCL-community/PCL-CE)
+[主线仓库](https://github.com/Meloong-Git/PCL)
 
 [提交问题](https://github.com/PCL-Nex-Developer/PCL2-Nex/issues/new/choose) |
 [插件开发指南](https://github.com/PCL-Nex-Developer/PCL2-Nex/wiki/Home)
@@ -25,9 +26,9 @@
 
 </div>
 
-PCL Nex 是基于 PCL 开源代码二次开发的社区版本，包含主线暂未制作的功能和改进。
+PCL Nex 是基于 PCL CE & PCL开源代码二次开发版本，包含主线暂未支持的功能，且提供插件扩展
 
-社区版版本号与主线并非严格对应关系，也请不要向官方仓库反馈社区版问题。
+Nex版本号与CE版及主线并非对应关系，也请不要向CE版仓库或官方仓库反馈Nex版问题。
 
 欢迎大家来用用看！
 
