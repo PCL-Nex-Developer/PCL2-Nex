@@ -930,7 +930,7 @@ public partial class PageInstanceSetup
         else if (selectedItem.Tag is UseRelativePath)
         {
             // 相对路径：需要用户选择实际文件
-            var ret = SystemDialogs.SelectFile(Lang.Text("Setup.Launch.Java.SelectFile.Filter"), Lang.Text("Setup.Launch.Java.SelectFile.Title"), Basics.ExecutableDirectory);
+            var ret = SystemDialogs.SelectFile(ModJava.GetJavaFileDialogFilter(), Lang.Text("Setup.Launch.Java.SelectFile.Title"), Basics.ExecutableDirectory);
             if (string.IsNullOrWhiteSpace(ret))
                 // 用户取消，不保存配置，保持原选择
                 return;

@@ -67,7 +67,16 @@ public class DefaultPathsScanner : IJavaScanner
         }
         else
         {
-            foreach (var root in JavaPlatform.GetPlatformSearchRoots()) AddIfNotEmpty(root);
+            foreach (var root in JavaPlatform.GetPlatformSearchRoots())
+            {
+                AddIfNotEmpty(root);
+
+                // macOS 的 JDK 以 .jdk bundle 形式安装，可执行文件位于 Contents/Home/bin，
+                // 直接搜索 bundle 根目录无法命中（PCL-Nex#18）。
+                if (OperatingSystem.IsMacOS())
+                    foreach (var home in EnumerateMacOsJdkHomes(root))
+                        roots.Add(home);
+            }
         }
 
         return roots;
@@ -78,7 +87,29 @@ public class DefaultPathsScanner : IJavaScanner
         }
     }
 
-    private static void _BfsSearch(string rootPath, ICollection<string> results)
+    /// <summary>
+    ///     展开 macOS 的 JDK bundle（<c>*.jdk/Contents/Home</c>）。
+    /// </summary>
+    internal static IEnumerable<string> EnumerateMacOsJdkHomes(string root)
+    {
+        string[] bundles;
+        try
+        {
+            if (!Directory.Exists(root)) return [];
+            bundles = Directory.GetDirectories(root);
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or DirectoryNotFoundException)
+        {
+            LogWrapper.Debug($"跳过目录 {root}: {ex.Message}");
+            return [];
+        }
+
+        return bundles
+            .Select(bundle => Path.Combine(bundle, "Contents", "Home"))
+            .Where(home => File.Exists(Path.Combine(home, "bin", JavaPlatform.ExecutableName)));
+    }
+
+    internal static void _BfsSearch(string rootPath, ICollection<string> results)
     {
         if (!Directory.Exists(rootPath)) return;
 
@@ -123,6 +154,11 @@ public class DefaultPathsScanner : IJavaScanner
         foreach (var ex in JavaConsts.ExcludeFolderNames)
             if (name.Contains(ex, StringComparison.OrdinalIgnoreCase))
                 return false;
+
+        // Mojang 运行时的平台目录（mac-os、linux 等）本身不含 Java 关键词（PCL-Nex#18）
+        foreach (var platform in JavaConsts.RuntimePlatformFolderNames)
+            if (name.Equals(platform, StringComparison.OrdinalIgnoreCase))
+                return true;
 
         foreach (var kw in JavaConsts.AllKeywords)
             if (name.Contains(kw, StringComparison.OrdinalIgnoreCase))

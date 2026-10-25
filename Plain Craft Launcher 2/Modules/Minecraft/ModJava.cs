@@ -28,6 +28,18 @@ public static class ModJava
     public static JavaManager Javas => JavaService.JavaManager;
 
     /// <summary>
+    ///     手动添加 Java 时使用的文件选择过滤器。
+    /// </summary>
+    /// <remarks>
+    ///     非 Windows 平台的 Java 可执行文件没有扩展名（<c>bin/java</c>），
+    ///     沿用 <c>java.exe</c> 过滤器会导致用户无法选中它（PCL-Nex#18）。
+    /// </remarks>
+    public static string GetJavaFileDialogFilter() =>
+        OperatingSystem.IsWindows()
+            ? Lang.Text("Setup.Launch.Java.SelectFile.Filter")
+            : "Java|*";
+
+    /// <summary>
     ///     根据要求返回最适合的 Java，若找不到则返回 Nothing。
     ///     最小与最大版本在与输入相同时也会通过。
     ///     必须在工作线程调用，且必须包括 SyncLock JavaLock。

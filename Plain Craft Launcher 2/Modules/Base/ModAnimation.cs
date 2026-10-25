@@ -35,6 +35,12 @@ public static partial class ModAnimation
     public static int aniFPS;
 
     /// <summary>
+    ///     设置页动画帧率上限滑块的最大值，代表“垂直同步”。
+    ///     达到该值时动画不再按固定 FPS 截断，而是跟随 WPF 合成帧率（即显示器刷新率）。
+    /// </summary>
+    public const int VsyncFpsLimit = 59;
+
+    /// <summary>
     ///     开始动画执行。
     /// </summary>
     public static void AniStart()
@@ -133,6 +139,10 @@ public static partial class ModAnimation
         if (aniCompositionStartTime == TimeSpan.MinValue)
             aniCompositionStartTime = renderingTime;
         aniCompositionFrameCount++;
+        var fpsLimit = Config.System.AnimationFpsLimit;
+        var followCompositionRate = fpsLimit >= VsyncFpsLimit;
+        var fpsCap = followCompositionRate ? double.PositiveInfinity : fpsLimit + 1d;
+
         if (aniCompositionFrameCount >= 20)
         {
             var sampleDuration = renderingTime - aniCompositionStartTime;
@@ -140,17 +150,19 @@ public static partial class ModAnimation
             {
                 var compositionFps = (aniCompositionFrameCount - 1) / sampleDuration.TotalSeconds;
                 var previousExpectedFps = aniCompositionFps > 0
-                    ? Math.Min(Config.System.AnimationFpsLimit + 1, aniCompositionFps)
+                    ? Math.Min(fpsCap, aniCompositionFps)
                     : 0;
                 aniCompositionFps = aniCompositionFps <= 0
                     ? compositionFps
                     : aniCompositionFps * 0.5 + compositionFps * 0.5;
-                var currentExpectedFps = Math.Min(Config.System.AnimationFpsLimit + 1, aniCompositionFps);
+                var currentExpectedFps = Math.Min(fpsCap, aniCompositionFps);
                 if (currentExpectedFps > previousExpectedFps + 2)
                     ResetFpsMeasurement(Stopwatch.GetTimestamp());
                 if (!aniCompositionRateLogged)
                 {
-                    ModBase.Log($"[Animation] WPF 垂直同步刷新率约 {compositionFps:N1} Hz，动画上限 {Config.System.AnimationFpsLimit + 1} FPS");
+                    ModBase.Log(followCompositionRate
+                        ? $"[Animation] WPF 垂直同步刷新率约 {compositionFps:N1} Hz，动画跟随垂直同步"
+                        : $"[Animation] WPF 垂直同步刷新率约 {compositionFps:N1} Hz，动画上限 {fpsLimit + 1} FPS");
                     aniCompositionRateLogged = true;
                 }
                 aniCompositionStartTime = renderingTime;
@@ -158,7 +170,8 @@ public static partial class ModAnimation
             }
         }
 
-        var configuredFps = Config.System.AnimationFpsLimit + 1;
+        // “垂直同步”档位下不做固定 FPS 截断，每个合成帧都更新动画，以匹配显示器刷新率
+        var configuredFps = followCompositionRate ? 0 : fpsLimit + 1;
         if (configuredFps != aniConfiguredFps || aniRenderingStartTime == TimeSpan.MinValue)
         {
             if (aniConfiguredFps > 0 && configuredFps > aniConfiguredFps)
@@ -168,12 +181,15 @@ public static partial class ModAnimation
             aniLastRenderingFrame = -1;
         }
 
-        var elapsedTicks = renderingTime.Ticks - aniRenderingStartTime.Ticks;
-        var frame = (elapsedTicks + TimeSpan.TicksPerMillisecond / 2) * configuredFps /
-                    TimeSpan.TicksPerSecond;
-        if (frame <= aniLastRenderingFrame)
-            return;
-        aniLastRenderingFrame = frame;
+        if (!followCompositionRate)
+        {
+            var elapsedTicks = renderingTime.Ticks - aniRenderingStartTime.Ticks;
+            var frame = (elapsedTicks + TimeSpan.TicksPerMillisecond / 2) * configuredFps /
+                        TimeSpan.TicksPerSecond;
+            if (frame <= aniLastRenderingFrame)
+                return;
+            aniLastRenderingFrame = frame;
+        }
 
         var now = Stopwatch.GetTimestamp();
         var deltaTime = Stopwatch.GetElapsedTime(aniLastFrameStamp, now).TotalMilliseconds;
@@ -195,7 +211,7 @@ public static partial class ModAnimation
             aniFPSWindowStamp = now;
         }
 
-        var expectedFps = aniCompositionFps > 0 ? Math.Min(configuredFps, aniCompositionFps) : 0;
+        var expectedFps = aniCompositionFps > 0 ? Math.Min(fpsCap, aniCompositionFps) : 0;
         if (RandomUtils.NextInt(0, 64 * (ModBase.modeDebug ? 5 : 30)) == 0 &&
             ((expectedFps > 0 && aniFPS < expectedFps - 2 && aniFPS > 0) ||
              aniCount > 4 || ModNet.NetManager.FileRemain != 0))
