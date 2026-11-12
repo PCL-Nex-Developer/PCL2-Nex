@@ -267,6 +267,7 @@ public static class UriActionService
 
                 await PluginInstallService.InstallFromDirectoryAsync(prepared.PluginRoot, manifest, prepared.SourceType,
                     prepared.SourceUrl, installedSha256: prepared.VerifiedSha256);
+                ModBase.RunInUi(() => ModMain.frmMain?.RefreshRestartButton(true));
                 ModBase.RunInUi(() => ModMain.MyMsgBox(Lang.Text("UriAction.Success.PluginInstalled", manifest.Name), Lang.Text("UriAction.Title.InstallComplete")));
             }
         }

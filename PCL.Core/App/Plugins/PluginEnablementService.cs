@@ -154,8 +154,13 @@ public static class PluginEnablementService
         return true;
     }
 
+    private static volatile bool _installRestartRequired;
+
+    public static void MarkInstallRestartRequired() => _installRestartRequired = true;
+
     public static bool HasPendingRestartChanges()
     {
+        if (_installRestartRequired) return true;
         var states = NormalizeEnabledStates(ReadEnabledStates()).ToArray();
         return states.Length != SessionEnabledBaseline.Length ||
                states.Where((state, index) => !string.Equals(state, SessionEnabledBaseline[index], StringComparison.OrdinalIgnoreCase)).Any();
