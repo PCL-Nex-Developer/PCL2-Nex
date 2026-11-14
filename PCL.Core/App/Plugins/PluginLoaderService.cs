@@ -51,8 +51,11 @@ public sealed class PluginLoaderService : GeneralService
     public static void LoadAll() => LoadAllAsync().GetAwaiter().GetResult();
 
     public static async Task LoadAllAsync(CancellationToken cancellationToken = default)
-        => await LoadAllFromDirectoryAsync(Paths.PluginInstalled, warnAboutFlatPlugins: true, cancellationToken)
+    {
+        PluginInstallService.CleanupStaleInstallDirectories();
+        await LoadAllFromDirectoryAsync(Paths.PluginInstalled, warnAboutFlatPlugins: true, cancellationToken)
             .ConfigureAwait(false);
+    }
 
     internal static async Task LoadAllFromDirectoryAsync(
         string installedDirectory,
@@ -144,6 +147,7 @@ public sealed class PluginLoaderService : GeneralService
 
         foreach (var pluginDir in Directory.GetDirectories(installedDir))
         {
+            if (Path.GetFileName(pluginDir).StartsWith(".", StringComparison.Ordinal)) continue;
             var manifestPath = Path.Combine(pluginDir, "plugin.json");
             if (!File.Exists(manifestPath)) continue;
 

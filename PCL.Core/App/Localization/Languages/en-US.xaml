@@ -2996,9 +2996,9 @@
 <sys:String x:Key="UriAction.Success.ModpackInstallComplete">URI modpack install completed</sys:String>
 <sys:String x:Key="UriAction.Error.InvalidPluginSource">URI plugin source is invalid.</sys:String>
 <sys:String x:Key="UriAction.Error.UnsupportedPluginSourceType">Unsupported URI plugin source type.</sys:String>
-<sys:String x:Key="UriAction.Warning.PluginInstallSecurity">About to install plugin ({0}):\n\nName: {1}\nSource: {2}\n\nImportant security reminder: Plugins run code inside the launcher and may read or modify local files, access the network, modify the launcher interface, or even perform malicious actions.\nOnly install from sources you fully trust.</sys:String>
+<sys:String x:Key="UriAction.Warning.PluginInstallSecurity">About to install plugin ({0}):&#x0a;&#x0a;Name: {1}&#x0a;Source: {2}&#x0a;&#x0a;Important security reminder: Plugins run code inside the launcher and may read or modify local files, access the network, modify the launcher interface, or even perform malicious actions.&#x0a;Only install from sources you fully trust.</sys:String>
 <sys:String x:Key="UriAction.Action.ConfirmInstall">Confirm Install</sys:String>
-<sys:String x:Key="UriAction.Success.PluginInstalled">Plugin {0} installed successfully!</sys:String>
+<sys:String x:Key="UriAction.Success.PluginInstalled">Plugin {0} installed successfully!&#x0a;Restart the launcher for it to take effect.</sys:String>
 <sys:String x:Key="UriAction.Title.InstallComplete">Install Complete</sys:String>
 <sys:String x:Key="UriAction.Error.PluginInstallFailed">URI plugin install failed</sys:String>
 <sys:String x:Key="UriAction.Error.PluginInstallFailedWithReason">URI plugin install failed: {0}</sys:String>

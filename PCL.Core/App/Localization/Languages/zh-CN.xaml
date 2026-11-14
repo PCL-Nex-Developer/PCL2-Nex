@@ -2996,9 +2996,9 @@
 <sys:String x:Key="UriAction.Success.ModpackInstallComplete">URI 整合包安装已完成</sys:String>
 <sys:String x:Key="UriAction.Error.InvalidPluginSource">URI 插件来源无效。</sys:String>
 <sys:String x:Key="UriAction.Error.UnsupportedPluginSourceType">不支持的 URI 插件来源类型。</sys:String>
-<sys:String x:Key="UriAction.Warning.PluginInstallSecurity">即将安装插件（{0}）：\n\n名称: {1}\n来源: {2}\n\n重大安全提醒：插件会在启动器内运行代码，可能读取或修改本地文件、访问网络、修改启动器界面，甚至执行恶意操作。\n请只安装你完全信任的来源。</sys:String>
+<sys:String x:Key="UriAction.Warning.PluginInstallSecurity">即将安装插件（{0}）：&#x0a;&#x0a;名称: {1}&#x0a;来源: {2}&#x0a;&#x0a;重大安全提醒：插件会在启动器内运行代码，可能读取或修改本地文件、访问网络、修改启动器界面，甚至执行恶意操作。&#x0a;请只安装你完全信任的来源。</sys:String>
 <sys:String x:Key="UriAction.Action.ConfirmInstall">确认安装</sys:String>
-<sys:String x:Key="UriAction.Success.PluginInstalled">插件 {0} 安装成功！</sys:String>
+<sys:String x:Key="UriAction.Success.PluginInstalled">插件 {0} 安装成功！&#x0a;请重启启动器后生效。</sys:String>
 <sys:String x:Key="UriAction.Title.InstallComplete">安装完成</sys:String>
 <sys:String x:Key="UriAction.Error.PluginInstallFailed">URI 安装插件失败</sys:String>
 <sys:String x:Key="UriAction.Error.PluginInstallFailedWithReason">URI 安装插件失败：{0}</sys:String>

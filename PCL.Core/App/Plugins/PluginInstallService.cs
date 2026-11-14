@@ -131,8 +131,19 @@ public static class PluginInstallService
             if (sourceType == PluginInstallSourceType.Manifest && !string.IsNullOrWhiteSpace(sourceUrl))
                 AddManifestSubscription(sourceUrl);
             PluginEnablementService.SetEnabled(pluginId, true);
+            PluginEnablementService.MarkInstallRestartRequired();
 
-            if (backupCreated && Directory.Exists(backupDir)) Directory.Delete(backupDir, recursive: true);
+            if (backupCreated && Directory.Exists(backupDir))
+            {
+                try
+                {
+                    Directory.Delete(backupDir, recursive: true);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // 旧插件 DLL 可能仍被当前进程加载，保留备份并在下次启动时清理。
+                }
+            }
         }
         catch
         {
@@ -387,6 +398,37 @@ public static class PluginInstallService
         if (!PluginPackageService.IsValidPluginId(id))
             throw new ArgumentException(Text("Plugins.Install.Error.InvalidPluginId", "插件 Id 无效。"), nameof(id));
         return id;
+    }
+
+    /// <summary>
+    /// 清理上次安装遗留的 .backup-* / .staging-* 目录。启动时调用，失败可忽略。
+    /// </summary>
+    public static void CleanupStaleInstallDirectories()
+    {
+        try
+        {
+            var root = PCL.Core.App.Paths.PluginInstalled;
+            if (!Directory.Exists(root)) return;
+            foreach (var dir in Directory.EnumerateDirectories(root))
+            {
+                var name = Path.GetFileName(dir);
+                if (!name.StartsWith(".", StringComparison.Ordinal)) continue;
+
+                if (name.Contains(".staging-", StringComparison.Ordinal))
+                {
+                    try { Directory.Delete(dir, recursive: true); } catch { }
+                    continue;
+                }
+
+                var backupIndex = name.LastIndexOf(".backup-", StringComparison.Ordinal);
+                if (backupIndex <= 1) continue;
+                var safeId = name[1..backupIndex];
+                // 安装目录不存在时，这个备份可能是唯一副本，不能删。
+                if (!Directory.Exists(Path.Combine(root, safeId))) continue;
+                try { Directory.Delete(dir, recursive: true); } catch { }
+            }
+        }
+        catch { }
     }
 
     private static void _CopyDirectory(string sourceDirectory, string targetDirectory)
